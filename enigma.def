@@ -1,0 +1,30 @@
+Bootstrap: docker
+
+From: continuumio/miniconda3
+
+%files
+	environment.yml
+	./python_code/load_data.py
+
+%environment
+	#PATH=/opt/conda/envs/$(head -1 environment.yml | cut -d' ' -f2)/bin:$PATH
+	export PATH=/opt/conda/bin:$PATH
+	export LC_ALL=C
+%post
+	#echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc
+	#echo "source activate $(head -1 environment.yml | cut -d' ' -f2)" > ~/.bashrc
+	. /opt/conda/bin/activate
+	conda install pip
+	pip install mne ipython 
+
+%runscript
+	./python_code/load_data.py
+	# exec "$@"
+
+%help
+	This singularity container is used to process resting state MEG data.
+	Typically the processes in the container will be run by calling the processes in the bin folder
+	Help for the processes can be found online in the NIMH MEGcore wiki >> Enigma Project or by calling the command with the -h flag
+		e.g.  enigma_meg_run -h
+		
+
