@@ -119,42 +119,6 @@ def apply_epoch_filter(label_ts=[], sfreq=None, fmin=None, fmax=None):
  
 ############################ END HELPER FUNCTIONS ############################   
 ##############################################################################
-def check_datatype(filename):
-    '''Check datatype based on the vendor naming convention'''
-    if os.path.splitext(filename)[-1] == '.ds':
-        return 'ctf'
-    elif os.path.splitext(filename)[-1] == '.fif':
-        return 'elekta'
-    elif os.path.splitext(filename)[-1] == '.4d':
-        return '4d'
-    #if os.path.splitext(filename)[-1] == '....KIT'
-    #
-    else:
-        raise ValueError('Could not detect MEG type')
-        
-def return_dataloader(datatype):
-    '''Return the dataset loader for this dataset'''
-    if datatype == 'ctf':
-        return mne.io.read_raw_ctf
-    if datatype == 'elekta':
-        return mne.io.read_raw_fif
-    if datatype == '4d':
-        return mne.io.read_raw_bti
-
-def load_data(filename, dataloader):
-    datatype = check_datatype(filename)
-    dataloader = return_dataloader(datatype)
-    raw = dataloader(filename)
-    raw.filter(10, 40)
-    raw.save('TestFile.fif')
-    
-    
-
-
-
-def check_load_dataset(filename):
-    '''Using the filename base, the data will be l
-
 
 
 def compute_rest_phase(SUBJID,DATATYPE='RestEO', RUN=None, PROJECT=None, COLUMN='PROC_CLEAN', outfolder=None):

@@ -19,7 +19,7 @@ def check_datatype(filename):
     #if os.path.splitext(filename)[-1] == '....KIT'
     #
     else:
-        raise ValueError('Could not detect MEG type')
+        raise ValueError('Could not detect datatype')
         
 def return_dataloader(datatype):
     '''Return the dataset loader for this dataset'''
@@ -35,7 +35,17 @@ def load_data(filename):
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
     raw.filter(10, 40)
-    raw.save('TestFile.fif')
+    raw.save('TestFile_meg.fif')
+    
+def chunk_data(mne_data_raw, chunk_size=2.0):
+    '''Break data into data chunks for processing'''
+
+    epochs = mne.make_fixed_length_epochs(mne_data_raw, duration=chunk_size,
+                    preload=True)
+    return epochs
+    
+    
+   
     
 if __name__=='__main__':
     import sys
