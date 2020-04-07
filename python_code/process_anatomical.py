@@ -9,54 +9,47 @@ import os
 import mne
 
 
-def proc_choice(var_name, default_val=None, **kwargs):
-    if var_name in kwargs:
-        return kwargs[var_name]
-    else:
-        return default_val
+
 
 
 class anat_info():
     '''Collect information for processing the data'''
     def __init__(self, **kwargs):
-        print(kwargs)
         self.recon1=False
         self.recon2=False
         self.recon3=False
-        self.source_setup=False
+        self.setup_source=False
         self.subjid=kwargs['subjid']
         if 'SUBJECTS_DIR' in kwargs:
             self.subjects_dir=kwargs['SUBJECTS_DIR']
         else:
             self.subjects_dir=os.environ['SUBJECTS_DIR']
+        if self.subjid not in os.listdir(self.subjects_dir):
+            raise ValueError('''{} not in {}.  If unexpected: 
+                1) check that the subject is in the SUBJECTS_DIR, or 
+                2) Set subjects_dir at the commandline'''.format(self.subjid, self.subjects_dir))
         self.fs_subj_dir=os.path.join(self.subjects_dir, self.subjid)
         self.fs_mri_contents=os.listdir(os.path.join(self.fs_subj_dir, 'mri')) 
         self.fs_surf_contents=os.listdir(os.path.join(self.fs_subj_dir, 'surf'))
         self.fs_label_contents=os.listdir(os.path.join(self.fs_subj_dir, 'label'))
 
-def process_anatomical(subjid, recon1=None, recon2=None, recon3=None, source_setup=None,
-                       do_incomplete=True, ):
-    subjects_dir=os.environ['SUBJECTS_DIR']
-    fs_subj_dir=os.path.join(subjects_dir, subjid)
-    
-    # Define contents for checking which processing steps have been completed
-    # fs_mri_contents=os.listdir(os.path.join(fs_subj_dir, 'mri'))    
-    # fs_surf_contents=os.listdir(os.path.join(fs_subj_dir, 'surf'))
-    # fs_label_contents=os.listdir(os.path.join(fs_subj_dir, 'label'))
-                                
+
+
+
+def process_anatomical(info):
     
 
-    if 'brainmask.mgz' not in fs_mri_contents:
+    if 'brainmask.mgz' not in info.fs_mri_contents:
         print('Brainmask not present: Running autorecon1')
         # !recon-all -autorecon1
-    if ('lh.pial' not in fs_surf_contents) | ('rh.pial' not in fs_surf_contents):
+    if ('lh.pial' not in info.fs_surf_contents) | ('rh.pial' not in info.fs_surf_contents):
         print('Left or Right hemi not present: Running autorecon2')
-    if ('lh.aparc.annot' not in fs_label_contents) | ('rh.aparc.annot' not in fs_label_contents):
+    if ('lh.aparc.annot' not in info.fs_label_contents) | ('rh.aparc.annot' not in info.fs_label_contents):
         print('Labels not present: Running autorecon3')
-    if ('lh.mid' not in fs_surf_contents) | ('rh.mid' not in fs_surf_contents):
+    if ('lh.mid' not in info.fs_surf_contents) | ('rh.mid' not in info.fs_surf_contents):
         print('Running mne.setup_source_space()')        
         from mne import setup_source_space
-        setup_source_space(subject=subjid, subjects_dir=subjects_dir, n_jobs=1)   
+        setup_source_space(subject=info.subjid, subjects_dir=subjects_dir, n_jobs=1)   
         
     
 if __name__=='__main__':
@@ -92,7 +85,20 @@ if __name__=='__main__':
     if args.run_unprocessed: info.run_unprocessed=True
     print(info)
     
- 
+
+    
+
+def test_inputs():
+    subjid='APBWVFAR_fs'
+    subjects_dir=os.path.join(os.environ['HOME'],'hv_proc/MRI')
+    info=anat_info(subjid=subjid, SUBJECTS_DIR=subjects_dir)
+    assert info.subjid==subjid
+    assert info.subjects_dir==subjects_dir
+    assert info.recon1==False
+    assert info.recon2==False
+    assert info.recon3==False
+    assert info.setup_source==False
+    
     
 
 
