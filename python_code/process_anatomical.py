@@ -52,8 +52,9 @@ def compile_fs_process_list(info):
         process_steps.append('recon-all -autorecon2 -s {}'.format(info.subjid))
     if info.recon3:
         process_steps.append('recon-all -autorecon3 -s {}'.format(info.subjid))
-    return process_steps        
-      
+    return process_steps     
+
+     
     
 if __name__=='__main__':
     import sys
@@ -87,6 +88,33 @@ if __name__=='__main__':
     if args.setup_source: info.setup_source=True
     if args.run_unprocessed: info.run_unprocessed=True
     
+    ## Create the Popen loops and run the freesurfer commands
+    ##################
+    ## MISSING CODE  <<<<<<<<<
+    ####
+    
+    # Run the BEM processing steps
+    inner_skull_path=os.path.join(info.fs_subj_dir, 'bem', 'inner_skull.surf')
+    if not os.path.exists(inner_skull_path):
+        mne.bem.make_watershed_bem(info.subjid, subjects_dir=info.subjects_dir)
+    else:
+        print('Using precalculated inner_skull.surf: {}'.format(inner_skull_path))
+        
+    # MEG related output folder
+    outfolder = os.path.join(os.environ['ENIGMA_REST_DIR'], info.subjid)
+    if not os.path.exists(outfolder): os.mkdir(outfolder)
+    
+    # Run the source
+    src_filename=os.path.join(outfolder, 'source_space-src.fif')
+    if not os.path.exists(src_filename):
+        src = mne.setup_source_space(info.subjid, spacing='oct6', add_dist='patch',
+                                 subjects_dir=info.subjects_dir)
+        src.save(src_filename)
+    else:
+        print('Loading precalculated source space {}'.format(src_filename))
+        
+
+        
 
 
     
