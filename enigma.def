@@ -3,6 +3,7 @@ Bootstrap: docker
 From: continuumio/miniconda3
 
 %files
+	config.txt
 	environment.yml
 	./python_code/load_data.py
 
@@ -10,6 +11,7 @@ From: continuumio/miniconda3
 	#PATH=/opt/conda/envs/$(head -1 environment.yml | cut -d' ' -f2)/bin:$PATH
 	export PATH=/opt/conda/bin:$PATH
 	export LC_ALL=C
+	. config.txt
 %post
 	#echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc
 	#echo "source activate $(head -1 environment.yml | cut -d' ' -f2)" > ~/.bashrc
