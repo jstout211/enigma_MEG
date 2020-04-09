@@ -29,6 +29,21 @@ class anat_info():
         self.fs_mri_contents=os.listdir(os.path.join(self.fs_subj_dir, 'mri')) 
         self.fs_surf_contents=os.listdir(os.path.join(self.fs_subj_dir, 'surf'))
         self.fs_label_contents=os.listdir(os.path.join(self.fs_subj_dir, 'label'))
+        
+        self.outfolder = os.path.join(os.environ['ENIGMA_REST_DIR'], self.subjid)
+        #Setup output expectations
+        # self.recon1_outputs
+        # self.recon2_outputs
+        # self.recon3_outputs
+        self.fs_bem_dir=os.path.join(self.fs_subj_dir, 'bem')
+        self.run_make_watershed_bem=not os.path.exists(os.path.join(self.fs_bem_dir,
+                                                                'inner_skull.surf'))
+        self.src=os.path.join(self.outfolder, 'source_space-src.fif')
+        self.run_make_src=not os.path.exists(self.src)
+        self.trans = None
+        
+        
+        
 
 def compile_fs_process_list(info):
     '''Verifies necessary steps for processing and returns a list'''
@@ -53,6 +68,25 @@ def compile_fs_process_list(info):
     if info.recon3:
         process_steps.append('recon-all -autorecon3 -s {}'.format(info.subjid))
     return process_steps     
+
+# def run_or_load(func, output_val=None):
+#     '''Checks the outputs of the function and determines if the function needs to 
+#     be loaded or run to produce an output'''
+    
+#     def wrapper(*args,**kwargs):
+#         #print("Something is happening before the function is called.")
+#         output=func(*args,**kwargs)
+#         if func.__name__=='make_watershed_bem':
+            
+#         output.save(func.__name__+'.npy')
+#         print("Saved data to {}".format(func.__name__+'.npy'))
+#     return wrapper
+    
+#     def load_data()
+
+  
+#     if func.__name__
+    
 
      
     
@@ -94,26 +128,20 @@ if __name__=='__main__':
     ####
     
     # Run the BEM processing steps
-    inner_skull_path=os.path.join(info.fs_subj_dir, 'bem', 'inner_skull.surf')
-    if not os.path.exists(inner_skull_path):
-        mne.bem.make_watershed_bem(info.subjid, subjects_dir=info.subjects_dir)
-    else:
-        print('Using precalculated inner_skull.surf: {}'.format(inner_skull_path))
+    if info.run_make_watershed_bem: mne.bem.make_watershed_bem(info.subjid, subjects_dir=info.subjects_dir)
         
-    # MEG related output folder
-    outfolder = os.path.join(os.environ['ENIGMA_REST_DIR'], info.subjid)
-    if not os.path.exists(outfolder): os.mkdir(outfolder)
+    # Create MEG related output folder
+    if not os.path.exists(info.outfolder): os.mkdir(info.outfolder)
     
     # Run the source
-    src_filename=os.path.join(outfolder, 'source_space-src.fif')
-    if not os.path.exists(src_filename):
+    if not info.run_make_src:
+        src = mne.source_space.read_source_spaces(info.src_filename)
+    else:
         src = mne.setup_source_space(info.subjid, spacing='oct6', add_dist='patch',
                                  subjects_dir=info.subjects_dir)
-        src.save(src_filename)
-    else:
-        print('Loading precalculated source space {}'.format(src_filename))
-        
-
+        src.save(info.src_filename)
+    
+    
         
 
 
