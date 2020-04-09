@@ -31,6 +31,7 @@ class anat_info():
         self.fs_label_contents=os.listdir(os.path.join(self.fs_subj_dir, 'label'))
         
         self.outfolder = os.path.join(os.environ['ENIGMA_REST_DIR'], self.subjid)
+        self.pickle_file = os.path.join(self.outfolder, 'info.pkl')
         #Setup output expectations
         # self.recon1_outputs
         # self.recon2_outputs
@@ -38,8 +39,8 @@ class anat_info():
         self.fs_bem_dir=os.path.join(self.fs_subj_dir, 'bem')
         self.run_make_watershed_bem=not os.path.exists(os.path.join(self.fs_bem_dir,
                                                                 'inner_skull.surf'))
-        self.src=os.path.join(self.outfolder, 'source_space-src.fif')
-        self.run_make_src=not os.path.exists(self.src)
+        self.src_filename=os.path.join(self.outfolder, 'source_space-src.fif')
+        self.run_make_src=not os.path.exists(self.src_filename)
         self.trans = None
         
         
@@ -84,8 +85,23 @@ def compile_fs_process_list(info):
     
 #     def load_data()
 
+
+def subcommand(function_str):
+    from subprocess import check_call
+    check_call(function_str.split(' '))
+    #output,err = cmd.communicate()
+    # 
+    # os.environ['SUBJECTS_DIR']=os.environ['HOME']+'/hv_proc/MRI'
+    # function_str='recon-all -autorecon1 -subjid APBWVFAR_fs_ortho'
+    
+    
+
   
 #     if func.__name__
+def pickle_info(info):
+    os.rename()
+        
+    fid = open(info.pickle_file)
     
 
      
@@ -108,7 +124,7 @@ if __name__=='__main__':
     parser.add_argument('-setup_source', help='''Runs the setup source space processing
                         in mne python to create the BEM model''', action='store_true')
     parser.add_argument('-run_unprocessed', help='''Checks for all unrun processes and
-                        runs any additional steps for inputs to the source model''')
+                        runs any additional steps for inputs to the source model''', action='store_true')
     parser.description='''Processing for the anatomical inputs of the enigma pipeline'''
     args = parser.parse_args()
     if not args.subjid: raise ValueError('Subject ID must be set')
@@ -124,7 +140,9 @@ if __name__=='__main__':
     
     ## Create the Popen loops and run the freesurfer commands
     ##################
-    ## MISSING CODE  <<<<<<<<<
+    fs_proc_list=compile_fs_process_list(info)
+    for proc in fs_proc_list:
+        subcommand(proc)
     ####
     
     # Run the BEM processing steps
