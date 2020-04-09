@@ -128,6 +128,7 @@ if __name__=='__main__':
     parser.description='''Processing for the anatomical inputs of the enigma pipeline'''
     args = parser.parse_args()
     if not args.subjid: raise ValueError('Subject ID must be set')
+    if not args.subjects_dir: args.subjects_dir=os.environ['SUBJECTS_DIR']
     
     #Initialize Defaults
     info=anat_info(subjid=args.subjid, SUBJECTS_DIR=args.subjects_dir)
@@ -141,6 +142,11 @@ if __name__=='__main__':
     ## Create the Popen loops and run the freesurfer commands
     ##################
     fs_proc_list=compile_fs_process_list(info)
+    if 'IsRunning.lh+rh' in os.listdir(os.path.join(info.fs_subj_dir, 'scripts')):
+        del_run_file=input('''The IsRunning.lh+rh file is present.  Could be from a broken process \
+              or the process is currently running.  Do you want to delete to continue?(y/n)''')
+        if del_run_file.lower()=='y':
+            os.remove(os.path.join(info.fs_subj_dir, 'scripts','IsRunning.lh+rh'))
     for proc in fs_proc_list:
         subcommand(proc)
     ####
