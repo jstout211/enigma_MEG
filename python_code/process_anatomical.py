@@ -37,11 +37,14 @@ class anat_info():
         # self.recon2_outputs
         # self.recon3_outputs
         self.fs_bem_dir=os.path.join(self.fs_subj_dir, 'bem')
-        self.run_make_watershed_bem=not os.path.exists(os.path.join(self.fs_bem_dir,
+        self.run_make_watershed_bem = not os.path.exists(os.path.join(self.fs_bem_dir,
                                                                 'inner_skull.surf'))
-        self.src_filename=os.path.join(self.outfolder, 'source_space-src.fif')
-        self.run_make_src=not os.path.exists(self.src_filename)
+        self.src_filename = os.path.join(self.outfolder, 'source_space-src.fif')
+        self.run_make_src = not os.path.exists(self.src_filename)
         self.trans = None
+        
+        self.bem_sol_filename = os.path.join(self.outfolder, 'bem_sol-sol.fif')
+        self.run_bem_sol = not os.path.exists(self.bem_sol_filename)
         
         
         
@@ -126,6 +129,8 @@ if __name__=='__main__':
     parser.add_argument('-run_unprocessed', help='''Checks for all unrun processes and
                         runs any additional steps for inputs to the source model''', action='store_true')
     parser.description='''Processing for the anatomical inputs of the enigma pipeline'''
+    parser.add_argument('-transform', help='''The transform from the MEG to MRI coregistration.
+                        This should be a 4x4 matrix in a text file format''')
     args = parser.parse_args()
     if not args.subjid: raise ValueError('Subject ID must be set')
     if not args.subjects_dir: args.subjects_dir=os.environ['SUBJECTS_DIR']
@@ -139,8 +144,7 @@ if __name__=='__main__':
     if args.setup_source: info.setup_source=True
     if args.run_unprocessed: info.run_unprocessed=True
     
-    ## Create the Popen loops and run the freesurfer commands
-    ##################
+    ## Create the subprocess loops and run the freesurfer commands
     fs_proc_list=compile_fs_process_list(info)
     if 'IsRunning.lh+rh' in os.listdir(os.path.join(info.fs_subj_dir, 'scripts')):
         del_run_file=input('''The IsRunning.lh+rh file is present.  Could be from a broken process \
@@ -149,7 +153,6 @@ if __name__=='__main__':
             os.remove(os.path.join(info.fs_subj_dir, 'scripts','IsRunning.lh+rh'))
     for proc in fs_proc_list:
         subcommand(proc)
-    ####
     
     # Run the BEM processing steps
     if info.run_make_watershed_bem: mne.bem.make_watershed_bem(info.subjid, subjects_dir=info.subjects_dir)
@@ -164,7 +167,20 @@ if __name__=='__main__':
         src = mne.setup_source_space(info.subjid, spacing='oct6', add_dist='patch',
                                  subjects_dir=info.subjects_dir)
         src.save(info.src_filename)
+        
+    if not info.run_bem_sol:
+        bem = mne.read_bem_solution(info.bem_sol_filename)
+    else:
+        conductivity = (0.3,)
+        model = mne.make_bem_model(subject=info.subjid, ico=4,
+                                    conductivity=conductivity,
+                                    subjects_dir=info.subjects_dir)
+        bem = mne.make_bem_solution(model)
+        mne.bem.write_bem_solution(info.bem_sol_filename, bem)
+        
     
+
+        
     
         
 
