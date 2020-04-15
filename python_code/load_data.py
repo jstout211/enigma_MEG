@@ -93,26 +93,6 @@ def test_visualize_coreg():
     
 
     
-    # trans_fname=subjpd.loc[data_index, 'Anat_Coreg']
-    # src_fname=subjpd.loc[data_index, 'Anat_SRC']
-    # bem_sol_fname=subjpd.loc[data_index, 'Anat_BEM_SOL']
-    # er_fname=subjpd.loc['emptyroom_1', 'PROC_INIT']
-    # fwd_fname=subjpd.loc['RestEO_'+str(RUN),'Anat_FWD_SOL']
-    # freq_bands=PROJECT.params['data'][DATATYPE]['freq_bands']
-    # SUBJECTS_DIR=os.path.join(PROJECT.project_dir,SUBJID)
-    # fs_subj='Anatomy'
-    
-    # fwd = mne.read_forward_solution(fwd_fname)
-    # raw_fname=subjpd.ix[data_index, COLUMN]
-    # raw = mne.io.Raw(raw_fname, preload=True)
-    # picks = mne.pick_types(raw.info, meg=True, eeg=False, stim=False, exclude='bads')
-    # raw.pick_types(meg=True, eeg=False, stim=False, exclude='bads')
-
-    # ##Create the inverse operator 
-    # inverse_operator = mne.minimum_norm.make_inverse_operator(raw.info, fwd, cov, 
-    #                                                           loose=0.2)
-    
-    
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
     from scipy.signal import welch
@@ -131,7 +111,7 @@ def get_freq_idx(bands, freq_bins):
     ''' Get the frequency indexes'''
     output=[]
     for band in bands:
-        tmp = np.argwhere((band[0] < freq_bins) & (freq_bins < band[1]))   ### <<<<<<<<<<<<< Should this be =<...
+        tmp = np.nonzero((band[0] < freq_bins) & (freq_bins < band[1]))[0]   ### <<<<<<<<<<<<< Should this be =<...
         output.append(tmp)
     return output
 
@@ -203,31 +183,37 @@ def main(filename):
     labels=labels_lh + labels_rh 
     label_ts=mne.extract_label_time_course(stcs, labels, src, mode='pca_flip') 
     
+    #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
     
-    
+    #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  #<< This will fail because freq_bins defined after
-    
-    #label_psd = np.zeros([100)
+    #Create PSD for each label
     for label_idx in range(len(labels)):
-        # tmp = label_psd(label_stack[:,label_idx, :], raw.fs)
-        
         _, label_power[label_idx,:] = label_psd(label_stack[:,label_idx, :], data_info['sfreq'])
     
     relative_power = label_power / label_power.sum(axis=1, keepdims=True)
 
-    
+    #Define bands
     bands = [[1,3], [3,5], [7,12], [13,35], [35,55]]
     band_idxs = get_freq_idx(bands, freq_bins)
 
+    #initialize output
     band_means = np.zeros([len(labels), len(bands)]) 
-    for mean_idx, band_idx in enumerate(band_idxs):
-        band_means[mean_idx,:] = relative_power[:, band_idx].sum(axis=1)
-    band_means = relative_power[:,]
-        
+    #Loop over all bands, select the indexes assocaited with the band and average    
+    for mean_band, band_idx in enumerate(band_idxs):
+        band_means[:, mean_band] = relative_power[:, band_idx].sum(axis=1)
     
+    output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
+    
+    import pandas as pd
+    bands_str = [str(i) for i in bands]
+    label_names = [i.name for i in labels]
+    
+    output_dframe = pd.DataFrame(band_means, columns=bands_str, index=label_names)
+    output_dframe.to_csv(output_filename, sep='\t')    
         
-    visualize_coreg(raw, info, trans=trans)
+    #visualize_coreg(raw, info, trans=trans)
     
     
 
