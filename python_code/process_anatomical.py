@@ -73,22 +73,6 @@ def compile_fs_process_list(info):
         process_steps.append('recon-all -autorecon3 -s {}'.format(info.subjid))
     return process_steps     
 
-# def run_or_load(func, output_val=None):
-#     '''Checks the outputs of the function and determines if the function needs to 
-#     be loaded or run to produce an output'''
-    
-#     def wrapper(*args,**kwargs):
-#         #print("Something is happening before the function is called.")
-#         output=func(*args,**kwargs)
-#         if func.__name__=='make_watershed_bem':
-            
-#         output.save(func.__name__+'.npy')
-#         print("Saved data to {}".format(func.__name__+'.npy'))
-#     return wrapper
-    
-#     def load_data()
-
-
 def subcommand(function_str):
     from subprocess import check_call
     check_call(function_str.split(' '))
@@ -96,18 +80,17 @@ def subcommand(function_str):
     # 
     # os.environ['SUBJECTS_DIR']=os.environ['HOME']+'/hv_proc/MRI'
     # function_str='recon-all -autorecon1 -subjid APBWVFAR_fs_ortho'
-    
-    
-
   
 #     if func.__name__
-def pickle_info(info):
-    os.rename()
-        
-    fid = open(info.pickle_file)
-    
 
-     
+def pickle_info(info):
+    import pickle, datetime
+    now=datetime.datetime.now().strftime("%Y_%m_%d_%H:%M:%S")
+    if os.path.exists(info.pickle_file):
+        os.rename(info.pickle_file, info.pickle_file+'BAK'+now)
+    fid=open(info.pickle_file, 'wb')
+    pickle.dump(info, fid)
+    fid.close()
     
 if __name__=='__main__':
     import sys
@@ -167,7 +150,8 @@ if __name__=='__main__':
         src = mne.setup_source_space(info.subjid, spacing='oct6', add_dist='patch',
                                  subjects_dir=info.subjects_dir)
         src.save(info.src_filename)
-        
+    
+    # Run bem solution
     if not info.run_bem_sol:
         bem = mne.read_bem_solution(info.bem_sol_filename)
     else:
@@ -177,6 +161,14 @@ if __name__=='__main__':
                                     subjects_dir=info.subjects_dir)
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(info.bem_sol_filename, bem)
+        
+    # Import Transformation matrix 
+    # if not info.trans:
+    #     trans = mne.gui.coregistration()
+        
+    pickle_info(info)
+    
+    
         
     
 
