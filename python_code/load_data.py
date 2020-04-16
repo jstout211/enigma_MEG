@@ -117,7 +117,7 @@ def get_freq_idx(bands, freq_bins):
 
 
 
-def main(filename):
+def main(filename=None, subjid=None, trans=None):
     raw=load_data(filename)
     raw.apply_gradient_compensation(3)
     
@@ -137,13 +137,6 @@ def main(filename):
     #Calculate covariance
     cov = mne.compute_covariance(epochs)
     
-    # Load transformation matrix  << HACK for orthohulled data
-    # trans=mne.transforms.Transform('ctf_head', 'ctf_meg')
-    trans=mne.transforms.Transform('mri', 'head')   
-    offset = np.array([-.5, -.5, -52.5])*0.01   ##### <<<<<<<<<<<<<<<  Fix - using single subject offset
-    trans['trans'][0:3,-1] = offset
-    
-    
     HOME=os.environ['HOME']
     subjid='APBWVFAR_fs_ortho'
 #    subjid = 'NLNHDGDO_fs_ortho'
@@ -153,15 +146,6 @@ def main(filename):
 
 
     fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
-    
-    
-    
-    
-    #Filter data
-        
-    
-    
-    
     
     inverse_operator = mne.minimum_norm.make_inverse_operator(epochs.info, fwd, cov, 
                                                            loose=0.2)
@@ -195,14 +179,16 @@ def main(filename):
     relative_power = label_power / label_power.sum(axis=1, keepdims=True)
 
     #Define bands
-    bands = [[1,3], [3,5], [7,12], [13,35], [35,55]]
+    bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
     band_idxs = get_freq_idx(bands, freq_bins)
+
+    ############3  MEAN or sum????????????
 
     #initialize output
     band_means = np.zeros([len(labels), len(bands)]) 
     #Loop over all bands, select the indexes assocaited with the band and average    
     for mean_band, band_idx in enumerate(band_idxs):
-        band_means[:, mean_band] = relative_power[:, band_idx].sum(axis=1)
+        band_means[:, mean_band] = relative_power[:, band_idx].sum(axis=1)   ##########  <<< mEAN or SUM
     
     output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
     
@@ -239,8 +225,16 @@ if __name__=='__main__':
     parser.add_argument('-subjid', help='''Define subjects id (folder name)
                         in the SUBJECTS_DIR''')
     parser.add_argument('-meg_file', help='''Location of meg rest dataset''')
+    parser.add_argument('-viz_coreg', help='''Open up a window to vizualize the 
+                        coregistration between head surface and MEG sensors''',
+                        action='store_true')
     
     args=parser.parse_args()
+    if not args.subjects_dir:
+        subjects_dir = os.environ['SUBJECTS_DIR']
+    else:
+        subjects_dir = args.subjects_dir
+    subjid = args.subjid
     
     #Load the anatomical information
     import pickle
@@ -252,12 +246,29 @@ if __name__=='__main__':
     raw=load_data(args.meg_file)
     trans=mne.transforms.Transform('mri', 'head')
     
-    offset_cmd = 'mri_info --cras {}'.format(os.path.join(args.subjects_dir, subjid, 'mri', 'orig','001.mgz')))
+    # Get the MRI offset from freesurfer call
+    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 'mri', 'orig','001.mgz'))
+    
+    import numpy as np
+    from subprocess import check_output
+    offset = check_output(offset_cmd.split(' ')).decode()[:-1]
+    offset = offset.split(' ')
+    offset = np.array([float(i) for i in offset])
+    
+    # Convert to RAS ????????????????????????  << Verify 
+    offset[2] *= -1
+    offset *= .001  #Convert to cm
 
-    offset = np.array([-.5, -.5, -52.5])*0.01
+    #offset = np.array([-.5, -.5, -52.5])*0.01
     trans['trans'][0:3,-1] = offset
     
-    visualize_coreg(raw, info, trans=trans)
+    if args.viz_coreg:
+        visualize_coreg(raw, info, trans=trans)
+        _ = input('Enter anything to exit')
+    
+    del raw
+    main(args.meg_file, subjid=subjid, trans=trans)
+    
     
         
 
