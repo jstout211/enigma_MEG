@@ -45,9 +45,6 @@ class anat_info():
         
         self.bem_sol_filename = os.path.join(self.outfolder, 'bem_sol-sol.fif')
         self.run_bem_sol = not os.path.exists(self.bem_sol_filename)
-        
-        
-        
 
 def compile_fs_process_list(info):
     '''Verifies necessary steps for processing and returns a list'''
@@ -76,12 +73,6 @@ def compile_fs_process_list(info):
 def subcommand(function_str):
     from subprocess import check_call
     check_call(function_str.split(' '))
-    #output,err = cmd.communicate()
-    # 
-    # os.environ['SUBJECTS_DIR']=os.environ['HOME']+'/hv_proc/MRI'
-    # function_str='recon-all -autorecon1 -subjid APBWVFAR_fs_ortho'
-  
-#     if func.__name__
 
 def pickle_info(info):
     import pickle, datetime
@@ -161,10 +152,6 @@ if __name__=='__main__':
                                     subjects_dir=info.subjects_dir)
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(info.bem_sol_filename, bem)
-        
-    # Import Transformation matrix 
-    # if not info.trans:
-    #     trans = mne.gui.coregistration()
         
     pickle_info(info)
     
