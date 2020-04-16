@@ -3,10 +3,19 @@
 """
 Created on Fri Apr  3 16:08:12 2020
 
+TODO:
+    Add cleaning algorithm
+    Check inverse solution
+    Verify sum versus mean on bandwidth
+    Check number of bins during welch calculation
+    Type of covariance
+    
+
+
 @author: stoutjd
 """
 import os
-import mne
+import mne, numpy as np
 
 mne.viz.set_3d_backend('pyvista')
 
@@ -72,13 +81,6 @@ def visualize_coreg(raw, info, trans):
     # fig.plotter.show(screenshot='test.png')
     return fig  
     
-    # mne.viz.set_3d_backend('pyvista')
-    # fig = mne.viz.plot_alignment(raw.info, trans=trans, subject=subjid,
-    #                              subjects_dir=subjects_dir, surfaces='head',
-    #                              show_axes=True, meg='sensors',
-    #                              coord_frame='meg')
-    # mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))    
-    
 def test_visualize_coreg():
     from hv_proc import test_config
     raw_fname = test_config.rest['meg']
@@ -90,8 +92,6 @@ def test_visualize_coreg():
         info=pickle.load(e)
     trans=mne.transforms.Transform('mri', 'head')
     tmp = visualize_coreg(raw, info, trans=trans)
-    
-
     
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
@@ -127,10 +127,6 @@ def main(filename=None, subjid=None, trans=None):
     
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
     
-    
-    #Clear memory
-    #del raw
-    
     #Drop bad epochs and channels
     ##
     
@@ -138,8 +134,6 @@ def main(filename=None, subjid=None, trans=None):
     cov = mne.compute_covariance(epochs)
     
     HOME=os.environ['HOME']
-    subjid='APBWVFAR_fs_ortho'
-#    subjid = 'NLNHDGDO_fs_ortho'
     src = mne.read_source_spaces(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/source_space-src.fif'))
     bem = mne.read_bem_solution(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/bem_sol-sol.fif'))
 
@@ -170,6 +164,9 @@ def main(filename=None, subjid=None, trans=None):
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
     
+    
+    freq_bins, _ = label_psd(label_stack[:,0, :], data_info['sfreq'])
+    
     #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  #<< This will fail because freq_bins defined after
     #Create PSD for each label
@@ -199,11 +196,6 @@ def main(filename=None, subjid=None, trans=None):
     output_dframe = pd.DataFrame(band_means, columns=bands_str, index=label_names)
     output_dframe.to_csv(output_filename, sep='\t')    
         
-    #visualize_coreg(raw, info, trans=trans)
-    
-    
-
-    
 
 
  # Check data type and load data
@@ -240,7 +232,7 @@ if __name__=='__main__':
     import pickle
     from enigma.python_code.process_anatomical import anat_info
     enigma_dir=os.environ['ENIGMA_REST_DIR']
-    with open(os.path.join(enigma_dir,args.subjid,'info.pkl'),'rb') as e:
+    with open(os.path.join(enigma_dir,subjid,'info.pkl'),'rb') as e:
         info=pickle.load(e)
         
     raw=load_data(args.meg_file)
@@ -249,7 +241,6 @@ if __name__=='__main__':
     # Get the MRI offset from freesurfer call
     offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 'mri', 'orig','001.mgz'))
     
-    import numpy as np
     from subprocess import check_output
     offset = check_output(offset_cmd.split(' ')).decode()[:-1]
     offset = offset.split(' ')
@@ -257,9 +248,7 @@ if __name__=='__main__':
     
     # Convert to RAS ????????????????????????  << Verify 
     offset[2] *= -1
-    offset *= .001  #Convert to cm
-
-    #offset = np.array([-.5, -.5, -52.5])*0.01
+    offset *= .001  #Convert to mm
     trans['trans'][0:3,-1] = offset
     
     if args.viz_coreg:
