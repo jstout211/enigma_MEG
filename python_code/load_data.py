@@ -9,6 +9,7 @@ TODO:
     Verify sum versus mean on bandwidth
     Check number of bins during welch calculation
     Type of covariance
+    Verify power on welch calc << does it need 20log10()
     
 
 
@@ -81,17 +82,17 @@ def visualize_coreg(raw, info, trans):
     # fig.plotter.show(screenshot='test.png')
     return fig  
     
-def test_visualize_coreg():
-    from hv_proc import test_config
-    raw_fname = test_config.rest['meg']
-    raw = mne.io.read_raw_ctf(raw_fname)
-    import pickle
-    from enigma.python_code.process_anatomical import anat_info
-    enigma_dir=os.environ['ENIGMA_REST_DIR']
-    with open(os.path.join(enigma_dir,'APBWVFAR_fs_ortho','info.pkl'),'rb') as e:
-        info=pickle.load(e)
-    trans=mne.transforms.Transform('mri', 'head')
-    tmp = visualize_coreg(raw, info, trans=trans)
+# def test_visualize_coreg():
+#     from hv_proc import test_config
+#     raw_fname = test_config.rest['meg']
+#     raw = mne.io.read_raw_ctf(raw_fname)
+#     import pickle
+#     from enigma.python_code.process_anatomical import anat_info
+#     enigma_dir=os.environ['ENIGMA_REST_DIR']
+#     with open(os.path.join(enigma_dir,'APBWVFAR_fs_ortho','info.pkl'),'rb') as e:
+#         info=pickle.load(e)
+#     trans=mne.transforms.Transform('mri', 'head')
+#     tmp = visualize_coreg(raw, info, trans=trans)
     
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
@@ -116,8 +117,40 @@ def get_freq_idx(bands, freq_bins):
     return output
 
 
+def test_main():
+    HOME=os.environ['HOME']
+    filename = os.path.join(HOME,'hv_proc/MEG/APBWVFAR_rest_20200122_03.ds')
+    subjid = 'APBWVFAR_fs_ortho'
+    subjects_dir = os.path.join(HOME, 'hv_proc', 'MRI')
+    
+    # Calc Transform
+    raw=load_data(filename)
+    trans=mne.transforms.Transform('mri', 'head')
+    
+    # Get the MRI offset from freesurfer call
+    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 'mri', 'orig','001.mgz'))
+    
+    from subprocess import check_output
+    offset = check_output(offset_cmd.split(' ')).decode()[:-1]
+    offset = offset.split(' ')
+    offset = np.array([float(i) for i in offset])
+    
+    # Convert to RAS ????????????????????????  << Verify 
+    offset[2] *= -1
+    offset *= .001  #Convert to mm
+    trans['trans'][0:3,-1] = offset
+    
+    import pickle
+    from enigma.python_code.process_anatomical import anat_info
+    enigma_dir=os.environ['ENIGMA_REST_DIR']
+    with open(os.path.join(enigma_dir,subjid,'info.pkl'),'rb') as e:
+        info=pickle.load(e)
+    
+    
+  
 
-def main(filename=None, subjid=None, trans=None):
+
+def main(filename=None, subjid=None, trans=None, info=None):
     raw=load_data(filename)
     raw.apply_gradient_compensation(3)
     
@@ -168,7 +201,7 @@ def main(filename=None, subjid=None, trans=None):
     freq_bins, _ = label_psd(label_stack[:,0, :], data_info['sfreq'])
     
     #Initialize 
-    label_power = np.zeros([len(labels), len(freq_bins)])  #<< This will fail because freq_bins defined after
+    label_power = np.zeros([len(labels), len(freq_bins)])  
     #Create PSD for each label
     for label_idx in range(len(labels)):
         _, label_power[label_idx,:] = label_psd(label_stack[:,label_idx, :], data_info['sfreq'])
@@ -185,7 +218,7 @@ def main(filename=None, subjid=None, trans=None):
     band_means = np.zeros([len(labels), len(bands)]) 
     #Loop over all bands, select the indexes assocaited with the band and average    
     for mean_band, band_idx in enumerate(band_idxs):
-        band_means[:, mean_band] = relative_power[:, band_idx].sum(axis=1)   ##########  <<< mEAN or SUM
+        band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1)   ##########  <<< mEAN or SUM
     
     output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
     
@@ -256,7 +289,7 @@ if __name__=='__main__':
         _ = input('Enter anything to exit')
     
     del raw
-    main(args.meg_file, subjid=subjid, trans=trans)
+    main(args.meg_file, subjid=subjid, trans=trans, info=info)
     
     
         
