@@ -10,6 +10,7 @@ TODO:
     Check number of bins during welch calculation
     Type of covariance
     Verify power on welch calc << does it need 20log10()
+    Relative Power - Over all regions or just the ROI specta 
     
 
 
@@ -167,9 +168,10 @@ def main(filename=None, subjid=None, trans=None, info=None):
     cov = mne.compute_covariance(epochs)
     
     HOME=os.environ['HOME']
-    src = mne.read_source_spaces(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/source_space-src.fif'))
-    bem = mne.read_bem_solution(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/bem_sol-sol.fif'))
-
+    src = mne.read_source_spaces(info.src_filename)
+    #src = mne.read_source_spaces(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/source_space-src.fif'))
+    # bem = mne.read_bem_solution(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/bem_sol-sol.fif'))
+    bem = mne.read_bem_solution(info.bem_sol_filename)
 
 
     fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
@@ -205,6 +207,9 @@ def main(filename=None, subjid=None, trans=None, info=None):
     #Create PSD for each label
     for label_idx in range(len(labels)):
         _, label_power[label_idx,:] = label_psd(label_stack[:,label_idx, :], data_info['sfreq'])
+    
+    #label_power *= np.sqrt(freq_bins)  ###################### SCALE BY Frequency  <<<<<<<<<<<<<<<<< CHECK
+    
     
     relative_power = label_power / label_power.sum(axis=1, keepdims=True)
 
