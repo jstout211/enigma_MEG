@@ -122,9 +122,9 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
-def sensor_psd(epoch_vector, info=None, fs=None):
-    '''Calculate and save the sensor level spectrum at each epoch
-    For testing bad data rejection'''
+# def sensor_psd(epoch_vector, info=None, fs=None):
+#     '''Calculate and save the sensor level spectrum at each epoch
+#     For testing bad data rejection'''
     
     
 
@@ -191,7 +191,7 @@ def main(filename=None, subjid=None, trans=None, info=None):
     #Calculate Inverse solution
     snr = 1.0  # use lower SNR for single epochs
     lambda2 = 1.0 / snr ** 2
-    method = 'MNE' #"dSPM"  # use dSPM method (could also be MNE or sLORETA)
+    method = 'dSPM'  
     stcs = mne.minimum_norm.apply_inverse_epochs(epochs, inverse_operator, lambda2, method,
                                 pick_ori="normal", return_generator=True)
     
