@@ -18,6 +18,7 @@ TODO:
 """
 import os
 import mne, numpy as np
+import pandas as pd
 
 mne.viz.set_3d_backend('pyvista')
 
@@ -95,11 +96,15 @@ def visualize_coreg(raw, info, trans):
 #     trans=mne.transforms.Transform('mri', 'head')
 #     tmp = visualize_coreg(raw, info, trans=trans)
     
+
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
     from scipy.signal import welch
     freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') #, nperseg=256, noverlap=None, nfft=None, detrend='constant', return_onesided=True, scaling='density', axis=-1)
     return freq_bins, np.median(epoch_spectra, axis=0) #welch(epoch_vector, fs=fs, window='hanning') #, nperseg=256, noverlap=None, nfft=None, detrend='constant', return_onesided=True, scaling='density', axis=-1)    
+
+
+
 
 # def test_label_psd():
 #     freq_bins, spectral_power = label_psd(label_stack[:,1,:], 300)
@@ -117,6 +122,11 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
+def sensor_psd(epoch_vector, info=None, fs=None):
+    '''Calculate and save the sensor level spectrum at each epoch
+    For testing bad data rejection'''
+    
+    
 
 def test_main():
     HOME=os.environ['HOME']
@@ -207,6 +217,16 @@ def main(filename=None, subjid=None, trans=None, info=None):
     #Create PSD for each label
     for label_idx in range(len(labels)):
         _, label_power[label_idx,:] = label_psd(label_stack[:,label_idx, :], data_info['sfreq'])
+    #Save the label spectrum to assemble the relative power
+    freq_bin_names=[str(binval) for binval in freq_bins]
+    label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
+    label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
+    # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
+    #     np.save(f, label_power)
+
+
+
+
     
     #label_power *= np.sqrt(freq_bins)  ###################### SCALE BY Frequency  <<<<<<<<<<<<<<<<< CHECK
     
@@ -217,7 +237,7 @@ def main(filename=None, subjid=None, trans=None, info=None):
     bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
     band_idxs = get_freq_idx(bands, freq_bins)
 
-    ############3  MEAN or sum????????????
+    ############  MEAN or sum????????????
 
     #initialize output
     band_means = np.zeros([len(labels), len(bands)]) 
@@ -227,7 +247,7 @@ def main(filename=None, subjid=None, trans=None, info=None):
     
     output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
     
-    import pandas as pd
+
     bands_str = [str(i) for i in bands]
     label_names = [i.name for i in labels]
     
