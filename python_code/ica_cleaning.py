@@ -109,6 +109,7 @@ def calc_ica(filename, outfilename):
 if __name__=='__main__':
     import sys
     filename = sys.argv[1]
-    calc_ica(filename)
+    outfilename = sys.argv[2]
+    calc_ica(filename, outfilename)
     #get_cardiac_epochs(filename)
     
