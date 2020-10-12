@@ -121,6 +121,37 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
+def plot_QA_head_sensor_align(info, raw):
+    '''Plot and save the head and sensor alignment and save to the output folder'''
+    import matplotlib
+    import os.path as op
+    matplotlib.use('Agg')  
+    
+    #########<<<<<<<<<<<<<  Replace with transfile  >>>>>>>>>>>>> ###########
+    trans=mne.transforms.Transform('mri', 'head')
+    
+    # Get the MRI offset from freesurfer call
+    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
+                                                          'mri', 'orig','001.mgz'))
+    
+    from subprocess import check_output
+    offset = check_output(offset_cmd.split(' ')).decode()[:-1]
+    offset = offset.split(' ')
+    offset = np.array([float(i) for i in offset])
+    
+    offset[2] *= -1
+    offset *= .001  #Convert to mm
+    trans['trans'][0:3,-1] = offset
+    #######<<<<<<<<<<  Replace with trans file >>>>>>>>>>>>>>> ###########
+    
+    fig = mne.viz.plot_alignment(raw.info, trans, subject=info.subjid, dig=False,
+                     coord_frame='meg', subjects_dir=info.subjects_dir)
+    mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=0)
+    fig.plotter.image.tofile(op.join(info.outfolder, 'lheadposQA.png'))
+    mne.viz.set_3d_view(figure=fig, azimuth=90, elevation=90)
+    fig.plotter.image.tofile(op.join(info.outfolder, 'rheadposQA.png'))
+    mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
+    fig.plotter.image.tofile(op.join(info.outfolder, 'fronposQA.png'))
 
     
 
@@ -160,11 +191,16 @@ def main(filename=None, subjid=None, trans=None, info=None):
     raw=load_data(filename)
     raw.apply_gradient_compensation(3)
     
+    #plot_QA_head_sensor_align(info, raw)
+    
     raw.resample(300)
     raw.filter(0.3, None)
     raw.notch_filter([60,120])
     
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+    
+    ####  Reduced for DEMO  ##############
+    epochs=epochs[0:10]
     
     #Drop bad epochs and channels
     ##
@@ -200,7 +236,7 @@ def main(filename=None, subjid=None, trans=None, info=None):
                                         subjects_dir=SUBJECTS_DIR, hemi='rh') 
     labels=labels_lh + labels_rh 
     
-    #labels = labels[0:5]  ######## <<< HACK for DEMO  3####################################
+    labels = labels[0:10]  ######## <<< HACK for DEMO  3####################################
     
     label_ts=mne.extract_label_time_course(stcs, labels, src, mode='pca_flip') 
     
