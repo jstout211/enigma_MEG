@@ -17,7 +17,7 @@ from fooof.plts.annotate import plot_annotated_model
 
 
 
-def calc_spec_peak(freqs, powers, fitting_bw=[1,55]):
+def calc_spec_peak(freqs, powers, fitting_bw=[1,55], out_image_path=None):
     '''Spectral fitting routine from the FOOOF toolbox
     https://fooof-tools.github.io/fooof/index.html
     
@@ -45,14 +45,22 @@ def calc_spec_peak(freqs, powers, fitting_bw=[1,55]):
     fm1 = FOOOF(min_peak_height=0.05, verbose=False)
     fm1.fit(freqs, powers)
 
-    # Plot an annotated version of the power spectrum model
-    plot_annotated_model(fm1, annotate_peaks=False)
+    if out_image_path is not None: 
+        import matplotlib
+        from matplotlib import pylab
+        matplotlib.use('Agg')
+        # import pylab
+        fig = pylab.Figure(figsize=[10,6])
+        ax = fig.add_subplot()
+        plot_annotated_model(fm1, annotate_peaks=False, ax=ax)
+        fig.tight_layout()
+        fig.savefig(out_image_path, dpi=150)
     
     params=fm1.get_results()
     params.peak_params[0]
 
-    plot_spectrum(freqs, powers, log_powers=True,
-                  color='black', label='Original Spectrum')
+    # plot_spectrum(freqs, powers, log_powers=True,
+    #               color='black', label='Original Spectrum')
     return params
 
 

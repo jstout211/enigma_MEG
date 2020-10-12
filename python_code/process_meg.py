@@ -11,6 +11,7 @@ TODO:
     Type of covariance
     Verify power on welch calc << does it need 20log10()
     Relative Power - Over all regions or just the ROI specta 
+    Fix alpha peak decision - if multiple peaks in alpha range?
     
 
 
@@ -19,6 +20,7 @@ TODO:
 import os
 import mne, numpy as np
 import pandas as pd
+from enigma.python_code.spectral_peak_analysis import calc_spec_peak
 
 mne.viz.set_3d_backend('pyvista')
 
@@ -106,9 +108,6 @@ def label_psd(epoch_vector, fs=None):
 
 
 
-# def test_label_psd():
-#     freq_bins, spectral_power = label_psd(label_stack[:,1,:], 300)
-
 def frequency_band_mean(label_by_freq=None, freq_band_list=None):
     '''Calculate the mean within the frequency bands'''
     for freqs in freq_band_list:
@@ -122,10 +121,7 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
-# def sensor_psd(epoch_vector, info=None, fs=None):
-#     '''Calculate and save the sensor level spectrum at each epoch
-#     For testing bad data rejection'''
-    
+
     
 
 def test_main():
@@ -146,7 +142,6 @@ def test_main():
     offset = offset.split(' ')
     offset = np.array([float(i) for i in offset])
     
-    # Convert to RAS ????????????????????????  << Verify 
     offset[2] *= -1
     offset *= .001  #Convert to mm
     trans['trans'][0:3,-1] = offset
@@ -204,6 +199,9 @@ def main(filename=None, subjid=None, trans=None, info=None):
     labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
                                         subjects_dir=SUBJECTS_DIR, hemi='rh') 
     labels=labels_lh + labels_rh 
+    
+    #labels = labels[0:5]  ######## <<< HACK for DEMO  3####################################
+    
     label_ts=mne.extract_label_time_course(stcs, labels, src, mode='pca_flip') 
     
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
@@ -214,17 +212,36 @@ def main(filename=None, subjid=None, trans=None, info=None):
     
     #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  
+    alpha_peak = np.zeros(len(labels))
+    
     #Create PSD for each label
     for label_idx in range(len(labels)):
-        _, label_power[label_idx,:] = label_psd(label_stack[:,label_idx, :], data_info['sfreq'])
+        _, current_psd = label_psd(label_stack[:,label_idx, :], 
+                                                data_info['sfreq'])
+        label_power[label_idx,:] = current_psd
+        
+        spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
+                                           labels[label_idx].name + '.png')
+        tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
+                                    out_image_path=spectral_image_path)
+        
+        
+        #FIX FOR MULTIPLE ALPHA PEAKS
+        potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
+                                (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
+        if len(potential_alpha_idx) > 1:
+            alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
+        else:
+            alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
+        
+        
+        
     #Save the label spectrum to assemble the relative power
     freq_bin_names=[str(binval) for binval in freq_bins]
     label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
     label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
     # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
     #     np.save(f, label_power)
-
-
 
 
     
@@ -251,7 +268,9 @@ def main(filename=None, subjid=None, trans=None, info=None):
     bands_str = [str(i) for i in bands]
     label_names = [i.name for i in labels]
     
-    output_dframe = pd.DataFrame(band_means, columns=bands_str, index=label_names)
+    output_dframe = pd.DataFrame(band_means, columns=bands_str, 
+                                 index=label_names)
+    output_dframe['AlphaPeak'] = alpha_peak
     output_dframe.to_csv(output_filename, sep='\t')    
         
 
@@ -297,7 +316,8 @@ if __name__=='__main__':
     trans=mne.transforms.Transform('mri', 'head')
     
     # Get the MRI offset from freesurfer call
-    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 'mri', 'orig','001.mgz'))
+    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
+                                                          'mri', 'orig','001.mgz'))
     
     from subprocess import check_output
     offset = check_output(offset_cmd.split(' ')).decode()[:-1]
