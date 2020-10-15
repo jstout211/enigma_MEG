@@ -198,7 +198,7 @@ def main(filename=None, subjid=None, trans=None, info=None):
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
     
     ####  Reduced for DEMO  ##############
-    epochs=epochs[0:10]
+    #epochs=epochs[0:10]
     
     #Drop bad epochs and channels
     ##
@@ -234,7 +234,7 @@ def main(filename=None, subjid=None, trans=None, info=None):
                                         subjects_dir=SUBJECTS_DIR, hemi='rh') 
     labels=labels_lh + labels_rh 
     
-    labels = labels[0:10]  ######## <<< HACK for DEMO  3####################################
+    #labels = labels[0:10]  ######## <<< HACK for DEMO  3####################################
     
     label_ts=mne.extract_label_time_course(stcs, labels, src, mode='pca_flip') 
     
@@ -331,6 +331,7 @@ if __name__=='__main__':
     parser.add_argument('-viz_coreg', help='''Open up a window to vizualize the 
                         coregistration between head surface and MEG sensors''',
                         action='store_true')
+    parser.add_argument('-trans', help='''Transfile from mne python -trans.fif''')
     
     args=parser.parse_args()
     if not args.subjects_dir:
@@ -347,21 +348,24 @@ if __name__=='__main__':
         info=pickle.load(e)
         
     raw=load_data(args.meg_file)
-    trans=mne.transforms.Transform('mri', 'head')
     
-    # Get the MRI offset from freesurfer call
-    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
-                                                          'mri', 'orig','001.mgz'))
+    trans = mne.read_trans(args.transfile)
     
-    from subprocess import check_output
-    offset = check_output(offset_cmd.split(' ')).decode()[:-1]
-    offset = offset.split(' ')
-    offset = np.array([float(i) for i in offset])
+    # trans=mne.transforms.Transform('mri', 'head')
     
-    # Convert to RAS ????????????????????????  << Verify 
-    offset[2] *= -1
-    offset *= .001  #Convert to mm
-    trans['trans'][0:3,-1] = offset
+    # # Get the MRI offset from freesurfer call
+    # offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
+    #                                                       'mri', 'orig','001.mgz'))
+    
+    # from subprocess import check_output
+    # offset = check_output(offset_cmd.split(' ')).decode()[:-1]
+    # offset = offset.split(' ')
+    # offset = np.array([float(i) for i in offset])
+    
+    # # Convert to RAS ????????????????????????  << Verify 
+    # offset[2] *= -1
+    # offset *= .001  #Convert to mm
+    # trans['trans'][0:3,-1] = offset
     
     if args.viz_coreg:
         visualize_coreg(raw, info, trans=trans)
