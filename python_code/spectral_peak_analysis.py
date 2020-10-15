@@ -50,11 +50,13 @@ def calc_spec_peak(freqs, powers, fitting_bw=[1,55], out_image_path=None):
         from matplotlib import pylab
         matplotlib.use('Agg')
         # import pylab
-        fig = pylab.Figure(figsize=[10,6])
+        fig = pylab.Figure(figsize=[10,6]) #, dpi=150)
         ax = fig.add_subplot()
         plot_annotated_model(fm1, annotate_peaks=False, ax=ax)
         fig.tight_layout()
-        fig.savefig(out_image_path, dpi=150)
+        fig.savefig(out_image_path, dpi=150, bbox_inches="tight")
+        
+        
     
     params=fm1.get_results()
     params.peak_params[0]

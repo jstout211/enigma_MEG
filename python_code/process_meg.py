@@ -147,13 +147,11 @@ def plot_QA_head_sensor_align(info, raw):
     fig = mne.viz.plot_alignment(raw.info, trans, subject=info.subjid, dig=False,
                      coord_frame='meg', subjects_dir=info.subjects_dir)
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=0)
-    fig.plotter.image.tofile(op.join(info.outfolder, 'lheadposQA.png'))
+    fig.plotter.image.tofile(op.join(info.outfolder, 'lhead_posQA.png'))
     mne.viz.set_3d_view(figure=fig, azimuth=90, elevation=90)
-    fig.plotter.image.tofile(op.join(info.outfolder, 'rheadposQA.png'))
+    fig.plotter.image.tofile(op.join(info.outfolder, 'rhead_posQA.png'))
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
-    fig.plotter.image.tofile(op.join(info.outfolder, 'fronposQA.png'))
-
-    
+    fig.plotter.image.tofile(op.join(info.outfolder, 'front_posQA.png'))
 
 def test_main():
     HOME=os.environ['HOME']
