@@ -259,14 +259,17 @@ def main(filename=None, subjid=None, trans=None, info=None):
         tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
                                     out_image_path=spectral_image_path)
         
-        
-        #FIX FOR MULTIPLE ALPHA PEAKS
-        potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
-                                (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
-        if len(potential_alpha_idx) > 1:
-            alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
-        else:
-            alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
+        try:
+            #FIX FOR MULTIPLE ALPHA PEAKS
+            potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
+                                    (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
+            if len(potential_alpha_idx) != 1:
+                alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
+            else:
+                alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
+        except:
+            alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<
+            
         
         
         
