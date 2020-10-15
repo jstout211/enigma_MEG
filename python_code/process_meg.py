@@ -349,7 +349,7 @@ if __name__=='__main__':
         
     raw=load_data(args.meg_file)
     
-    trans = mne.read_trans(args.transfile)
+    trans = mne.read_trans(args.trans)
     
     # trans=mne.transforms.Transform('mri', 'head')
     
