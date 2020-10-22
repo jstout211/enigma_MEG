@@ -121,37 +121,45 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
-def plot_QA_head_sensor_align(info, raw):
+def plot_QA_head_sensor_align(info, raw, trans):
     '''Plot and save the head and sensor alignment and save to the output folder'''
-    import matplotlib
+    import matplotlib, pylab
     import os.path as op
     matplotlib.use('Agg')  
     
-    #########<<<<<<<<<<<<<  Replace with transfile  >>>>>>>>>>>>> ###########
-    trans=mne.transforms.Transform('mri', 'head')
-    
-    # Get the MRI offset from freesurfer call
-    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
-                                                          'mri', 'orig','001.mgz'))
-    
-    from subprocess import check_output
-    offset = check_output(offset_cmd.split(' ')).decode()[:-1]
-    offset = offset.split(' ')
-    offset = np.array([float(i) for i in offset])
-    
-    offset[2] *= -1
-    offset *= .001  #Convert to mm
-    trans['trans'][0:3,-1] = offset
-    #######<<<<<<<<<<  Replace with trans file >>>>>>>>>>>>>>> ###########
     
     fig = mne.viz.plot_alignment(raw.info, trans, subject=info.subjid, dig=False,
                      coord_frame='meg', subjects_dir=info.subjects_dir)
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=0)
-    fig.plotter.image.tofile(op.join(info.outfolder, 'lhead_posQA.png'))
+    
+    tmp_outfile_name = op.join(info.outfolder, 'lhead_posQA.png')
+    pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)
+    
+    # fig.plotter.image.tofile(op.join(info.outfolder, 'lhead_posQA.png'))
     mne.viz.set_3d_view(figure=fig, azimuth=90, elevation=90)
-    fig.plotter.image.tofile(op.join(info.outfolder, 'rhead_posQA.png'))
+    tmp_outfile_name = op.join(info.outfolder, 'rhead_posQA.png')
+    pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)    
+    
+    # fig.plotter.image.tofile(op.join(info.outfolder, 'rhead_posQA.png'))
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
-    fig.plotter.image.tofile(op.join(info.outfolder, 'front_posQA.png'))
+    tmp_outfile_name = op.join(info.outfolder, 'front_posQA.png')
+    pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)  
+    
+    # fig.plotter.image.tofile(op.join(info.outfolder, 'front_posQA.png'))
+    # test = input('Press any key to close')
+    fig.plotter.close()
+
+def test_QA_plot():
+    import bunch
+    info = bunch.Bunch()
+    meg_filename = '/home/stoutjd/data/MEG/20190115/AYCYELJY_rest_20190115_03.ds'
+    subjid = 'AYCYELJY_fs'
+    subjects_dir = '/home/stoutjd/data/ENIGMA'
+    raw = mne.io.read_raw_ctf(meg_filename)
+    trans = mne.read_trans('/home/stoutjd/data/ENIGMA/transfiles/AYCYELJY-trans.fif')
+    info.subjid, info.subjects_dir = subjid, subjects_dir
+    plot_QA_head_sensor_align(info, raw, trans ) #subjid, subjects_dir)
+    
 
 def test_main():
     HOME=os.environ['HOME']
@@ -164,7 +172,8 @@ def test_main():
     trans=mne.transforms.Transform('mri', 'head')
     
     # Get the MRI offset from freesurfer call
-    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 'mri', 'orig','001.mgz'))
+    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
+                                                          'mri', 'orig','001.mgz'))
     
     from subprocess import check_output
     offset = check_output(offset_cmd.split(' ')).decode()[:-1]
@@ -371,8 +380,10 @@ if __name__=='__main__':
     # trans['trans'][0:3,-1] = offset
     
     if args.viz_coreg:
-        visualize_coreg(raw, info, trans=trans)
+        plot_QA_head_sensor_align(info, raw, trans)
+        # visualize_coreg(raw, info, trans=trans)
         _ = input('Enter anything to exit')
+        exit(0)
     
     del raw
     main(args.meg_file, subjid=subjid, trans=trans, info=info)
