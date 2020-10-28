@@ -265,10 +265,12 @@ def main(filename=None, subjid=None, trans=None, info=None):
         
         spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
                                            labels[label_idx].name + '.png')
-        tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
-                                    out_image_path=spectral_image_path)
+
         
         try:
+            tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
+                            out_image_path=spectral_image_path)
+            
             #FIX FOR MULTIPLE ALPHA PEAKS
             potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
                                     (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
