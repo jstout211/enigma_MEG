@@ -85,23 +85,36 @@ def review_data():
 #         out_filename = os.path.join(filename, 'rest_{}-ica.fif'.format(str(rstate)))
 #         ica.save(out_filename)
         
-def calc_ica(filename, outfilename):
-    raw = mne.io.read_raw_ctf(filename, preload=True)
-    raw.apply_gradient_compensation(3)
+def calc_ica(filename): #, outfilename):
+    if filename[-2:]=='ds':
+        raw = mne.io.read_raw_ctf(filename, preload=True)
+        raw.apply_gradient_compensation(3)
+    if filename[-3:]=='fif':
+        raw = mne.io.read_raw_fif(filename, preload=True)
+    if filename[-4:]=='rfDC':
+        raw = mne.io.read_raw_bti(filename, preload=True, head_shape_fname=None)
+     
+    raw.notch_filter([60,120,180])    
+    #raw.notch_filter([50,100,150]) 
     raw.resample(300)
     raw.filter(1.0, None)
-    raw.notch_filter([60,120])
+    # raw.notch_filter([60,120])
+#    raw.notch_filter([50,100,150])
     
-    ica = ICA(n_components=30, random_state=0)
-    ica.fit(raw)
-    
-    #raw.load_data()
-    #ica.plot_sources(raw)
-    
-    
-    
-    out_filename = outfilename+'-ica.fif'
-    ica.save(out_filename)        
+    file_base = os.path.basename(filename)
+    file_base = os.path.splitext(file_base)[0]	 
+    rand_state = range(0,10)
+    for rstate in rand_state:
+        ica = ICA(n_components=25, random_state=rstate)
+        ica.fit(raw)
+        
+        #raw.load_data()
+        #ica.plot_sources(raw)
+        out_filename = file_base + '_{}-ica.fif'.format(str(rstate))
+        ica.save(out_filename)
+    raw.save(file_base+'_300srate.fif')
+        
+
 
 
 
@@ -109,7 +122,8 @@ def calc_ica(filename, outfilename):
 if __name__=='__main__':
     import sys
     filename = sys.argv[1]
-    outfilename = sys.argv[2]
-    calc_ica(filename, outfilename)
+    if len(sys.argv) > 1:
+        outfilename=sys.argv[2]
+    calc_ica(filename, outbasename=outfilename)
     #get_cardiac_epochs(filename)
-    
+
