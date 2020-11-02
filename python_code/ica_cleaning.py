@@ -85,7 +85,7 @@ def review_data():
 #         out_filename = os.path.join(filename, 'rest_{}-ica.fif'.format(str(rstate)))
 #         ica.save(out_filename)
         
-def calc_ica(filename): #, outfilename):
+def calc_ica(filename, outbasename=None):
     if filename[-2:]=='ds':
         raw = mne.io.read_raw_ctf(filename, preload=True)
         raw.apply_gradient_compensation(3)
@@ -94,15 +94,18 @@ def calc_ica(filename): #, outfilename):
     if filename[-4:]=='rfDC':
         raw = mne.io.read_raw_bti(filename, preload=True, head_shape_fname=None)
      
-    raw.notch_filter([60,120,180])    
-    #raw.notch_filter([50,100,150]) 
+    #raw.notch_filter([60,120,180])    
+    raw.notch_filter([50,100,150]) 
     raw.resample(300)
     raw.filter(1.0, None)
     # raw.notch_filter([60,120])
 #    raw.notch_filter([50,100,150])
     
-    file_base = os.path.basename(filename)
-    file_base = os.path.splitext(file_base)[0]	 
+    if outbasename != None:
+        file_base = outbasename
+    else:
+        file_base = os.path.basename(filename)
+        file_base = os.path.splitext(file_base)[0]	 
     rand_state = range(0,10)
     for rstate in rand_state:
         ica = ICA(n_components=25, random_state=rstate)
@@ -122,8 +125,10 @@ def calc_ica(filename): #, outfilename):
 if __name__=='__main__':
     import sys
     filename = sys.argv[1]
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 2:
         outfilename=sys.argv[2]
-    calc_ica(filename, outbasename=outfilename)
+        calc_ica(filename, outbasename=outfilename)
+    else:
+        calc_ica(filename)
     #get_cardiac_epochs(filename)
 
