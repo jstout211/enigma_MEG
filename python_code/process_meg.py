@@ -17,12 +17,16 @@ TODO:
 
 @author: stoutjd
 """
-import os
+import os, os.path as op
 import mne, numpy as np
 import pandas as pd
 from enigma.python_code.spectral_peak_analysis import calc_spec_peak
 
-mne.viz.set_3d_backend('pyvista')
+
+#mne.viz.set_3d_backend('pyvista')
+# import mayavi
+# mayavi.engine.current_scene.scene.off_screen_rendering = True
+
 
 #@save_numpy_output
 def load_test_data():
@@ -75,30 +79,6 @@ def calculate_inverse(epochs, outfolder=None):
     cov = mne.compute_covariance(epochs)
     cov.save(os.path.join(outfolder, 'rest-cov.fif'))
     
-    
-def visualize_coreg(raw, info, trans):
-    mne.viz.set_3d_backend('pyvista')
-    fig = mne.viz.plot_alignment(raw.info, trans=trans, subject=info.subjid,
-                                  subjects_dir=info.subjects_dir, surfaces='head',
-                                  show_axes=True, meg='sensors',
-                                  coord_frame='meg')
-    mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))  
-    # fig.plotter.show(screenshot='test.png')
-    return fig  
-    
-# def test_visualize_coreg():
-#     from hv_proc import test_config
-#     raw_fname = test_config.rest['meg']
-#     raw = mne.io.read_raw_ctf(raw_fname)
-#     import pickle
-#     from enigma.python_code.process_anatomical import anat_info
-#     enigma_dir=os.environ['ENIGMA_REST_DIR']
-#     with open(os.path.join(enigma_dir,'APBWVFAR_fs_ortho','info.pkl'),'rb') as e:
-#         info=pickle.load(e)
-#     trans=mne.transforms.Transform('mri', 'head')
-#     tmp = visualize_coreg(raw, info, trans=trans)
-    
-
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
     from scipy.signal import welch
@@ -123,31 +103,58 @@ def get_freq_idx(bands, freq_bins):
 
 def plot_QA_head_sensor_align(info, raw, trans):
     '''Plot and save the head and sensor alignment and save to the output folder'''
-    import matplotlib, pylab
-    import os.path as op
-    matplotlib.use('Agg')  
+    from mayavi import mlab
+    mlab.options.offscreen = True
+    mne.viz.set_3d_backend('mayavi')
     
+    outfolder = info.outfolder
+    subjid = info.subjid
+    subjects_dir = info.subjects_dir
     
-    fig = mne.viz.plot_alignment(raw.info, trans, subject=info.subjid, dig=False,
-                     coord_frame='meg', subjects_dir=info.subjects_dir)
+    fig = mne.viz.plot_alignment(raw.info, trans, subject=subjid, dig=False,
+                     coord_frame='meg', subjects_dir=subjects_dir)
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=0)
+    fig.scene.save_png(op.join(outfolder, 'lhead_posQA.png'))
     
-    tmp_outfile_name = op.join(info.outfolder, 'lhead_posQA.png')
-    pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)
-    
-    # fig.plotter.image.tofile(op.join(info.outfolder, 'lhead_posQA.png'))
     mne.viz.set_3d_view(figure=fig, azimuth=90, elevation=90)
-    tmp_outfile_name = op.join(info.outfolder, 'rhead_posQA.png')
-    pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)    
+    fig.scene.save_png(op.join(outfolder, 'rhead_posQA.png'))
     
-    # fig.plotter.image.tofile(op.join(info.outfolder, 'rhead_posQA.png'))
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
-    tmp_outfile_name = op.join(info.outfolder, 'front_posQA.png')
-    pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)  
+    fig.scene.save_png(op.join(outfolder, 'front_posQA.png'))
     
-    # fig.plotter.image.tofile(op.join(info.outfolder, 'front_posQA.png'))
-    # test = input('Press any key to close')
-    fig.plotter.close()
+
+
+
+## Pyvista version - currently requires on screen display - not suitable for cluster    
+# def plot_QA_head_sensor_align(info, raw, trans):
+#     '''Plot and save the head and sensor alignment and save to the output folder'''
+#     import matplotlib, pylab
+#     import os.path as op
+#     matplotlib.use('Agg')  
+    
+    
+#     fig = mne.viz.plot_alignment(raw.info, trans, subject=info.subjid, dig=False,
+#                      coord_frame='meg', subjects_dir=info.subjects_dir)
+#     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=0)
+    
+#     fig.save(op.join(info.outfolder, 'lhead_posQA.png'))
+    
+#     tmp_outfile_name = op.join(info.outfolder, 'lhead_posQA.png')
+#     pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)
+    
+#     # fig.plotter.image.tofile(op.join(info.outfolder, 'lhead_posQA.png'))
+#     mne.viz.set_3d_view(figure=fig, azimuth=90, elevation=90)
+#     tmp_outfile_name = op.join(info.outfolder, 'rhead_posQA.png')
+#     pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)    
+    
+#     # fig.plotter.image.tofile(op.join(info.outfolder, 'rhead_posQA.png'))
+#     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
+#     tmp_outfile_name = op.join(info.outfolder, 'front_posQA.png')
+#     pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)  
+    
+#     # fig.plotter.image.tofile(op.join(info.outfolder, 'front_posQA.png'))
+#     # test = input('Press any key to close')
+#     fig.plotter.close()
 
 def test_QA_plot():
     import bunch
@@ -158,7 +165,8 @@ def test_QA_plot():
     raw = mne.io.read_raw_ctf(meg_filename)
     trans = mne.read_trans('/home/stoutjd/data/ENIGMA/transfiles/AYCYELJY-trans.fif')
     info.subjid, info.subjects_dir = subjid, subjects_dir
-    plot_QA_head_sensor_align(info, raw, trans ) #subjid, subjects_dir)
+    info.outfolder = '/home/stoutjd/Desktop'
+    plot_QA_head_sensor_align(info, raw, trans ) 
     
 
 def test_main():
@@ -189,6 +197,73 @@ def test_main():
     enigma_dir=os.environ['ENIGMA_REST_DIR']
     with open(os.path.join(enigma_dir,subjid,'info.pkl'),'rb') as e:
         info=pickle.load(e)
+        
+def test_beamformer():
+    import bunch
+    info = bunch.Bunch()
+    
+    
+    meg_filename = '/home/stoutjd/data/MEG/20190115/AYCYELJY_rest_20190115_03.ds'
+    subjid = 'AYCYELJY_fs'
+    subjects_dir = '/home/stoutjd/data/ENIGMA'
+    raw = mne.io.read_raw_ctf(meg_filename, preload=True)
+    trans = mne.read_trans('/home/stoutjd/data/ENIGMA/transfiles/AYCYELJY-trans.fif')
+    info.subjid, info.subjects_dir = subjid, subjects_dir
+    
+    #raw=load_data(filename)
+    raw.apply_gradient_compensation(3)
+    
+    #plot_QA_head_sensor_align(info, raw)
+    
+    raw.resample(300)
+    raw.filter(1.0, None)
+    raw.notch_filter([60,120])
+    
+    epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+
+    data_cov = mne.compute_covariance(epochs, method='empirical')  
+    
+    eroom_filename = '/home/stoutjd/data/ENIGMA/EMPTY_ROOM/20200221/MEG_EmptyRoom_20200221_01.ds'
+    eroom_raw = mne.io.read_raw_ctf(eroom_filename, preload=True)
+    eroom_raw.resample(300)
+    eroom_raw.notch_filter([60,120])
+    eroom_raw.filter(1.0, None)
+    
+    eroom_epochs = mne.make_fixed_length_epochs(eroom_raw, duration=4.0)
+    noise_cov = mne.compute_covariance(eroom_epochs)
+    
+    # data_cov = mne.compute_covariance(epochs, tmin=0.01, tmax=0.25,
+    #                                   method='empirical')
+    
+    
+    # noise_cov = mne.compute_covariance(epochs, tmin=tmin, tmax=0,
+    #                                    method='empirical')
+    
+#    src = mne.read_source_spaces(info.src_filename)
+    # src = mne.read_source_spaces(os.path.join(HOME, 'data/ENIGMA/enigma_outputs/'+subjid+'/source_space-src.fif'))
+    fwd = mne.make_forward_solution(epochs.info, trans, info.src_filename, info.bem_sol_filename)
+    
+    from mne.beamformer import make_lcmv
+    filters = make_lcmv(epochs.info, fwd, data_cov, reg=0.05,
+                        noise_cov=noise_cov, pick_ori='max-power',
+                        weight_norm='unit-noise-gain', rank=None)
+    
+    labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
+                                        subjects_dir=SUBJECTS_DIR, hemi='lh') 
+    labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
+                                        subjects_dir=SUBJECTS_DIR, hemi='rh') 
+    labels=labels_lh + labels_rh 
+    
+    labels[1].center_of_mass()
+    
+    for i in labels: brain.add_foci(i.center_of_mass(), coords_as_verts=True, 
+                                    hemi='lh', color='blue', scale_factor=1.0, 
+                                    alpha=0.5)
+
+
+    
+    
+
     
     
   
@@ -242,9 +317,7 @@ def main(filename=None, subjid=None, trans=None, info=None):
     labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
                                         subjects_dir=SUBJECTS_DIR, hemi='rh') 
     labels=labels_lh + labels_rh 
-    
-    #labels = labels[0:10]  ######## <<< HACK for DEMO  3####################################
-    
+        
     label_ts=mne.extract_label_time_course(stcs, labels, src, mode='pca_flip') 
     
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
@@ -364,27 +437,11 @@ if __name__=='__main__':
     raw=load_data(args.meg_file)
     
     trans = mne.read_trans(args.trans)
-    
-    # trans=mne.transforms.Transform('mri', 'head')
-    
-    # # Get the MRI offset from freesurfer call
-    # offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
-    #                                                       'mri', 'orig','001.mgz'))
-    
-    # from subprocess import check_output
-    # offset = check_output(offset_cmd.split(' ')).decode()[:-1]
-    # offset = offset.split(' ')
-    # offset = np.array([float(i) for i in offset])
-    
-    # # Convert to RAS ????????????????????????  << Verify 
-    # offset[2] *= -1
-    # offset *= .001  #Convert to mm
-    # trans['trans'][0:3,-1] = offset
-    
+        
     if args.viz_coreg:
         plot_QA_head_sensor_align(info, raw, trans)
         # visualize_coreg(raw, info, trans=trans)
-        _ = input('Enter anything to exit')
+        # _ = input('Enter anything to exit')
         exit(0)
     
     del raw
