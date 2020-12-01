@@ -20,21 +20,33 @@ from mne_bids.read import _extract_landmarks
 np.set_printoptions(suppress=True)
 
 
-def trans_from_json(t1w_json_path, meg_path, subjid=None):
+def trans_from_json(t1w_path=None, coordsys_json_path=None,
+                    meg_path=None, subjid=None, plot_coreg=False):
+    '''
+    Script to extract the transformation matrix from the CAMCAN datasets
+    
+    Data must be reorganized before implementing
+        The script expects root_dir/subjid/{meg,anat}/....
+        Use the file - .reorganize_camcan_dsets.py to organize data
+    '''
+    
+    
+    
     ##### Code below is from the mne_bids package
     # '0.6.dev0'
     # commit 18cc4f912495e8de8ab30d9c3077b19c923bebf4
     # Specific function is mne_bids.get_head_mri_trans
     # Modifications were made to bypass some of the bids requirements
+    # Also the LPA,RPA,Nasion are pulled from the coordsys meg file not T1.json
     # >>>
     
-    # Get MRI landmarks from the JSON sidecar
-    with open(t1w_json_path, 'r', encoding='utf-8-sig') as f:
-        t1w_json = json.load(f)
-    mri_coords_dict = t1w_json.get('AnatomicalLandmarkCoordinates', dict())
+    # Get MRI landmarks from MEGcoordsys JSON sidecar
+    with open(coordsys_json_path, 'r', encoding='utf-8-sig') as f:
+        coordsys_json = json.load(f)
+    mri_coords_dict = coordsys_json.get('AnatomicalLandmarkCoordinates', dict())
     mri_landmarks = np.asarray((mri_coords_dict.get('LPA', np.nan),
-                                mri_coords_dict.get('Nasion', np.nan),
-                                mri_coords_dict.get('RPA', np.nan)))
+                                mri_coords_dict.get('NAS', np.nan),
+                                mri_coords_dict.get('RPA', np.nan)))    
     
     if np.isnan(mri_landmarks).any():
         raise RuntimeError('Could not parse T1w sidecar file: "{}"\n\n'
@@ -42,33 +54,20 @@ def trans_from_json(t1w_json_path, meg_path, subjid=None):
                            '"AnatomicalLandmarkCoordinates" pointing to a '
                            'dict with keys "LPA", "NAS", "RPA". '
                            'Yet, the following structure was found:\n\n"{}"'
-                           .format(t1w_json_path, t1w_json))
+                           .format(coordsys_json_path, coordsys_json))
     
     # The MRI landmarks are in "voxels". We need to convert the to the
     # neuromag RAS coordinate system in order to compare the with MEG landmarks
     # see also: `mne_bids.write.write_anat`
-    t1w_path = t1w_json_path.replace('.json', '.nii')
+    # t1w_path = t1w_json_path.replace('.json', '.nii')
     if not op.exists(t1w_path):
         t1w_path += '.gz'  # perhaps it is .nii.gz? ... else raise an error
     if not op.exists(t1w_path):
-        raise RuntimeError('Could not find the T1 weighted MRI associated '
-                           'with "{}". Tried: "{}" but it does not exist.'
-                           .format(t1w_json_path, t1w_path))
-    t1_nifti = nib.load(t1w_path)
-    # Convert to MGH format to access vox2ras method
-    t1_mgh = nib.MGHImage(t1_nifti.dataobj, t1_nifti.affine)
+        raise RuntimeError('Could not find the T1 weighted MRI \
+                           Tried: "{}" but it does not exist.'
+                           .format(t1w_path))
     
-    # now extract transformation matrix and put back to RAS coordinates of MRI
-    vox2ras_tkr = t1_mgh.header.get_vox2ras_tkr()
-    mri_landmarks = apply_trans(vox2ras_tkr, mri_landmarks)
     mri_landmarks = mri_landmarks * 1e-3
-    
-    # Get MEG landmarks from the raw file
-    # _, ext = _parse_ext(bids_fname)
-    # if extra_params is None:
-    #     extra_params = dict()
-    #     if ext == '.fif':
-    #         extra_params = dict(allow_maxshield=True)
     
     raw =  mne.io.read_raw_fif(meg_path)
     meg_coords_dict = _extract_landmarks(raw.info['dig'])
@@ -85,79 +84,53 @@ def trans_from_json(t1w_json_path, meg_path, subjid=None):
     # <<< End of block
     
     
-    #Apply necessary coordinate swaps 
-    #FIX 
-
-    
-    # offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
-    #                                                   'mri', 'orig','001.mgz'))
-    # from subprocess import check_output
-    # offset = check_output(offset_cmd.split(' ')).decode()[:-1]
-    # offset = offset.split(' ')
-    # offset = np.array([float(i) for i in offset])
-    
     _,_,tmp = nib.freesurfer.io.read_geometry('./SUBJECTS_DIR/{}/surf/lh.pial'\
                                              .format(subjid),
                                              read_metadata=True)
     offset = tmp['cras']
     
-    import copy
-    r0 = copy.deepcopy(trans['trans'][0,:])
-    r1 = copy.deepcopy(trans['trans'][1,:])
-    r2 = copy.deepcopy(trans['trans'][2,:])
-        
-    trans['trans'][0,:]=r1
-    trans['trans'][1,:]=r0
-    trans['trans'][2,:]*=-1
+    trans['trans'][0,3]-=(offset[0]*.001)  
+    trans['trans'][1,3]-=(offset[1]*.001)
+    trans['trans'][2,3]-=(offset[2]*.001)
     
-    trans['trans'][0,3]+=(offset[0]*.001)  
-    trans['trans'][1,3]+=(offset[1]*.001)
-    trans['trans'][2,3]+=(offset[2]*.001)
-    
-    # trans.save(os.path.splitext(t1w_path)[0]+'-trans.fif')
+    trans.save(os.path.splitext(t1w_path)[0]+'-trans.fif')
     print(trans)
-    mne.viz.plot_alignment(raw.info, dig=True,
-                           subjects_dir='./SUBJECTS_DIR', 
-                           subject=subjid,
-                           trans=trans,
-                           surfaces=['pial','head'],
-                           meg=True)
-    _ = input('Enter anything to continue')
+    
+    if plot_coreg==True:
+        mne.viz.plot_alignment(raw.info, dig=True,
+                               subjects_dir='./SUBJECTS_DIR', 
+                               subject=subjid,
+                               trans=trans,
+                               surfaces=['pial','head'],
+                               meg=False)#True)
+        _ = input('Enter anything to continue')
 
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    # parser.add_argument('-meg', help='MEG path')    
-    # parser.add_argument('-subjects_dir', help='Freesurfer subjects_dir')
     parser.add_argument('-camcan_dir', help='Top directory of CAMCAN converted format')
-    # parser.add_argument('-t1mri', help='T1w MRI used to create fs recon')
     parser.add_argument('-subjid', help='Subjid of dataset')
+    parser.add_argument('-plot_coreg', help='Bring up a pyvista image with coreg',
+                        action='store_true')
     args=parser.parse_args()
     
     if not args.camcan_dir or not args.subjid:
         print('The camcan_dir and subjid options must be supplied')
         exit()
         
-    
-    #os.chdir('/home/stoutjd/data/CAMCAN')
-    # fs_aff = nib.load('SUBJECTS_DIR/sub-CC121106/mri/T1.mgz').affine
-    # t1_aff = nib.load('sub-CC121106/anat/sub-CC121106_T1w.nii.gz').affine
-    
-    # root_dir = '/home/stoutjd/data/CAMCAN'
-    # subjid = 'sub-CC121106'
     os.chdir(args.camcan_dir)
     
-    #may need to fix filenames on CAMCAN bids - mne_bids throws warnings
     subjid=args.subjid
     meg_path='{}/meg/{}_ses-rest_task-rest_proc-sss.fif'.format(subjid,subjid)
+    coordsys_path = '{}/meg/{}_ses-rest_task-rest_proc-sss_coordsystem.json'.format(subjid,subjid)
     
     print(meg_path)
-    
     tmp_path=os.path.join(args.camcan_dir, subjid, 'anat')
-    t1w_json_path = glob.glob(tmp_path+'/*T1w*.json')[0]
+    t1w_path = glob.glob(tmp_path+'/*T1w*.nii.gz')[0]
     
-    print(t1w_json_path)
-    trans_from_json(t1w_json_path, meg_path, subjid=subjid)
+    print(t1w_path)
+    trans_from_json(t1w_path=t1w_path, coordsys_json_path=coordsys_path,
+                    meg_path=meg_path, subjid=subjid, plot_coreg=args.plot_coreg)
     
     
 
