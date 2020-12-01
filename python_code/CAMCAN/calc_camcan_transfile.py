@@ -21,7 +21,8 @@ np.set_printoptions(suppress=True)
 
 
 def trans_from_json(t1w_path=None, coordsys_json_path=None,
-                    meg_path=None, subjid=None, plot_coreg=False):
+                    meg_path=None, subjid=None, plot_coreg=False,
+                    subjects_dir=None):
     '''
     Script to extract the transformation matrix from the CAMCAN datasets
     
@@ -83,17 +84,26 @@ def trans_from_json(t1w_path=None, coordsys_json_path=None,
     
     # <<< End of block
     
-    
-    _,_,tmp = nib.freesurfer.io.read_geometry('./SUBJECTS_DIR/{}/surf/lh.pial'\
-                                             .format(subjid),
-                                             read_metadata=True)
+    if subjects_dir==None:
+        if 'SUBJECTS_DIR' not in os.environ:
+            print('SUBJECTS_DIR must either be an environmental variable\
+                  or declared on the commandline.')
+            raise(ValueError)
+        else:
+            subjects_dir=os.environ['SUBJECTS_DIR']
+        
+    pial_path=op.join(subjects_dir, '{}/surf/lh.pial'.format(subjid))
+    _,_,tmp = nib.freesurfer.io.read_geometry(pial_path, read_metadata=True)
     offset = tmp['cras']
     
     trans['trans'][0,3]-=(offset[0]*.001)  
     trans['trans'][1,3]-=(offset[1]*.001)
     trans['trans'][2,3]-=(offset[2]*.001)
     
-    trans.save(os.path.splitext(t1w_path)[0]+'-trans.fif')
+    trans_filename=os.path.join(os.path.dirname(t1w_path),
+                                subjid+'-trans.fif')
+    
+    trans.save(trans_filename)
     print(trans)
     
     if plot_coreg==True:
@@ -112,6 +122,7 @@ if __name__=='__main__':
     parser.add_argument('-subjid', help='Subjid of dataset')
     parser.add_argument('-plot_coreg', help='Bring up a pyvista image with coreg',
                         action='store_true')
+    parser.add_argument('-subjects_dir', help='Overrides SUBJECTS_DIR set in environment')
     args=parser.parse_args()
     
     if not args.camcan_dir or not args.subjid:
@@ -126,11 +137,19 @@ if __name__=='__main__':
     
     print(meg_path)
     tmp_path=os.path.join(args.camcan_dir, subjid, 'anat')
+    print(tmp_path)
+    print(glob.glob(tmp_path+'/*T1w*.nii.gz'))
     t1w_path = glob.glob(tmp_path+'/*T1w*.nii.gz')[0]
+    
+    if args.subjects_dir:
+        subjects_dir=args.subjects_dir
+    else:
+        subjects_dir=None
     
     print(t1w_path)
     trans_from_json(t1w_path=t1w_path, coordsys_json_path=coordsys_path,
-                    meg_path=meg_path, subjid=subjid, plot_coreg=args.plot_coreg)
+                    meg_path=meg_path, subjid=subjid, plot_coreg=args.plot_coreg,
+                    subjects_dir=subjects_dir)
     
     
 
