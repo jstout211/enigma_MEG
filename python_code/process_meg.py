@@ -269,34 +269,36 @@ def test_beamformer():
   
 
 
-def main(filename=None, subjid=None, trans=None, info=None):
+def main(filename=None, subjid=None, trans=None, info=None, line_freq=None):
+    
+    ## Load and prefilter continuous data
     raw=load_data(filename)
-    raw.apply_gradient_compensation(3)
     
-    #plot_QA_head_sensor_align(info, raw)
+    if type(raw)==mne.io.ctf.ctf.RawCTF:
+        raw.apply_gradient_compensation(3)
     
-    raw.resample(300)
+    resample_freq=300
+    raw.resample(resample_freq)
     raw.filter(0.3, None)
-    raw.notch_filter([60,120])
     
+    if line_freq==None:
+        try:
+            line_freq = raw.info['line_freq']  # this isn't present in all files
+        except:
+            raise(ValueError('Could not determine line_frequency'))
+    
+    notch_freqs = np.arange(line_freq, 
+                            resample_freq/2, 
+                            line_freq)
+    raw.notch_filter(notch_freqs)
+    
+    
+    ## Create Epochs and  
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
-    
-    ####  Reduced for DEMO  ##############
-    #epochs=epochs[0:10]
-    
-    #Drop bad epochs and channels
-    ##
-    
-    #Calculate covariance
     cov = mne.compute_covariance(epochs)
     
-    HOME=os.environ['HOME']
     src = mne.read_source_spaces(info.src_filename)
-    #src = mne.read_source_spaces(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/source_space-src.fif'))
-    # bem = mne.read_bem_solution(os.path.join(HOME, 'hv_proc/enigma_outputs/'+subjid+'/bem_sol-sol.fif'))
     bem = mne.read_bem_solution(info.bem_sol_filename)
-
-
     fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
     
     inverse_operator = mne.minimum_norm.make_inverse_operator(epochs.info, fwd, cov, 
@@ -419,6 +421,7 @@ if __name__=='__main__':
                         coregistration between head surface and MEG sensors''',
                         action='store_true')
     parser.add_argument('-trans', help='''Transfile from mne python -trans.fif''')
+    parser.add_argument('-line_f', help='''Line frequecy''', type=float)
     
     args=parser.parse_args()
     if not args.subjects_dir:
@@ -445,7 +448,8 @@ if __name__=='__main__':
         exit(0)
     
     del raw
-    main(args.meg_file, subjid=subjid, trans=trans, info=info)
+    main(args.meg_file, subjid=subjid, trans=trans, info=info, 
+         line_freq=args.line_f)
     
     
         
