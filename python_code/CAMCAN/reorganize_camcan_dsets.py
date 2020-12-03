@@ -63,15 +63,18 @@ def create_links(dseries=None):
         if 'nomovecomp' in task_id:
             continue
         if task_id == 'meg_emptyroom':
-            tmp = op.dirname(dseries['input_'+task_id])
-            eroom = glob.glob(op.join(tmp, 'emptyroom','*room*.fif'))[0]
-            dset_basename=op.basename(eroom)
-            output_dset_path = op.join(dseries['output_meg_dir'], dset_basename)
-            if not os.path.exists(eroom):
-                continue
-            if not os.path.exists(output_dset_path):
-                print(eroom, output_dset_path)
-                os.symlink(eroom, output_dset_path)                
+            try:
+                tmp = op.dirname(dseries['input_'+task_id])
+                eroom = glob.glob(op.join(tmp, 'emptyroom','*room*.fif'))[0]
+                dset_basename=op.basename(eroom)
+                output_dset_path = op.join(dseries['output_meg_dir'], dset_basename)
+                if not os.path.exists(eroom):
+                    continue
+                if not os.path.exists(output_dset_path):
+                    print(eroom, output_dset_path)
+                    os.symlink(eroom, output_dset_path)    
+            except:
+                print('Error linking {}:'.format(dseries['input_'+task_id]))
             
         if task_id == 'meg_rest_mf':
             for input_dset_path in glob.glob(dseries['input_'+task_id]+'/meg/*'):
