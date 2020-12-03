@@ -56,24 +56,33 @@ def create_links(dseries=None):
         os.mkdir(dseries['output_meg_dir'])
         
     #Loop over meg tasks and create symlinks for all files into the folder:
-    for task_id in ['meg_rest_mf']:#, 'meg_smt_mf']:
+    for task_id in ['meg_rest_mf', 'meg_emptyroom']:#, 'meg_smt_mf']:
 #     for task_id in meg_types:
         print(task_id)
         #Skip - the no movement correction data
         if 'nomovecomp' in task_id:
             continue
         if task_id == 'meg_emptyroom':
-            continue
-        
-        for input_dset_path in glob.glob(dseries['input_'+task_id]+'/meg/*'):
-            dset_basename=op.basename(input_dset_path)
+            tmp = op.dirname(dseries['input_'+task_id])
+            eroom = glob.glob(op.join(tmp, 'emptyroom','*room*.fif'))[0]
+            dset_basename=op.basename(eroom)
             output_dset_path = op.join(dseries['output_meg_dir'], dset_basename)
-            if not os.path.exists(input_dset_path):
+            if not os.path.exists(eroom):
                 continue
             if not os.path.exists(output_dset_path):
-                print(input_dset_path, output_dset_path)
-                #shutil.copyfile(input_dset_path, output_dset_path)
-                os.symlink(input_dset_path, output_dset_path)
+                print(eroom, output_dset_path)
+                os.symlink(eroom, output_dset_path)                
+            
+        if task_id == 'meg_rest_mf':
+            for input_dset_path in glob.glob(dseries['input_'+task_id]+'/meg/*'):
+                dset_basename=op.basename(input_dset_path)
+                output_dset_path = op.join(dseries['output_meg_dir'], dset_basename)
+                if not os.path.exists(input_dset_path):
+                    continue
+                if not os.path.exists(output_dset_path):
+                    print(input_dset_path, output_dset_path)
+                    #shutil.copyfile(input_dset_path, output_dset_path)
+                    os.symlink(input_dset_path, output_dset_path)
         
 
 def link_anat_folder(dframe=None, subjid=None):
