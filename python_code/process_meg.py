@@ -269,24 +269,29 @@ def test_beamformer():
   
 
 
-def main(filename=None, subjid=None, trans=None, info=None, line_freq=None):
+def main(filename=None, subjid=None, trans=None, info=None, line_freq=None, 
+         emptyroom_filename=None):
     
     ## Load and prefilter continuous data
     raw=load_data(filename)
+    eraw=load_data(emptyroom_filename)
     
     if type(raw)==mne.io.ctf.ctf.RawCTF:
         raw.apply_gradient_compensation(3)
     
     resample_freq=300
+    
     raw.resample(resample_freq)
+    eraw.resample(resample_freq)
+    
     raw.filter(0.3, None)
+    eraw.filter(0.3, None)
     
     if line_freq==None:
         try:
             line_freq = raw.info['line_freq']  # this isn't present in all files
         except:
             raise(ValueError('Could not determine line_frequency'))
-    
     notch_freqs = np.arange(line_freq, 
                             resample_freq/2, 
                             line_freq)
@@ -297,11 +302,14 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None):
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
     cov = mne.compute_covariance(epochs)
     
+    er_epochs=mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+    er_cov = mne.compute_covariance(er_epochs)
+    
     src = mne.read_source_spaces(info.src_filename)
     bem = mne.read_bem_solution(info.bem_sol_filename)
     fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
     
-    inverse_operator = mne.minimum_norm.make_inverse_operator(epochs.info, fwd, cov, 
+    inverse_operator = mne.minimum_norm.make_inverse_operator(epochs.info, fwd, er_cov, 
                                                            loose=0.2)
     #Calculate Inverse solution
     snr = 1.0  # use lower SNR for single epochs
@@ -417,6 +425,8 @@ if __name__=='__main__':
     parser.add_argument('-subjid', help='''Define subjects id (folder name)
                         in the SUBJECTS_DIR''')
     parser.add_argument('-meg_file', help='''Location of meg rest dataset''')
+    parser.add_argument('-er_meg_file', help='''Emptyroom dataset assiated with meg
+                        file''')
     parser.add_argument('-viz_coreg', help='''Open up a window to vizualize the 
                         coregistration between head surface and MEG sensors''',
                         action='store_true')
@@ -449,7 +459,7 @@ if __name__=='__main__':
     
     del raw
     main(args.meg_file, subjid=subjid, trans=trans, info=info, 
-         line_freq=args.line_f)
+         line_freq=args.line_f, emptyroom_filename=args.er_meg_file)
     
     
         
