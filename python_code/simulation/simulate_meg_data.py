@@ -11,6 +11,7 @@ import os
 import glob
 import os.path as op
 import numpy as np
+import pandas as pd
 import mne
 from mne.datasets import sample
 from mne.simulation.raw import simulate_raw
@@ -64,16 +65,24 @@ def generate_subjects_psuedomeg(subjid=None,
 
     source_simulator = SourceSimulator(src, tstep=1/sfreq, duration=duration)
     
-    for rseed, label in enumerate(labels[0:10]):
-        np.random.seed(rseed)
-        sig=return_pseudo_neuro_sig(peakFreq=10, peakBw=2, burstProp=0.3,
+    #Generate uniform distribution of alpha peaks between 8 and 12
+    alpha_rand = np.random.uniform(8, 12, size=len(labels))
+    
+    dframe=pd.DataFrame()
+    
+    for idx, label in enumerate(labels):
+        np.random.seed(idx)
+        sig=return_pseudo_neuro_sig(peakFreq=alpha_rand[idx], peakBw=2, burstProp=0.3,
                                 sigDuration=duration, sfreq=sfreq, ooofExp=-2,
                                 sigAmplitudeNam=1)
         np.save(label.name+'_sig.npy', sig)
         source_simulator.add_data(label, sig, [[0, 0, 1]])
-
-
-
+        
+        dframe.loc[idx, 'label']=label.name
+        dframe.loc[idx, 'seed']=idx
+        dframe.loc[idx, 'alpha_val'] = alpha_rand[idx]
+    
+    dframe.to_csv('./simulation_values.csv')
 
     #FIX  - ONly works for CTF currently #####################################
     #################
