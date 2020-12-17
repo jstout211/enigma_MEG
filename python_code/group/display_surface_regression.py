@@ -26,7 +26,8 @@ print(__doc__)
 #Use python terminal - seems to have issue with ipython 
 
 
-dframe=pd.read_csv('/home/stoutjd/data/ENIGMA/Prelim_coeffs_Age2.csv')
+# dframe=pd.read_csv('/home/stoutjd/data/ENIGMA/Prelim_coeffs_Age2.csv')
+dframe = pd.read_csv('/home/stoutjd/CAMCAN_ageValpha/Alpha_vs_age.csv')
 
 os.environ['SUBJECTS_DIR'] = '/home/stoutjd/data/BIDS_nih/'
 subject_id = "fsaverage"
