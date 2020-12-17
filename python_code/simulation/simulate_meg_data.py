@@ -84,10 +84,10 @@ def generate_subjects_psuedomeg(subjid=None,
     
     dframe.to_csv('./simulation_values.csv')
 
-    #FIX  - ONly works for CTF currently #####################################
-    #################
-    ch_names = [i for i in info.ch_names if len(i)==5]
-    info.pick_channels(ch_names)
+    #FIX  - For CTF files, the simulation does not apply to ref data
+    if raw_fname[-3:]=='.ds':
+        ch_names = [i for i in info.ch_names if len(i)==5]
+        info.pick_channels(ch_names)
 
     raw = simulate_raw(info, source_simulator, forward=fwd)
     raw.save('{}_NeuroDSP_sim_meg.fif'.format(subjid))
