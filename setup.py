@@ -4,7 +4,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="enigma", # Replace with your own username
+    name="enigma", 
     version="0.0.1",
     author="Jeff Stout",
     author_email="stoutjd@nih.gov",
@@ -15,8 +15,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: None <<< FIX",
-        "Operating System :: OS Independent",
+        "License :: OSI Approved :: UNLICENSE",
+        "Operating System :: Linux/Unix",
     ],
     python_requires='>=3.6',
 )
