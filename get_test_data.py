@@ -7,14 +7,6 @@ Created on Tue Dec 22 14:06:22 2020
 """
 import os
 import os.path as op
-import bunch
-
-defaults = bunch.Bunch()
-defaults.trans = None
-defaults.src = None
-defaults.meg_rest = None
-defaults.enigma_outputs = None 
-
 
 class datasets():
     def __init__(self):
@@ -46,7 +38,7 @@ def get_hcp(topdir=None):
     return inputs
 
 def get_ctf(topdir=None):
-    inputs = bunch.Bunch()
+    inputs = dict() 
     inputs['meg_rest'] = op.join(topdir, 'CTF', 'ctf_rest.ds')
     inputs['meg_eroom'] = op.join(topdir, 'CTF', 'ctf_eroom.ds')
     inputs['enigma_outputs'] = op.join(topdir, 'enigma_outputs')
@@ -56,7 +48,7 @@ def get_ctf(topdir=None):
     return inputs
 
 def get_elekta(topdir=None):
-    inputs = bunch.Bunch()
+    inputs = dict() 
     inputs['meg_rest'] = op.join(topdir, 'HCP', 'hcp_rest_example.fif')
     inputs['meg_eroom'] = op.join(topdir, 'HCP', 'hcp_eroom_example.fif')
     inputs['enigma_outputs'] = op.join(topdir, 'enigma_outputs')
