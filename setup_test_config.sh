@@ -1,6 +1,14 @@
-echo Make sure to use an interactive bash window:
-echo bash -i ./setup_test_config.py
-echo Without the -i, the conda init function will not be accessible
+if [[ $- == *i* ]]
+then
+	echo Shell is properly in interactive mode
+else
+	echo Error: Shell needs to be invoked using interactive flag
+	echo Without the -i, bash cannot access conda activate in subshell
+	echo bash -i $0
+	exit 1
+fi
+
+
 
 
 conda create -n test_enigma -y python=3.7 pip
