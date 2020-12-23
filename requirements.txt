@@ -6,4 +6,4 @@ neurodsp
 fooof
 statsmodels
 nibabel
-
+pytest
