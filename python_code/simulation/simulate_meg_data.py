@@ -40,7 +40,8 @@ def generate_subjects_psuedomeg(subjid=None,
                                 src_fname=None,
                                 sfreq=400,
                                 duration=10, 
-                                input_dir=None):
+                                input_dir=None, 
+                                get_hcp=None):
     if subjects_dir==None:
         try:
             subjects_dir=os.environ['SUBJECTS_DIR']
@@ -54,7 +55,14 @@ def generate_subjects_psuedomeg(subjid=None,
     bem = mne.read_bem_solution(bem_fname)
     trans = mne.read_trans(trans_fname)
 
-    info = mne.io.read_raw_ctf(raw_fname, clean_names=True).info
+    
+    if get_hcp !=None:
+        raw, eroom=read_hcp_input()
+        info = raw.info
+    elif raw_fname[-3:]=='.ds':
+        info = mne.io.read_raw_ctf(raw_fname, clean_names=True).info
+    elif raw_fname[-4:]=='.fif':
+        info = mne.io.read_raw_fif(raw_fname).info
     info.update(sfreq=sfreq, bads=[])
     
     fwd = mne.make_forward_solution(info=info, trans=trans,src=src, 
@@ -82,7 +90,7 @@ def generate_subjects_psuedomeg(subjid=None,
         dframe.loc[idx, 'seed']=idx
         dframe.loc[idx, 'alpha_val'] = alpha_rand[idx]
     
-    dframe.to_csv('./simulation_values.csv')
+    dframe.to_csv('./simulation_values.csv', index=False)
 
     #FIX  - For CTF files, the simulation does not apply to ref data
     if raw_fname[-3:]=='.ds':
@@ -91,6 +99,92 @@ def generate_subjects_psuedomeg(subjid=None,
 
     raw = simulate_raw(info, source_simulator, forward=fwd)
     raw.save('{}_NeuroDSP_sim_meg.fif'.format(subjid))
+    
+# def test_hcp_sim():
+#     #os.chdir('/home/stoutjd/src/enigma/tmp')
+#     #data_path = os.path.join(os.path.realpath(__file__), '../../test_data')
+#     subjid = 'AYCYELJY_fs'
+#     enigma_outputs = os.path.join(data_path, 'enigma_outputs')
+#     subjects_dir= os.path.join(data_path, 'SUBJECTS_DIR') #, subjid) 
+#     raw_fname = os.path.join(data_path, 'HCP', 'hcp_rest_example.fif')
+#     trans_fname=os.path.join(data_path, 'CTF', 'ctf-trans.fif') 
+#     bem_fname=os.path.join(enigma_outputs, subjid, 'bem_sol-sol.fif')
+#     src_fname=os.path.join(enigma_outputs, subjid, 'source_space-src.fif')
+#     sfreq=100
+#     duration=10 
+#     generate_subjects_psuedomeg(subjid=subjid, 
+#                                 subjects_dir=subjects_dir, 
+#                                 raw_fname=raw_fname,
+#                                 trans_fname=trans_fname, 
+#                                 bem_fname=bem_fname,
+#                                 src_fname=src_fname,
+#                                 sfreq=100,
+#                                 duration=10, 
+#                                 input_dir=enigma_outputs, 
+#                                 get_hcp=None)
+    
+    
+# def read_hcp_input():
+#     '''Returns test data for hcp
+#     raw, errom =  return_hcp_test_files()'''
+#     hcp_fname = '/home/stoutjd/src/enigma/test_data/HCP/hcp_rest_example.fif'
+#     eroom_fname = '/home/stoutjd/src/enigma/test_data/HCP/hcp_eroom_example.fif'
+#     raw = mne.io.read_raw_fif(hcp_fname)
+#     eroom = mne.io.read_raw_fif(eroom_fname)
+#     return raw, eroom
+        
+
+# def test_load_hcp():
+    
+
+def compare_simulation_signals(sim_dir=None):
+    '''Evaluate the ground truth simulated data to the recovered signal'''
+    dframe = pd.read_csv(op.join(sim_dir, 'simulation_values.csv'))
+    
+    for idx,row in dframe.iterrows():
+        # print(row)
+        print(row['label'])
+        current = np.load(op.join(sim_dir, row['label']+'_sig.npy'))
+        recovered = None
+        
+        print(len(current))
+        
+                          
+    
+    labels=mne.read_labels_from_annot(subjid, 
+                                  subjects_dir=subjects_dir)
+    
+def test_generate_subjects_psuedomeg():
+    from enigma.get_test_data import datasets
+    filenames = datasets().elekta    
+        
+    subjid = filenames['subject'] 
+    subjects_dir = filenames['SUBJECTS_DIR'] 
+    raw_fname = filenames['meg_rest']
+    trans_fname = filenames['trans']
+    bem_fname = filenames['bem'] 
+    src_fname = filenames['src'] 
+    input_dir= filenames['enigma_outputs']
+    
+    
+    
+    # raw_fname = '/home/stoutjd/data/ENIGMA/AYCYELJY_rest_20190115_03.ds'
+    # trans_fname = '/home/stoutjd/data/ENIGMA/transfiles/AYCYELJY-trans.fif'
+    # bem_fname = '/home/stoutjd/data/ENIGMA/enigma_outputs/AYCYELJY_fs/bem_sol-sol.fif'
+    # src_fname = '/home/stoutjd/data/ENIGMA/enigma_outputs/AYCYELJY_fs/source_space-src.fif'
+    sfreq=100
+    duration=10
+    # input_dir='/home/stoutjd/data/ENIGMA/enigma_outputs'
+    
+    import os
+    os.mkdir('./tmp2')
+    os.chdir('./tmp2')
+    
+    np.random.seed(31)
+    generate_subjects_psuedomeg(subjid, subjects_dir, raw_fname, trans_fname, bem_fname, 
+                                src_fname, sfreq, duration, input_dir)
+
+    
     
 if __name__ ==  '__main__':
     import argparse

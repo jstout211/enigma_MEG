@@ -16,14 +16,21 @@ class datasets():
         print('Need to make HCP MNE src/bem/tran files - using CTF fillins')
         verify_inputs(get_hcp(basedir))
         self.hcp = get_hcp(basedir) 
+        self.hcp['subject'] = 'hcp_fs'
         
         print('Elekta')
         verify_inputs(get_elekta(basedir))
         self.elekta = get_elekta(basedir)
+        self.elekta['subject'] = 'elekta_fs'
         
         print('CTF')
         verify_inputs(get_ctf(basedir))
         self.ctf = get_ctf(basedir)
+        self.ctf['subject'] = 'ctf_fs'
+        
+        for current in self.ctf, self.hcp, self.elekta:
+            current['SUBJECTS_DIR'] = op.join(basedir, 'SUBJECTS_DIR')
+        
         # self.elekta = get_ctf(basedir, inputs=defaults)
         
 
