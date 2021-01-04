@@ -56,10 +56,10 @@ def get_ctf(topdir=None):
 
 def get_elekta(topdir=None):
     inputs = dict() 
-    inputs['meg_rest'] = op.join(topdir, 'HCP', 'hcp_rest_example.fif')
-    inputs['meg_eroom'] = op.join(topdir, 'HCP', 'hcp_eroom_example.fif')
+    inputs['meg_rest'] = op.join(topdir, 'ELEKTA', 'elekta_rest_meg.fif')
+    inputs['meg_eroom'] = op.join(topdir, 'ELEKTA', 'elekta_eroom_meg.fif')
     inputs['enigma_outputs'] = op.join(topdir, 'enigma_outputs')
-    inputs['trans'] = op.join(topdir, 'CTF', 'ctf-trans.fif')
+    inputs['trans'] = op.join(topdir, 'ELEKTA', 'elekta-trans.fif')
     inputs['src'] = op.join(inputs['enigma_outputs'], 'elekta_fs', 'source_space-src.fif')
     inputs['bem'] = op.join(inputs['enigma_outputs'], 'elekta_fs', 'bem_sol-sol.fif')
     return inputs
