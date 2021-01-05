@@ -8,13 +8,13 @@ Created on Wed Dec 16 11:20:12 2020
 
 import os
 import numpy as np
-from ..simulate_meg_data import generate_subjects_psuedomeg
+from enigmeg.simulation.simulate_meg_data import generate_subjects_psuedomeg
 
 import pytest
 
-@pytest.mark.skip()
+#@pytest.mark.skip()
 def test_generate_subjects_psuedomeg():
-    from ..test_data.get_test_data import datasets
+    from enigmeg.test_data.get_test_data import datasets
     
     #For elekta data
     elekta_dat = datasets().elekta
