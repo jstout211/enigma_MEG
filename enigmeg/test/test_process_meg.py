@@ -7,7 +7,7 @@ Created on Fri Apr  3 16:38:03 2020
 """
 
 # from hv_proc import test_config
-from enigma.get_test_data import datasets
+from enigmeg.test_data.get_test_data import datasets
 import pytest
 
 

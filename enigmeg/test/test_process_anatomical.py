@@ -7,8 +7,8 @@ This is a temporary script file.
 
 import os, mne
 from ..process_anatomical import anat_info, compile_fs_process_list
-import enigma    
-test_data_path = os.path.join(enigma.__path__[0], 'test_data')
+import enigmeg    
+test_data_path = os.path.join(enigmeg.__path__[0], 'test_data')
 os.environ['ENIGMA_REST_DIR'] = os.path.join(test_data_path, 'enigma_outputs')
 
 

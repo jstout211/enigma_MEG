@@ -1,3 +1,3 @@
 [submodule "python_code/test_data"]
-	path = python_code/test_data
+	path = enigmeg/test_data
 	url = git@tako:test_data

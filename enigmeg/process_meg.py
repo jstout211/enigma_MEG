@@ -20,7 +20,7 @@ TODO:
 import os, os.path as op
 import mne, numpy as np
 import pandas as pd
-from enigma.python_code.spectral_peak_analysis import calc_spec_peak
+from .spectral_peak_analysis import calc_spec_peak
 
 
 #mne.viz.set_3d_backend('pyvista')
