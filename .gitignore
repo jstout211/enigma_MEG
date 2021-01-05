@@ -3,4 +3,4 @@ __pycache__
 .coverage
 
 .ipynb_checkpoints
-
+htmlcov/*
