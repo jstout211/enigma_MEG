@@ -1,2 +1,6 @@
 __pycache__
 .pytest_cache_
+.coverage
+
+.ipynb_checkpoints
+htmlcov/*

@@ -6,11 +6,17 @@ Created on Fri Apr  3 16:38:03 2020
 @author: stoutjd
 """
 
-from hv_proc import test_config
+# from hv_proc import test_config
+from enigmeg.test_data.get_test_data import datasets
 import pytest
-filename = test_config.hariri['meg']
 
-from ..load_data import check_datatype, return_dataloader, load_data
+
+filename = datasets().ctf['meg_rest']
+
+# test_config.hariri['meg']
+
+# from ..load_data import check_datatype, return_dataloader, load_data
+from ..process_meg import check_datatype, return_dataloader, load_data
 
 def test_check_datatype():
     assert check_datatype('test.fif')  == 'elekta'
@@ -31,8 +37,8 @@ def test_return_dataloader():
     assert return_dataloader('elekta') == mne.io.read_raw_fif
     
 def test_load_data():
-    from hv_proc import test_config
-    filename = test_config.rest['meg']
+    # from hv_proc import test_config
+    filename = datasets().ctf['meg_rest'] #test_config.rest['meg']
     assert check_datatype(filename) == 'ctf'
     load_data(filename)     
     
