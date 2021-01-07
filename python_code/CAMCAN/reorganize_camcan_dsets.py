@@ -13,14 +13,14 @@ import shutil
 import glob
 
 #Configuration Components
-camcan_topdir = '/data/EnigmaMeg/camcan/cc700'
+camcan_topdir = '/data/EnigmaMeg/CAMCAN/camcan/cc700'
 camcan_anatdir = op.join(camcan_topdir,
                          'mri/pipeline/release004/BIDS_20190411/anat')
 camcan_megdir = op.join(camcan_topdir,
                         'meg/pipeline/release004/BIDS_20190411')
 camcan_freesurfer_dir = ''
 
-camcan_new_bidsout = '/data/EnigmaMeg/camcan_mne_bids'
+camcan_new_bidsout = '/data/EnigmaMeg/CAMCAN/camcan_mne_bids'
 
 #Define the different MEG datasets
 tmp = glob.glob(camcan_megdir+'/*')
