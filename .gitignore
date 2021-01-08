@@ -1,6 +1,10 @@
 __pycache__
 .pytest_cache_
 .coverage
+*.egg-info
+
+#Kept in a separate git annex repo
+enigmeg/test_data
 
 .ipynb_checkpoints
 htmlcov/*
