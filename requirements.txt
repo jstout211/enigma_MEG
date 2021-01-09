@@ -7,3 +7,4 @@ fooof
 statsmodels
 nibabel
 pytest
+pytest-shell
