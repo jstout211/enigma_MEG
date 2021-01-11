@@ -42,7 +42,8 @@ def test_load_data():
     filename = datasets().ctf['meg_rest'] #test_config.rest['meg']
     assert check_datatype(filename) == 'ctf'
     load_data(filename)  
-    
+
+@pytest.mark.meg    
 @pytest.mark.slow
 def test_main_ctf(tmpdir):
     '''
@@ -77,7 +78,8 @@ def test_main_ctf(tmpdir):
     test_dframe = pd.read_csv(tmpdir.join('Band_rel_power.csv'), delimiter='\t')
     
     allclose(standard_dframe.iloc[:,1:], test_dframe.iloc[:,1:])
-    
+
+@pytest.mark.meg    
 @pytest.mark.slow
 def test_main_elekta(tmpdir):
     '''

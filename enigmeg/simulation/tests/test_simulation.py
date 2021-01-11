@@ -12,8 +12,8 @@ from enigmeg.simulation.simulate_meg_data import generate_subjects_psuedomeg
 
 import pytest
 
-#@pytest.mark.skip()
-def test_generate_subjects_psuedomeg():
+@pytest.mark.sim
+def test_generate_subjects_psuedomeg(tmpdir):
     from enigmeg.test_data.get_test_data import datasets
     
     #For elekta data
@@ -32,8 +32,7 @@ def test_generate_subjects_psuedomeg():
     duration=10
     
     import os
-    os.mkdir('./tmp')
-    os.chdir('./tmp')
+    os.chdir(tmpdir)
     
     np.random.seed(31)
     generate_subjects_psuedomeg(subject, subjects_dir, raw_fname, trans_fname, bem_fname, 
