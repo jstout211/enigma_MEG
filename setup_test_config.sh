@@ -29,11 +29,11 @@ conda activate test_enigma
 #fi
 
 git clone git@tako:enigma
-pip install ./enigma
+pip install -e ./enigma #The -e is required to bring in the test_data symlink
 pip install -r enigma/requirements.txt
 
-cd enigma
-ln -s /data/test_data
+cd enigma/enigmeg
+ln -s /fast/test_data #./enigmeg/test_data #/data/test_data
 
 pytest
 
