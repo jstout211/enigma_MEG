@@ -77,7 +77,7 @@ def generate_combined_simulation(raw_fname,
                                                              sine_frequency))
     stc.save(stc_out_fname)
     
-
+@pytest.mark.sim
 def test_iterate_elekta_simulations():
     from enigmeg.test_data.get_test_data import datasets
     
