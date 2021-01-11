@@ -132,9 +132,94 @@ def generate_subjects_psuedomeg(subjid=None,
 #     raw = mne.io.read_raw_fif(hcp_fname)
 #     eroom = mne.io.read_raw_fif(eroom_fname)
 #     return raw, eroom
-        
 
-# def test_load_hcp():
+
+
+def generate_sine_signal(subjid=None, 
+                                subjects_dir=None, 
+                                raw_fname=None,
+                                trans_fname=None, 
+                                bem_fname=None,
+                                src_fname=None,
+                                sfreq=400,
+                                duration=10, 
+                                input_dir=None, 
+                                get_hcp=None):
+    if subjects_dir==None:
+        try:
+            subjects_dir=os.environ['SUBJECTS_DIR']
+        except:
+            print('SUBJECTS_DIR not defined in os.environ or commandline')
+            raise(ValueError)
+
+    src_fname = glob.glob(op.join(input_dir, subjid, '*-src.fif'))[0]
+    src = mne.read_source_spaces(src_fname)
+    bem_fname = glob.glob(op.join(input_dir, subjid, '*-sol.fif'))[0]
+    bem = mne.read_bem_solution(bem_fname)
+    trans = mne.read_trans(trans_fname)
+
+    
+    if get_hcp !=None:
+        raw, eroom=read_hcp_input()
+        info = raw.info
+    elif raw_fname[-3:]=='.ds':
+        info = mne.io.read_raw_ctf(raw_fname, clean_names=True).info
+    elif raw_fname[-4:]=='.fif':
+        info = mne.io.read_raw_fif(raw_fname).info
+    info.update(sfreq=sfreq, bads=[])
+    
+    fwd = mne.make_forward_solution(info=info, trans=trans,src=src, 
+                                    bem=bem_fname, meg=True)
+    
+    labels=mne.read_labels_from_annot(subjid, 
+                                      subjects_dir=subjects_dir)
+
+    source_simulator = SourceSimulator(src, tstep=1/sfreq, duration=duration)
+    
+    for idx, label in enumerate(labels):
+    np.random.seed(idx)
+    sig=dat_fun(raw.times)
+    
+    np.save(label.name+'_sig.npy', sig)
+    source_simulator.add_data(label, sig, [[0, 0, 1]])
+    return source_simulator
+   
+
+
+    
+    
+    
+def data_fun(times):
+    """Generate time-staggered sinusoids at harmonics of 10Hz"""
+    """From https://mne.tools/stable/auto_examples/simulation/plot_simulate_raw_data.html#sphx-glr-auto-examples-simulation-plot-simulate-raw-data-py"""
+    # n_samp = len(times)
+    data = 25e-9 * np.sin(2. * np.pi * 10. * times)
+    return data
+
+def test_generate_sine_signal():
+    from enigmeg.test_data.get_test_data import datasets
+    test_dat = datasets().elekta
+    
+    sig = generate_sine_signal(subjid=test_dat['subject'], 
+                        subjects_dir=test_dat['SUBJECTS_DIR'], 
+                        raw_fname=test_dat['meg_rest'],
+                        trans_fname=test_dat['trans'], 
+                        bem_fname=test_dat['bem'],
+                        src_fname=test_dat['src'],
+                        sfreq=400,
+                        duration=10, 
+                        input_dir=test_dat['enigma_outputs'], 
+                        get_hcp=None)
+    
+    #FIX  - For CTF files, the simulation does not apply to ref data
+    if raw_fname[-3:]=='.ds':
+        ch_names = [i for i in info.ch_names if len(i)==5]
+        info.pick_channels(ch_names)
+
+    raw = simulate_raw(info, source_simulator, forward=fwd)
+    raw.save('{}_NeuroDSP_sim_meg.fif'.format(subjid))
+    
+
     
 
 def compare_simulation_signals(sim_dir=None):
@@ -154,35 +239,6 @@ def compare_simulation_signals(sim_dir=None):
     labels=mne.read_labels_from_annot(subjid, 
                                   subjects_dir=subjects_dir)
     
-def test_generate_subjects_psuedomeg():
-    from enigma.get_test_data import datasets
-    filenames = datasets().elekta    
-        
-    subjid = filenames['subject'] 
-    subjects_dir = filenames['SUBJECTS_DIR'] 
-    raw_fname = filenames['meg_rest']
-    trans_fname = filenames['trans']
-    bem_fname = filenames['bem'] 
-    src_fname = filenames['src'] 
-    input_dir= filenames['enigma_outputs']
-    
-    
-    
-    # raw_fname = '/home/stoutjd/data/ENIGMA/AYCYELJY_rest_20190115_03.ds'
-    # trans_fname = '/home/stoutjd/data/ENIGMA/transfiles/AYCYELJY-trans.fif'
-    # bem_fname = '/home/stoutjd/data/ENIGMA/enigma_outputs/AYCYELJY_fs/bem_sol-sol.fif'
-    # src_fname = '/home/stoutjd/data/ENIGMA/enigma_outputs/AYCYELJY_fs/source_space-src.fif'
-    sfreq=100
-    duration=10
-    # input_dir='/home/stoutjd/data/ENIGMA/enigma_outputs'
-    
-    import os
-    os.mkdir('./tmp2')
-    os.chdir('./tmp2')
-    
-    np.random.seed(31)
-    generate_subjects_psuedomeg(subjid, subjects_dir, raw_fname, trans_fname, bem_fname, 
-                                src_fname, sfreq, duration, input_dir)
 
     
     
