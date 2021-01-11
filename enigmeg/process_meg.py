@@ -20,7 +20,7 @@ TODO:
 import os, os.path as op
 import mne, numpy as np
 import pandas as pd
-from .spectral_peak_analysis import calc_spec_peak
+from enigmeg.spectral_peak_analysis import calc_spec_peak
 
 
 #mne.viz.set_3d_backend('pyvista')
@@ -199,22 +199,25 @@ def test_main():
         info=pickle.load(e)
         
 def test_beamformer():
-    import bunch
-    info = bunch.Bunch()
+   
+    #Load filenames from test datasets
+    from enigmeg.test_data.get_test_data import datasets
+    test_dat = datasets().ctf
+
+    meg_filename = test_dat['meg_rest'] 
+    subjid = test_dat['subject']
+    subjects_dir = test_dat['SUBJECTS_DIR'] 
+    trans_fname = test_dat['trans']
+    src_fname = test_dat['src']
+    bem = test_dat['bem']
     
+    outfolder = './tmp'  #<<< Change this ############################
     
-    meg_filename = '/home/stoutjd/data/MEG/20190115/AYCYELJY_rest_20190115_03.ds'
-    subjid = 'AYCYELJY_fs'
-    subjects_dir = '/home/stoutjd/data/ENIGMA'
     raw = mne.io.read_raw_ctf(meg_filename, preload=True)
-    trans = mne.read_trans('/home/stoutjd/data/ENIGMA/transfiles/AYCYELJY-trans.fif')
-    info.subjid, info.subjects_dir = subjid, subjects_dir
+    trans = mne.read_trans(trans_fname)
+    # info.subjid, info.subjects_dir = subjid, subjects_dir
     
-    #raw=load_data(filename)
     raw.apply_gradient_compensation(3)
-    
-    #plot_QA_head_sensor_align(info, raw)
-    
     raw.resample(300)
     raw.filter(1.0, None)
     raw.notch_filter([60,120])
@@ -223,7 +226,7 @@ def test_beamformer():
 
     data_cov = mne.compute_covariance(epochs, method='empirical')  
     
-    eroom_filename = '/home/stoutjd/data/ENIGMA/EMPTY_ROOM/20200221/MEG_EmptyRoom_20200221_01.ds'
+    eroom_filename = test_dat['meg_eroom'] 
     eroom_raw = mne.io.read_raw_ctf(eroom_filename, preload=True)
     eroom_raw.resample(300)
     eroom_raw.notch_filter([60,120])
@@ -231,34 +234,63 @@ def test_beamformer():
     
     eroom_epochs = mne.make_fixed_length_epochs(eroom_raw, duration=4.0)
     noise_cov = mne.compute_covariance(eroom_epochs)
+
+    fwd = mne.make_forward_solution(epochs.info, trans, src_fname, 
+                                    bem)
     
-    # data_cov = mne.compute_covariance(epochs, tmin=0.01, tmax=0.25,
-    #                                   method='empirical')
-    
-    
-    # noise_cov = mne.compute_covariance(epochs, tmin=tmin, tmax=0,
-    #                                    method='empirical')
-    
-#    src = mne.read_source_spaces(info.src_filename)
-    # src = mne.read_source_spaces(os.path.join(HOME, 'data/ENIGMA/enigma_outputs/'+subjid+'/source_space-src.fif'))
-    fwd = mne.make_forward_solution(epochs.info, trans, info.src_filename, info.bem_sol_filename)
-    
-    from mne.beamformer import make_lcmv
-    filters = make_lcmv(epochs.info, fwd, data_cov, reg=0.05,
+    from mne.beamformer import make_lcmv, apply_lcmv_epochs
+    filters = make_lcmv(epochs.info, fwd, data_cov, reg=0.01,
                         noise_cov=noise_cov, pick_ori='max-power',
                         weight_norm='unit-noise-gain', rank=None)
     
     labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
-                                        subjects_dir=SUBJECTS_DIR, hemi='lh') 
+                                        subjects_dir=subjects_dir, hemi='lh') 
     labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
-                                        subjects_dir=SUBJECTS_DIR, hemi='rh') 
+                                        subjects_dir=subjects_dir, hemi='rh') 
     labels=labels_lh + labels_rh 
     
-    labels[1].center_of_mass()
+    # labels[1].center_of_mass()
     
-    for i in labels: brain.add_foci(i.center_of_mass(), coords_as_verts=True, 
-                                    hemi='lh', color='blue', scale_factor=1.0, 
-                                    alpha=0.5)
+    results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
+    
+    label_ts=mne.extract_label_time_course(results_stcs, labels, fwd['src'],
+                                           mode='pca_flip')
+
+    #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
+    label_stack = np.stack(label_ts)
+
+    
+    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
+    
+    
+    #Initialize 
+    label_power = np.zeros([len(labels), len(freq_bins)])  
+    alpha_peak = np.zeros(len(labels))
+    
+    #Create PSD for each label
+    for label_idx in range(len(labels)):
+        _, current_psd = label_psd(label_stack[:,label_idx, :], 
+                                                raw.info['sfreq'])
+        label_power[label_idx,:] = current_psd
+        
+        spectral_image_path = os.path.join(outfolder, 'Spectra_'+
+                                           labels[label_idx].name + '.png')
+
+        
+        try:
+            tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
+                            out_image_path=spectral_image_path)
+            
+            #FIX FOR MULTIPLE ALPHA PEAKS
+            potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
+                                    (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
+            if len(potential_alpha_idx) != 1:
+                alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
+            else:
+                alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
+        except:
+            alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<
+            
 
 
     
@@ -442,7 +474,7 @@ if __name__=='__main__':
     
     #Load the anatomical information
     import pickle
-    from enigma.python_code.process_anatomical import anat_info
+    from enigmeg.process_anatomical import anat_info
     enigma_dir=os.environ['ENIGMA_REST_DIR']
     with open(os.path.join(enigma_dir,subjid,'info.pkl'),'rb') as e:
         info=pickle.load(e)
