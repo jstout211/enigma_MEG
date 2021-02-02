@@ -302,7 +302,7 @@ def test_beamformer():
 
 
 def main(filename=None, subjid=None, trans=None, info=None, line_freq=None, 
-         emptyroom_filename=None):
+         emptyroom_filename=None, subjects_dir=None):
     
     ## Load and prefilter continuous data
     raw=load_data(filename)
@@ -353,11 +353,11 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     data_info = epochs.info
     
 
-    SUBJECTS_DIR=os.environ['SUBJECTS_DIR']
+    #SUBJECTS_DIR=os.environ['SUBJECTS_DIR']
     labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
-                                        subjects_dir=SUBJECTS_DIR, hemi='lh') 
+                                        subjects_dir=subjects_dir, hemi='lh') 
     labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
-                                        subjects_dir=SUBJECTS_DIR, hemi='rh') 
+                                        subjects_dir=subjects_dir, hemi='rh') 
     labels=labels_lh + labels_rh 
         
     label_ts=mne.extract_label_time_course(stcs, labels, src, mode='pca_flip') 
@@ -491,7 +491,8 @@ if __name__=='__main__':
     
     del raw
     main(args.meg_file, subjid=subjid, trans=trans, info=info, 
-         line_freq=args.line_f, emptyroom_filename=args.er_meg_file)
+         line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
+         subjects_dir=subjects_dir)
     
     
         
