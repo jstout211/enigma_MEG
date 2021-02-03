@@ -27,23 +27,11 @@ from enigmeg.spectral_peak_analysis import calc_spec_peak
 # import mayavi
 # mayavi.engine.current_scene.scene.off_screen_rendering = True
 
-
-#@save_numpy_output
 def load_test_data():
     from hv_proc import test_config
     filename=test_config.rest['meg']
     raw=load_data(filename)
     return raw
-
-def save_numpy_output(func):
-    def wrapper(*args,**kwargs):
-        #print("Something is happening before the function is called.")
-        output=func(*args,**kwargs)
-        output.save(func.__name__+'.npy')
-        print("Saved data to {}".format(func.__name__+'.npy'))
-    return wrapper
-
-################
 
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
@@ -85,9 +73,6 @@ def label_psd(epoch_vector, fs=None):
     freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') #, nperseg=256, noverlap=None, nfft=None, detrend='constant', return_onesided=True, scaling='density', axis=-1)
     return freq_bins, np.median(epoch_spectra, axis=0) #welch(epoch_vector, fs=fs, window='hanning') #, nperseg=256, noverlap=None, nfft=None, detrend='constant', return_onesided=True, scaling='density', axis=-1)    
 
-
-
-
 def frequency_band_mean(label_by_freq=None, freq_band_list=None):
     '''Calculate the mean within the frequency bands'''
     for freqs in freq_band_list:
@@ -123,39 +108,6 @@ def plot_QA_head_sensor_align(info, raw, trans):
     fig.scene.save_png(op.join(outfolder, 'front_posQA.png'))
     
 
-
-
-## Pyvista version - currently requires on screen display - not suitable for cluster    
-# def plot_QA_head_sensor_align(info, raw, trans):
-#     '''Plot and save the head and sensor alignment and save to the output folder'''
-#     import matplotlib, pylab
-#     import os.path as op
-#     matplotlib.use('Agg')  
-    
-    
-#     fig = mne.viz.plot_alignment(raw.info, trans, subject=info.subjid, dig=False,
-#                      coord_frame='meg', subjects_dir=info.subjects_dir)
-#     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=0)
-    
-#     fig.save(op.join(info.outfolder, 'lhead_posQA.png'))
-    
-#     tmp_outfile_name = op.join(info.outfolder, 'lhead_posQA.png')
-#     pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)
-    
-#     # fig.plotter.image.tofile(op.join(info.outfolder, 'lhead_posQA.png'))
-#     mne.viz.set_3d_view(figure=fig, azimuth=90, elevation=90)
-#     tmp_outfile_name = op.join(info.outfolder, 'rhead_posQA.png')
-#     pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)    
-    
-#     # fig.plotter.image.tofile(op.join(info.outfolder, 'rhead_posQA.png'))
-#     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
-#     tmp_outfile_name = op.join(info.outfolder, 'front_posQA.png')
-#     pylab.imshow(fig.plotter.image).figure.savefig(tmp_outfile_name)  
-    
-#     # fig.plotter.image.tofile(op.join(info.outfolder, 'front_posQA.png'))
-#     # test = input('Press any key to close')
-#     fig.plotter.close()
-
 def test_QA_plot():
     import bunch
     info = bunch.Bunch()
@@ -167,36 +119,6 @@ def test_QA_plot():
     info.subjid, info.subjects_dir = subjid, subjects_dir
     info.outfolder = '/home/stoutjd/Desktop'
     plot_QA_head_sensor_align(info, raw, trans ) 
-    
-
-def test_main():
-    HOME=os.environ['HOME']
-    filename = os.path.join(HOME,'hv_proc/MEG/APBWVFAR_rest_20200122_03.ds')
-    subjid = 'APBWVFAR_fs_ortho'
-    subjects_dir = os.path.join(HOME, 'hv_proc', 'MRI')
-    
-    # Calc Transform
-    raw=load_data(filename)
-    trans=mne.transforms.Transform('mri', 'head')
-    
-    # Get the MRI offset from freesurfer call
-    offset_cmd = 'mri_info --cras {}'.format(os.path.join(subjects_dir, subjid, 
-                                                          'mri', 'orig','001.mgz'))
-    
-    from subprocess import check_output
-    offset = check_output(offset_cmd.split(' ')).decode()[:-1]
-    offset = offset.split(' ')
-    offset = np.array([float(i) for i in offset])
-    
-    offset[2] *= -1
-    offset *= .001  #Convert to mm
-    trans['trans'][0:3,-1] = offset
-    
-    import pickle
-    from enigma.python_code.process_anatomical import anat_info
-    enigma_dir=os.environ['ENIGMA_REST_DIR']
-    with open(os.path.join(enigma_dir,subjid,'info.pkl'),'rb') as e:
-        info=pickle.load(e)
         
 def test_beamformer():
    
@@ -292,15 +214,6 @@ def test_beamformer():
             alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<
             
 
-
-    
-    
-
-    
-    
-  
-
-
 def main(filename=None, subjid=None, trans=None, info=None, line_freq=None, 
          emptyroom_filename=None, subjects_dir=None):
     
@@ -352,7 +265,6 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     
     data_info = epochs.info
     
-
     #SUBJECTS_DIR=os.environ['SUBJECTS_DIR']
     labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
                                         subjects_dir=subjects_dir, hemi='lh') 
@@ -494,10 +406,3 @@ if __name__=='__main__':
          line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
          subjects_dir=subjects_dir)
     
-    
-        
-
-
-
-
-
