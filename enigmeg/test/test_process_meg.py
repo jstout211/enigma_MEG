@@ -89,12 +89,12 @@ def test_main_elekta(tmpdir):
     spectra and binned power estimates'''
     
     
-    #Get ctf data paths from git annex repo
+    #Get elekta data paths from git annex repo
     test_dat = datasets().elekta
     inputs=SimpleNamespace(**test_dat)
     
     info=SimpleNamespace()
-    info.bem_sol_filename = bem=inputs.bem  
+    info.bem_sol_filename = inputs.bem  
     info.src_filename = inputs.src
     info.outfolder = tmpdir  #Override the typical enigma_outputs folder
     
