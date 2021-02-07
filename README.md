@@ -10,7 +10,6 @@ conda install python pip
 ```#Install enigma meg and dependencies
 git clone https://github.com/jstout211/enigma_MEG
 pip install ./enigma_MEG
-pip install -r ./enigma_MEG/requirements.txt
 ```
 
 # Setup config file

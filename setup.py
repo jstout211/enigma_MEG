@@ -19,4 +19,8 @@ setuptools.setup(
         "Operating System :: Linux/Unix",
     ],
     python_requires='>=3.6',
+    install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof',
+                      'statsmodels', 'nibabel', 'pytest'],
+    scripts=['enigmeg/process_meg.py', 
+             'enigmeg/process_anatomical.py'],
 )
