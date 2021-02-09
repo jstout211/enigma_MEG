@@ -428,6 +428,12 @@ if __name__=='__main__':
                         subjects.  Use proc_template.csv as a template''')
     
     args=parser.parse_args()
+    
+    if args.proc_file:
+        proc_file = args.proc_file
+        parse_proc_inputs(proc_file)
+        exit(0)
+    
     if not args.subjects_dir:
         subjects_dir = os.environ['SUBJECTS_DIR']
     else:
@@ -452,11 +458,7 @@ if __name__=='__main__':
         exit(0)
     
     del raw
-    if args.proc_file:
-        proc_file = args.proc_file
-        parse_proc_inputs(proc_file)
-    else:
-        main(args.meg_file, subjid=subjid, trans=trans, info=info, 
-             line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
-             subjects_dir=subjects_dir)
-        
+    main(args.meg_file, subjid=subjid, trans=trans, info=info, 
+         line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
+         subjects_dir=subjects_dir)
+    
