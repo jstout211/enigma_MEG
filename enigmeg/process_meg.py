@@ -424,6 +424,8 @@ if __name__=='__main__':
                         action='store_true')
     parser.add_argument('-trans', help='''Transfile from mne python -trans.fif''')
     parser.add_argument('-line_f', help='''Line frequecy''', type=float)
+    parser.add_argument('-proc_file', help='''Process file to batch submit 
+                        subjects.  Use proc_template.csv as a template''')
     
     args=parser.parse_args()
     if not args.subjects_dir:
@@ -450,7 +452,11 @@ if __name__=='__main__':
         exit(0)
     
     del raw
-    main(args.meg_file, subjid=subjid, trans=trans, info=info, 
-         line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
-         subjects_dir=subjects_dir)
-    
+    if args.proc_file:
+        proc_file = args.proc_file
+        parse_proc_inputs(proc_file)
+    else:
+        main(args.meg_file, subjid=subjid, trans=trans, info=info, 
+             line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
+             subjects_dir=subjects_dir)
+        
