@@ -6,6 +6,8 @@ Created on Fri Apr  3 16:08:12 2020
 @author: stoutjd
 """
 import os
+import os.path as op
+import glob
 import mne
 
 class anat_info():
@@ -153,7 +155,20 @@ if __name__=='__main__':
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(info.bem_sol_filename, bem)
         
-    pickle_info(info)
+    pickle_info(info)        
+        
+    if not glob.glob(op.join(info.outfolder, '*.html')):
+        report = mne.Report(subject=info.subjid, subjects_dir=info.subjects_dir, 
+                            verbose=True)
+        report.parse_folder(info.outfolder, pattern='', mri_decim=25)
+        out_html_file=op.join(info.outfolder, 'report_mri_bem.html')
+        report.save(out_html_file, overwrite=True)
+
+        
+        
+        
+        
+
     
     
         
