@@ -16,6 +16,7 @@ import pytest
 from enigmeg.test_data import loop_test_data 
 from enigmeg.test_data.get_test_data import datasets
 from enigmeg.process_meg import main
+from enigmeg.process_meg import parse_proc_inputs
 
 
 def generate_short_test_data():
@@ -40,53 +41,7 @@ def generate_short_test_data():
     tmp2 = 'newDs -resample 4 ctf_eroom.ds short_ctf_eroom.ds'
     print('Must process CTF data manually\n{}\n{}'.format(tmp1, tmp2))
 
-def parse_inputs(proc_file):
-    # Load csv processing tab separated file
-    proc_dframe = pd.read_csv(proc_file, sep='\t')    
-    
-    # Reject subjects with ignore flags
-    keep_idx = proc_dframe.ignore.isna()   #May want to make a list of possible ignores
-    proc_dframe = proc_dframe[keep_idx]
-    
-    for idx, dseries in proc_dframe.iterrows():
-        print(dseries)
-        
-        dseries['output_dir']=op.expanduser(dseries['output_dir'])
-        
-        from types import SimpleNamespace
-        info = SimpleNamespace()
-        info.SUBJECTS_DIR = dseries['fs_subjects_dir']
-        
-        info.outfolder = op.join(dseries['output_dir'], dseries['subject'])
-        info.bem_sol_filename = op.join(info.outfolder, 'bem_sol-sol.fif') 
-        info.src_filename = op.join(info.outfolder, 'source_space-src.fif')
-        
 
-        os.environ['SUBJECTS_DIR']=dseries['fs_subjects_dir']
-        
-        #Determine if meg_file_path is a full path or relative path
-        if not op.isabs(dseries['meg_file_path']):
-            if op.isabs(dseries['meg_top_dir']):
-                dseries['meg_file_path'] = op.join(dseries['meg_top_dir'], 
-                                                   dseries['meg_file_path'])
-            else:
-                raise ValueError('This is not a valid path')
-        
-        #Perform the same check on the emptyroom data
-        if not op.isabs(dseries['eroom_file_path']):
-            if op.isabs(dseries['meg_top_dir']):
-                dseries['eroom_file_path'] = op.join(dseries['meg_top_dir'], 
-                                                   dseries['eroom_file_path'])
-            else:
-                raise ValueError('This is not a valid path')        
-            
-        inputs = {'filename' : dseries['meg_file_path'],
-                  'subjid' : dseries['subject'],
-                  'trans' : dseries['trans_file'],
-                  'info' : info ,
-                  'line_freq' : dseries['line_freq'],
-                  'emptyroom_filename' : dseries['eroom_file_path']}
-        main(**inputs)
         
 def test_process_file(tmpdir):
     '''Generate a csv file and use this as input for the config file loop
@@ -134,7 +89,8 @@ def test_process_file(tmpdir):
     output_csv = op.join(output_dir, 'process.csv')  
     test_dframe.to_csv(output_csv, sep='\t', index=False)
     
-    parse_inputs(output_csv)
+    # parse_inputs(output_csv)
+    parse_proc_inputs(output_csv)
     
     #Verify that the outputs have been created for the multiple inputs
     assert op.exists(op.join(output_dir, elekta_dat['subject'], 'Band_rel_power.csv'))

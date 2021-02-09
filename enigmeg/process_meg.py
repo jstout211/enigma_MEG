@@ -27,11 +27,11 @@ from enigmeg.spectral_peak_analysis import calc_spec_peak
 # import mayavi
 # mayavi.engine.current_scene.scene.off_screen_rendering = True
 
-def load_test_data():
-    from hv_proc import test_config
-    filename=test_config.rest['meg']
-    raw=load_data(filename)
-    return raw
+# def load_test_data():
+#     from hv_proc import test_config
+#     filename=test_config.rest['meg']
+#     raw=load_data(filename)
+#     return raw
 
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
@@ -85,6 +85,54 @@ def get_freq_idx(bands, freq_bins):
         tmp = np.nonzero((band[0] < freq_bins) & (freq_bins < band[1]))[0]   ### <<<<<<<<<<<<< Should this be =<...
         output.append(tmp)
     return output
+
+def parse_proc_inputs(proc_file):
+    # Load csv processing tab separated file
+    proc_dframe = pd.read_csv(proc_file, sep='\t')    
+    
+    # Reject subjects with ignore flags
+    keep_idx = proc_dframe.ignore.isna()   #May want to make a list of possible ignores
+    proc_dframe = proc_dframe[keep_idx]
+    
+    for idx, dseries in proc_dframe.iterrows():
+        print(dseries)
+        
+        dseries['output_dir']=op.expanduser(dseries['output_dir'])
+        
+        from types import SimpleNamespace
+        info = SimpleNamespace()
+        info.SUBJECTS_DIR = dseries['fs_subjects_dir']
+        
+        info.outfolder = op.join(dseries['output_dir'], dseries['subject'])
+        info.bem_sol_filename = op.join(info.outfolder, 'bem_sol-sol.fif') 
+        info.src_filename = op.join(info.outfolder, 'source_space-src.fif')
+        
+
+        os.environ['SUBJECTS_DIR']=dseries['fs_subjects_dir']
+        
+        #Determine if meg_file_path is a full path or relative path
+        if not op.isabs(dseries['meg_file_path']):
+            if op.isabs(dseries['meg_top_dir']):
+                dseries['meg_file_path'] = op.join(dseries['meg_top_dir'], 
+                                                   dseries['meg_file_path'])
+            else:
+                raise ValueError('This is not a valid path')
+        
+        #Perform the same check on the emptyroom data
+        if not op.isabs(dseries['eroom_file_path']):
+            if op.isabs(dseries['meg_top_dir']):
+                dseries['eroom_file_path'] = op.join(dseries['meg_top_dir'], 
+                                                   dseries['eroom_file_path'])
+            else:
+                raise ValueError('This is not a valid path')        
+            
+        inputs = {'filename' : dseries['meg_file_path'],
+                  'subjid' : dseries['subject'],
+                  'trans' : dseries['trans_file'],
+                  'info' : info ,
+                  'line_freq' : dseries['line_freq'],
+                  'emptyroom_filename' : dseries['eroom_file_path']}
+        main(**inputs)
 
 def plot_QA_head_sensor_align(info, raw, trans):
     '''Plot and save the head and sensor alignment and save to the output folder'''
