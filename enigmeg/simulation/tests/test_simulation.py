@@ -12,6 +12,7 @@ from enigmeg.simulation.simulate_meg_data import generate_subjects_psuedomeg
 
 import pytest
 
+@pytest.mark.slow
 @pytest.mark.sim
 def test_generate_subjects_psuedomeg(tmpdir):
     from enigmeg.test_data.get_test_data import datasets
