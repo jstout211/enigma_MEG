@@ -23,8 +23,7 @@ def test_check_datatype():
     assert check_datatype('test.fif')  == 'elekta'
     assert check_datatype('test.4d') == '4d'
     assert check_datatype('test.ds') == 'ctf'
-    #assert ... KIT
-    #assert ....
+    assert check_datatype('test.sqd') == 'kit'
     
     #Verify that innapropriate inputs fail
     with pytest.raises(ValueError) as e:
@@ -36,10 +35,10 @@ def test_return_dataloader():
     assert return_dataloader('ctf') == mne.io.read_raw_ctf
     assert return_dataloader('4d') == mne.io.read_raw_bti
     assert return_dataloader('elekta') == mne.io.read_raw_fif
+    assert return_dataloader('kit') == mne.io.read_raw_kit
     
 def test_load_data():
-    # from hv_proc import test_config
-    filename = datasets().ctf['meg_rest'] #test_config.rest['meg']
+    filename = datasets().ctf['meg_rest'] 
     assert check_datatype(filename) == 'ctf'
     load_data(filename)  
 
@@ -114,6 +113,20 @@ def test_main_elekta(tmpdir):
     test_dframe = pd.read_csv(tmpdir.join('Band_rel_power.csv'), delimiter='\t')
     
     allclose(standard_dframe.iloc[:,1:], test_dframe.iloc[:,1:])
+    
+    
+
+# def test_QA_plot(tmpdir):
+#     import bunch
+#     info = bunch.Bunch()
+#     meg_filename = 
+#     subjid = 
+#     subjects_dir = 
+#     raw = mne.io.read_raw_ctf(meg_filename)
+#     trans = mne.read_trans()
+#     info.subjid, info.subjects_dir = subjid, subjects_dir
+#     info.outfolder = tmpdir
+#     plot_QA_head_sensor_align(info, raw, trans ) 
     
     
     
