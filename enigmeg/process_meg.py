@@ -17,21 +17,13 @@ TODO:
 
 @author: stoutjd
 """
-import os, os.path as op
-import mne, numpy as np
+import os
+import os.path as op
+import mne
+import numpy as np
 import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 
-
-#mne.viz.set_3d_backend('pyvista')
-# import mayavi
-# mayavi.engine.current_scene.scene.off_screen_rendering = True
-
-# def load_test_data():
-#     from hv_proc import test_config
-#     filename=test_config.rest['meg']
-#     raw=load_data(filename)
-#     return raw
 
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
@@ -62,10 +54,6 @@ def load_data(filename):
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
     return raw
-
-def calculate_inverse(epochs, outfolder=None):
-    cov = mne.compute_covariance(epochs)
-    cov.save(os.path.join(outfolder, 'rest-cov.fif'))
     
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
@@ -107,7 +95,6 @@ def parse_proc_inputs(proc_file):
         info.bem_sol_filename = op.join(info.outfolder, 'bem_sol-sol.fif') 
         info.src_filename = op.join(info.outfolder, 'source_space-src.fif')
         
-
         os.environ['SUBJECTS_DIR']=dseries['fs_subjects_dir']
         
         #Determine if meg_file_path is a full path or relative path
@@ -154,19 +141,7 @@ def plot_QA_head_sensor_align(info, raw, trans):
     
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
     fig.scene.save_png(op.join(outfolder, 'front_posQA.png'))
-    
 
-def test_QA_plot():
-    import bunch
-    info = bunch.Bunch()
-    meg_filename = '/home/stoutjd/data/MEG/20190115/AYCYELJY_rest_20190115_03.ds'
-    subjid = 'AYCYELJY_fs'
-    subjects_dir = '/home/stoutjd/data/ENIGMA'
-    raw = mne.io.read_raw_ctf(meg_filename)
-    trans = mne.read_trans('/home/stoutjd/data/ENIGMA/transfiles/AYCYELJY-trans.fif')
-    info.subjid, info.subjects_dir = subjid, subjects_dir
-    info.outfolder = '/home/stoutjd/Desktop'
-    plot_QA_head_sensor_align(info, raw, trans ) 
         
 def test_beamformer():
    
@@ -229,9 +204,7 @@ def test_beamformer():
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
 
-    
     freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
-    
     
     #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  
@@ -246,7 +219,6 @@ def test_beamformer():
         spectral_image_path = os.path.join(outfolder, 'Spectra_'+
                                            labels[label_idx].name + '.png')
 
-        
         try:
             tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
                             out_image_path=spectral_image_path)
@@ -396,18 +368,6 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     output_dframe['AlphaPeak'] = alpha_peak
     output_dframe.to_csv(output_filename, sep='\t')    
         
-
-
- # Check data type and load data
- # Downsample to 200Hz
- # Split to 1 second epochs
- # Reject sensor level data at a specific threshold
- # Calculate broad band dSPM inverse solution
- # Filter the data into bands (1-3, 3-6, 8-12, 13-35, 35-55)
- # Project the data to parcels and create parcel time series
- # Calculate relative power in each band and parcel    
-    
-   
     
 if __name__=='__main__':
     import argparse
