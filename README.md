@@ -28,7 +28,6 @@ Commandline flags
 usage: process_anatomical.py [-h] [-subjects_dir SUBJECTS_DIR] [-subjid SUBJID]
                              [-recon_check RECON_CHECK] [-recon1] [-recon2]
                              [-recon3] [-setup_source] [-run_unprocessed]
-                             [-transform TRANSFORM]
 
 Processing for the anatomical inputs of the enigma pipeline
 
@@ -50,8 +49,6 @@ optional arguments:
                         create the BEM model
   -run_unprocessed      Checks for all unrun processes and runs any additional steps
                         for inputs to the source model
-  -transform TRANSFORM  The transform from the MEG to MRI coregistration. This
-                        should be a 4x4 matrix in a text file format
 ```
 
 Example:
