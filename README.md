@@ -14,9 +14,9 @@ pip install ./enigma_MEG
 # Parameter Heirarchy
 ```
 Commandline flags
-		Passed Config File
-			Default Config File
-				Environmental Variables
+    Passed Config File
+        Default Config File
+	    Environmental Variables
 ```
 
 # Setup config file
@@ -57,7 +57,7 @@ process_anatomical.py -subjects_dir /data/test_data/SUBJECTS_DIR -subjid ctf_fs 
 ```
 
 # Running meg processing
-```bash
+```
 usage: process_meg.py [-h] [-subjects_dir SUBJECTS_DIR] [-subjid SUBJID] 
                       [-meg_file MEG_FILE] [-er_meg_file ER_MEG_FILE] [-viz_coreg] 
                       [-trans TRANS] [-line_f LINE_F] 
