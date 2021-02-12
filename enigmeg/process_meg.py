@@ -9,9 +9,6 @@ TODO:
     Verify sum versus mean on bandwidth
     Check number of bins during welch calculation
     Type of covariance
-    Verify power on welch calc << does it need 20log10()
-    Relative Power - Over all regions or just the ROI specta 
-    Fix alpha peak decision - if multiple peaks in alpha range?
     
 
 
@@ -20,6 +17,7 @@ TODO:
 import os
 import os.path as op
 import mne
+from mne import Report
 import numpy as np
 import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
@@ -58,8 +56,8 @@ def load_data(filename):
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
     from scipy.signal import welch
-    freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') #, nperseg=256, noverlap=None, nfft=None, detrend='constant', return_onesided=True, scaling='density', axis=-1)
-    return freq_bins, np.median(epoch_spectra, axis=0) #welch(epoch_vector, fs=fs, window='hanning') #, nperseg=256, noverlap=None, nfft=None, detrend='constant', return_onesided=True, scaling='density', axis=-1)    
+    freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') 
+    return freq_bins, np.median(epoch_spectra, axis=0) 
 
 def frequency_band_mean(label_by_freq=None, freq_band_list=None):
     '''Calculate the mean within the frequency bands'''
@@ -142,6 +140,17 @@ def plot_QA_head_sensor_align(info, raw, trans):
     mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
     fig.scene.save_png(op.join(outfolder, 'front_posQA.png'))
 
+
+def make_report(subject, subjects_dir, meg_filename, output_dir):
+    #Create report from output
+    report = Report(image_format='png', subjects_dir=subjects_dir,
+                   subject=subject,  
+                    raw_psd=False)  # use False for speed here
+    #info_fname=meg_filename,  
+    
+    report.parse_folder(output_dir, on_error='ignore', mri_decim=10)
+    report_filename = op.join(output_dir, 'QA_report.html')
+    report.save(report_filename)
         
 def test_beamformer():
    
@@ -349,13 +358,12 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
     band_idxs = get_freq_idx(bands, freq_bins)
 
-    ############  MEAN or sum????????????
 
     #initialize output
     band_means = np.zeros([len(labels), len(bands)]) 
     #Loop over all bands, select the indexes assocaited with the band and average    
     for mean_band, band_idx in enumerate(band_idxs):
-        band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1)   ##########  <<< mEAN or SUM
+        band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
     
     output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
     
@@ -421,4 +429,8 @@ if __name__=='__main__':
     main(args.meg_file, subjid=subjid, trans=trans, info=info, 
          line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
          subjects_dir=subjects_dir)
+    
+    
+
+
     

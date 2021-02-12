@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 
 from ..process_meg import check_datatype, return_dataloader, load_data
+from ..process_meg import make_report
 
 def test_check_datatype():
     assert check_datatype('test.fif')  == 'elekta'
@@ -41,6 +42,15 @@ def test_load_data():
     filename = datasets().ctf['meg_rest'] 
     assert check_datatype(filename) == 'ctf'
     load_data(filename)  
+    
+# def test_make_report(tmpdir):
+#     'Test that the report function generates an html file'
+#     dat = datasets().ctf
+#     make_report(dat['subject'],
+#                 dat['SUBJECTS_DIR'],
+#                 None,
+#                 tmpdir)
+#     assert os.path.exists(tmpdir.join('QA_report.html'))
 
 @pytest.mark.meg    
 @pytest.mark.slow
