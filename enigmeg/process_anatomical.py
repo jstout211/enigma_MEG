@@ -105,8 +105,6 @@ if __name__=='__main__':
     parser.add_argument('-run_unprocessed', help='''Checks for all unrun processes and
                         runs any additional steps for inputs to the source model''', action='store_true')
     parser.description='''Processing for the anatomical inputs of the enigma pipeline'''
-    parser.add_argument('-transform', help='''The transform from the MEG to MRI coregistration.
-                        This should be a 4x4 matrix in a text file format''')
     args = parser.parse_args()
     if not args.subjid: raise ValueError('Subject ID must be set')
     if not args.subjects_dir: args.subjects_dir=os.environ['SUBJECTS_DIR']
