@@ -55,8 +55,18 @@ def load_data(filename):
     
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
-    from scipy.signal import welch
-    freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') 
+    # from scipy.signal import welch
+    # freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') 
+    
+    from mne.time_frequency.multitaper import psd_array_multitaper
+    epoch_spectra, freq_bins = psd_array_multitaper(epoch_vector, 
+                                                    fs, 
+                                                    fmin=1, fmax=45,
+                                                    bandwidth=2, 
+                                                    n_jobs=4, 
+                                                    adaptive=True, 
+                                                    low_bias=True) 
+    
     return freq_bins, np.median(epoch_spectra, axis=0) 
 
 def frequency_band_mean(label_by_freq=None, freq_band_list=None):
@@ -226,7 +236,7 @@ def test_beamformer():
         label_power[label_idx,:] = current_psd
         
         spectral_image_path = os.path.join(outfolder, 'Spectra_'+
-                                           labels[label_idx].name + '.png')
+                                            labels[label_idx].name + '.png')
 
         try:
             tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
@@ -258,8 +268,8 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     raw.resample(resample_freq)
     eraw.resample(resample_freq)
     
-    raw.filter(0.3, None)
-    eraw.filter(0.3, None)
+    raw.filter(0.5, 140)
+    eraw.filter(0.5, 140)
     
     if line_freq==None:
         try:
@@ -274,9 +284,11 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     
     ## Create Epochs and  
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+    epochs.apply_baseline(baseline=(0,None))
     cov = mne.compute_covariance(epochs)
     
     er_epochs=mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+    er_epochs.apply_baseline(baseline=(0,None))
     er_cov = mne.compute_covariance(er_epochs)
     
     src = mne.read_source_spaces(info.src_filename)
@@ -306,7 +318,7 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
     
-    
+    #Determine the number of frequency bands
     freq_bins, _ = label_psd(label_stack[:,0, :], data_info['sfreq'])
     
     #Initialize 
