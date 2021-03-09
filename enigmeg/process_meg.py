@@ -21,6 +21,7 @@ from mne import Report
 import numpy as np
 import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
+from enigmeg.mod_label_extract import mod_source_estimate
 
 
 def check_datatype(filename):
@@ -217,13 +218,18 @@ def test_beamformer():
     
     results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
     
-    label_ts=mne.extract_label_time_course(results_stcs, labels, fwd['src'],
-                                           mode='pca_flip')
+    #Monkey patch of mne.source_estimate to perform 15 component SVD
+    label_ts = mod_source_estimate.extract_label_time_course(results_stcs, labels, 
+                                                         fwd['src'],
+                                       mode='pca15_multitaper')
+    
+    # label_ts=mne.extract_label_time_course(results_stcs, labels, fwd['src'],
+    #                                        mode='pca_flip')
 
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
 
-    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
+#    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
     
     #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  
