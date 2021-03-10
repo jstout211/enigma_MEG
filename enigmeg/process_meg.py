@@ -223,22 +223,20 @@ def test_beamformer():
                                                          fwd['src'],
                                        mode='pca15_multitaper')
     
-    # label_ts=mne.extract_label_time_course(results_stcs, labels, fwd['src'],
-    #                                        mode='pca_flip')
-
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
+    label_stack = np.mean(label_stack, axis=0)
 
 #    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
-    
+    freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+
     #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  
     alpha_peak = np.zeros(len(labels))
     
     #Create PSD for each label
     for label_idx in range(len(labels)):
-        _, current_psd = label_psd(label_stack[:,label_idx, :], 
-                                                raw.info['sfreq'])
+        current_psd = label_stack[:,label_idx, :].mean(axis=0) 
         label_power[label_idx,:] = current_psd
         
         spectral_image_path = os.path.join(outfolder, 'Spectra_'+
