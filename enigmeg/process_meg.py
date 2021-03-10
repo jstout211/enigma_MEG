@@ -276,7 +276,7 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
     cov = mne.compute_covariance(epochs)
     
-    er_epochs=mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+    er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
     er_cov = mne.compute_covariance(er_epochs)
     
     src = mne.read_source_spaces(info.src_filename)
