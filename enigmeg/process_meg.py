@@ -225,7 +225,7 @@ def test_beamformer():
     
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
-    label_stack = np.mean(label_stack, axis=0)
+    # label_stack = np.mean(label_stack, axis=0)
 
 #    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
     freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
@@ -236,6 +236,7 @@ def test_beamformer():
     
     #Create PSD for each label
     for label_idx in range(len(labels)):
+        print(str(label_idx))
         current_psd = label_stack[:,label_idx, :].mean(axis=0) 
         label_power[label_idx,:] = current_psd
         
