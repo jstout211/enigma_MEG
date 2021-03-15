@@ -37,7 +37,8 @@ def _pca15_fft(flip, data):
                                                 bandwidth=2, 
                                                 n_jobs=4, 
                                                 adaptive=True, 
-                                                low_bias=True) 
+                                                low_bias=True, 
+                                                normalization='full') 
     
     # scale = linalg.norm(s) / np.sqrt(len(data))
     normalized_spectra=s[0:maxeig,np.newaxis]*epoch_spectra
