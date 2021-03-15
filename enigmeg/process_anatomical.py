@@ -72,6 +72,25 @@ def compile_fs_process_list(info):
         process_steps.append('recon-all -autorecon3 -s {}'.format(info.subjid))
     return process_steps     
 
+
+def write_aparc_sub(subjid=None, subjects_dir=None):
+    '''Check for fsaverage and aparc_sub and download
+    Morph fsaverage aparc_sub labels to single subject data
+    
+    https://mne.tools/stable/auto_examples/visualization/plot_parcellation.html
+    '''
+    mne.datasets.fetch_fsaverage(verbose='ERROR') #True requires TQDM
+    mne.datasets.fetch_aparc_sub_parcellation(subjects_dir=subjects_dir,
+                                          verbose='ERROR')
+    
+    sub_labels=mne.read_labels_from_annot('fsaverage',parc='aparc_sub', 
+                                   subjects_dir=subjects_dir)        
+    subject_labels=mne.morph_labels(sub_labels, subject_to=subjid, 
+                                 subjects_dir=subjects_dir)
+    mne.write_labels_to_annot(subject_labels, subject=subjid, 
+                              parc='aparc_sub', subjects_dir=subjects_dir, 
+                              overwrite=True)
+
 def subcommand(function_str):
     from subprocess import check_call
     check_call(function_str.split(' '))
@@ -107,7 +126,10 @@ if __name__=='__main__':
     parser.description='''Processing for the anatomical inputs of the enigma pipeline'''
     args = parser.parse_args()
     if not args.subjid: raise ValueError('Subject ID must be set')
-    if not args.subjects_dir: args.subjects_dir=os.environ['SUBJECTS_DIR']
+    if not args.subjects_dir: 
+        args.subjects_dir=os.environ['SUBJECTS_DIR']
+    else:
+        os.environ['SUBJECTS_DIR']=args.subjects_dir  
     
     #Initialize Defaults
     info=anat_info(subjid=args.subjid, SUBJECTS_DIR=args.subjects_dir)
@@ -153,7 +175,14 @@ if __name__=='__main__':
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(info.bem_sol_filename, bem)
         
-    pickle_info(info)        
+    pickle_info(info) 
+
+    # Run aparc_sub processing to create 450 parcels
+    path_bool = os.path.join(info.subjects_dir, info.subjid, 'label', 
+                       'lh.aparc_sub.annot')
+    if not os.path.exists(path_bool):
+        write_aparc_sub(subjid=info.subjid, subjects_dir=info.subjects_dir) 
+        
         
     if not glob.glob(op.join(info.outfolder, '*.html')):
         report = mne.Report(subject=info.subjid, subjects_dir=info.subjects_dir, 
@@ -161,6 +190,8 @@ if __name__=='__main__':
         report.parse_folder(info.outfolder, pattern='', mri_decim=25)
         out_html_file=op.join(info.outfolder, 'report_mri_bem.html')
         report.save(out_html_file, overwrite=True)
+        
+    
 
         
         
