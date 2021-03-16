@@ -308,9 +308,9 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
                         noise_cov=er_cov, pick_ori='max-power',
                         weight_norm='unit-noise-gain', rank=None)
     
-    labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
+    labels_lh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
                                         subjects_dir=subjects_dir, hemi='lh') 
-    labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
+    labels_rh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
                                         subjects_dir=subjects_dir, hemi='rh') 
     labels=labels_lh + labels_rh 
     
