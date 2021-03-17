@@ -16,7 +16,7 @@ from mne import source_estimate as mod_source_estimate
 import numpy as np
 from numpy import linalg
 from mne.time_frequency import psd_array_multitaper
-
+from scipy.stats import trim_mean
 
 
 num_freq_bins=177  #Hardcoded freq bins - Bad form
@@ -41,9 +41,12 @@ def _pca15_fft(flip, data):
                                                 normalization='full') 
     
     # scale = linalg.norm(s) / np.sqrt(len(data))
-    normalized_spectra=s[0:maxeig,np.newaxis]*epoch_spectra
-    output_spectra = np.mean(normalized_spectra, axis=0)
-    return  output_spectra #s[0:maxeig,np.newaxis]* V[0:maxeig] #sign *
+    eigval_weighted_spectra=s[0:maxeig,np.newaxis]*epoch_spectra
+    
+    # Reject top and bottom 10% using trimmed mean
+    output_spectra = trim_mean(eigval_weighted_spectra, 0.1, axis=0)
+    # output_spectra = np.mean(normalized_spectra, axis=0)
+    return  output_spectra 
 
 from mne.source_estimate import _label_funcs
 _label_funcs['pca15_multitaper']=_pca15_fft
