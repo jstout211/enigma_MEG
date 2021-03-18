@@ -20,7 +20,7 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof',
-                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'umap-learn'],
+                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'umap-learn', 'seaborn'],
     scripts=['enigmeg/process_meg.py', 
              'enigmeg/process_anatomical.py'],
 )
