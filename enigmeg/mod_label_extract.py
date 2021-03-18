@@ -28,8 +28,6 @@ def _pca15_fft(flip, data):
     
     maxeig=15
     
-    # determine sign-flip
-    #sign = np.sign(np.dot(U[:, 0], flip))
     # use average power in label for scaling
     epoch_spectra, freq_bins = psd_array_multitaper(V[0:maxeig], 
                                                 300,                    #!!!!################ HardCodede
@@ -40,12 +38,12 @@ def _pca15_fft(flip, data):
                                                 low_bias=True, 
                                                 normalization='full') 
     
-    # scale = linalg.norm(s) / np.sqrt(len(data))
     eigval_weighted_spectra=s[0:maxeig,np.newaxis]*epoch_spectra
     
     # Reject top and bottom 10% using trimmed mean
     output_spectra = trim_mean(eigval_weighted_spectra, 0.1, axis=0)
-    # output_spectra = np.mean(normalized_spectra, axis=0)
+    # Normalize by number of samples
+    normalized_spectra = output_spectra / np.sqrt(len(data))
     return  output_spectra 
 
 from mne.source_estimate import _label_funcs
