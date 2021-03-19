@@ -6,12 +6,19 @@ Created on Thu Oct 15 07:41:59 2020
 @author: stoutjd
 """
 
+'''TODO:
+    use parc as input so that subjects without full parc will not be added
+    '''
+
+
 import pandas as pd
 import numpy as np
 import os, os.path as op
 import glob
 import seaborn as sns
 import pylab
+import nibabel as nib
+from mne.viz import Brain
 
 
 import statsmodels.api as sm
@@ -96,7 +103,6 @@ def filter_parcel_data(dframe, parcel_name=None, column_name=None):
     # return tmp[[column_name, 'age', 'gender_text']].dropna()
 
 
-
 def proc_parcel_regression(dframe):
     '''Takes merged dataframe (subj_vars + parcel data)
     and performs regression of variables using statsmodels'''
@@ -117,30 +123,65 @@ def proc_parcel_regression(dframe):
 
 
 
+##################  <<<<<<<<<<<<<<<<  CHECK
+
 # dframe.parcel_name.values
 
-tmp=filter_parcel_data(dframe, parcel_name='inferiortemporal-lh', column_name='AlphaPeak')
+# tmp=filter_parcel_data(dframe, parcel_name='inferiortemporal_1-lh', column_name='AlphaPeak')
+# # results = smf.ols('AlphaPeak ~ age', data=tmp).fit()
+# # print(results.summary())
 
 
-# results = smf.ols('AlphaPeak ~ age', data=tmp).fit()
+# pylab.scatter(tmp['age'], tmp['AlphaPeak'])
+# pylab.xlabel('age'); pylab.ylabel('AlphaPeak')
+
+# pylab.hist(demographics.age)
+
+# pylab.hist(dframe.age)
+
+# rdframe.to_csv('Alpha_vs_age.csv', index=False)
 
 
-# print(results.summary())
-
-
-pylab.scatter(tmp['age'], tmp['AlphaPeak'])
-pylab.xlabel('age'); pylab.ylabel('AlphaPeak')
-
-pylab.hist(demographics.age)
-
-pylab.hist(dframe.age)
-
-rdframe.to_csv('Alpha_vs_age.csv', index=False)
-
-
-
-
-
+def display_regression_coefs(stats_dframe, 
+                             subject_id='fsaverage',
+                             parc_name='aparc',
+                             subjects_dir=None):
+    '''Plot the statistics on the brain
+    parc_name:
+        aparc or aparc_sub currently supported
+    
+    '''
+   
+    if subjects_dir != None: os.environ['SUBJECTS_DIR']=subjects_dir
+    hemi = "lh"
+    surf = "inflated"
+    
+    brain = Brain(subject_id, hemi, surf, background="white")
+    
+    aparc_file = os.path.join(os.environ["SUBJECTS_DIR"],
+                              subject_id, "label",
+                              hemi + f".{parc_name}.annot") 
+    labels, ctab, names = nib.freesurfer.read_annot(aparc_file)
+    
+    names2=[i.decode() for i in names] #convert from binary
+    if 'corpuscallosum' in names2: names2.remove('corpuscallosum')
+    if 'unknown' in names2: names2.remove('unknown')
+    
+    # Placeholder - must be larger than number of ROIs
+    roi_data = np.zeros(600)
+    
+    for idx,name in enumerate(names2):
+        if stats_dframe.loc[idx, 'parcel_name'].split('-')[0] != name:
+            raise(ValueError)
+        roi_data[idx]=stats_dframe.loc[idx, 'coeff']
+    	
+    vtx_data = roi_data[labels]
+    vtx_data[labels == -1] = 0
+    
+    thresh=.001
+    vtx_data[np.abs(vtx_data)<thresh]=0
+    
+    brain.add_data(vtx_data, fmin=-0.025, fmax=0.025, colormap="coolwarm", alpha=1) 
 
 
 
@@ -161,6 +202,16 @@ def test_merge_in_demographics():
                           parcel_merge_idx='subject')
     assert dframe.shape[0] == 25022 
     assert dframe.shape[1] == 10
+    
+    dframe=dframe.rename(columns={'AGE':'age'})
+    
+    stats_dframe=proc_parcel_regression(dframe)
+    
+    display_regression_coefs(stats_dframe, 
+                             subject_id='fsaverage',
+                             parc_name='aparc_sub',
+                             subjects_dir=None)
+    
     
     
     
