@@ -8,6 +8,9 @@ Created on Thu Oct 15 07:41:59 2020
 
 '''TODO:
     use parc as input so that subjects without full parc will not be added
+    
+    Fix testing
+    Add commandline functionality
     '''
 
 
@@ -145,7 +148,8 @@ def proc_parcel_regression(dframe):
 def display_regression_coefs(stats_dframe, 
                              subject_id='fsaverage',
                              parc_name='aparc',
-                             subjects_dir=None):
+                             subjects_dir=None,
+                             image_outpath=None):
     '''Plot the statistics on the brain
     parc_name:
         aparc or aparc_sub currently supported
@@ -172,6 +176,8 @@ def display_regression_coefs(stats_dframe,
     
     for idx,name in enumerate(names2):
         if stats_dframe.loc[idx, 'parcel_name'].split('-')[0] != name:
+            print(f'{stats_dframe.loc[idx, "parcel_name"].split("-")[0]} \
+                  != {name}')
             raise(ValueError)
         roi_data[idx]=stats_dframe.loc[idx, 'coeff']
     	
@@ -181,7 +187,10 @@ def display_regression_coefs(stats_dframe,
     thresh=.001
     vtx_data[np.abs(vtx_data)<thresh]=0
     
-    brain.add_data(vtx_data, fmin=-0.025, fmax=0.025, colormap="coolwarm", alpha=1) 
+    brain.add_data(vtx_data, fmin=-0.05, fmax=0.05, colormap="coolwarm", alpha=1) 
+    
+    if image_outpath != None:
+        brain.save_image(image_outpath)
 
 
 
@@ -223,12 +232,6 @@ def test_merge_in_demographics():
 def test_main():
     filenames = compile_group_outputs('/data/test_data/GROUP/enigma_outputs')
     dframe = return_multisubject_dframe(filenames)    
-
-
-
-
-
-    
 
 
 def test_plots(dframe):
