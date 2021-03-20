@@ -16,14 +16,11 @@ Modified example from the pysurfer website
 import os
 import numpy as np
 import nibabel as nib
-from surfer import Brain
+from mne.viz import Brain
 
 import pandas as pd
 
 print(__doc__)
-
-#Deactivate all other conda envs to base.  Startup pysurfer conda env
-#Use python terminal - seems to have issue with ipython 
 
 
 # dframe=pd.read_csv('/home/stoutjd/data/ENIGMA/Prelim_coeffs_Age2.csv')
@@ -83,7 +80,7 @@ Handle vertices that are not defined in the annotation.
 """
 vtx_data[labels == -1] = 0
 
-thresh=.01
+thresh=.001
 vtx_data[np.abs(vtx_data)<thresh]=0
 
 """
@@ -91,5 +88,5 @@ Display these values on the brain. Use a sequential colormap (assuming
 these data move from low to high values), and add an alpha channel so the
 underlying anatomy is visible.
 """
-brain.add_data(vtx_data, -.05, 0.05, colormap="coolwarm", alpha=1)
-
+#brain.add_data(vtx_data, -.001, 0.001, colormap="coolwarm", alpha=1)
+brain.add_data(vtx_data, fmin=-0.01, fmax=0.01, colormap="coolwarm", alpha=1) 
