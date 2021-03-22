@@ -166,7 +166,8 @@ if __name__=='__main__':
     
     # Run bem solution
     if not info.run_bem_sol:
-        bem = mne.read_bem_solution(info.bem_sol_filename)
+        print('BEM already created: skipping')
+        #bem = mne.read_bem_solution(info.bem_sol_filename)
     else:
         conductivity = (0.3,)
         model = mne.make_bem_model(subject=info.subjid, ico=4,

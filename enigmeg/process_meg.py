@@ -21,6 +21,7 @@ from mne import Report
 import numpy as np
 import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
+from enigmeg.mod_label_extract import mod_source_estimate
 
 
 def check_datatype(filename):
@@ -55,8 +56,18 @@ def load_data(filename):
     
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
-    from scipy.signal import welch
-    freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') 
+    # from scipy.signal import welch
+    # freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') 
+    
+    from mne.time_frequency.multitaper import psd_array_multitaper
+    epoch_spectra, freq_bins = psd_array_multitaper(epoch_vector, 
+                                                    fs, 
+                                                    fmin=1, fmax=45,
+                                                    bandwidth=2, 
+                                                    n_jobs=4, 
+                                                    adaptive=True, 
+                                                    low_bias=True) 
+    
     return freq_bins, np.median(epoch_spectra, axis=0) 
 
 def frequency_band_mean(label_by_freq=None, freq_band_list=None):
@@ -207,26 +218,30 @@ def test_beamformer():
     
     results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
     
-    label_ts=mne.extract_label_time_course(results_stcs, labels, fwd['src'],
-                                           mode='pca_flip')
-
+    #Monkey patch of mne.source_estimate to perform 15 component SVD
+    label_ts = mod_source_estimate.extract_label_time_course(results_stcs, labels, 
+                                                         fwd['src'],
+                                       mode='pca15_multitaper')
+    
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
+    # label_stack = np.mean(label_stack, axis=0)
 
-    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
-    
+#    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
+    freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+
     #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  
     alpha_peak = np.zeros(len(labels))
     
     #Create PSD for each label
     for label_idx in range(len(labels)):
-        _, current_psd = label_psd(label_stack[:,label_idx, :], 
-                                                raw.info['sfreq'])
+        print(str(label_idx))
+        current_psd = label_stack[:,label_idx, :].mean(axis=0) 
         label_power[label_idx,:] = current_psd
         
         spectral_image_path = os.path.join(outfolder, 'Spectra_'+
-                                           labels[label_idx].name + '.png')
+                                            labels[label_idx].name + '.png')
 
         try:
             tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
@@ -258,8 +273,8 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     raw.resample(resample_freq)
     eraw.resample(resample_freq)
     
-    raw.filter(0.3, None)
-    eraw.filter(0.3, None)
+    raw.filter(0.5, 140)
+    eraw.filter(0.5, 140)
     
     if line_freq==None:
         try:
@@ -272,57 +287,60 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     raw.notch_filter(notch_freqs)
     
     
-    ## Create Epochs and  
+    ## Create Epochs and covariance 
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+    epochs.apply_baseline(baseline=(0,None))
     cov = mne.compute_covariance(epochs)
     
     er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
+    er_epochs.apply_baseline(baseline=(0,None))
     er_cov = mne.compute_covariance(er_epochs)
     
+    os.environ['SUBJECTS_DIR']=subjects_dir
     src = mne.read_source_spaces(info.src_filename)
     bem = mne.read_bem_solution(info.bem_sol_filename)
     fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
     
-    inverse_operator = mne.minimum_norm.make_inverse_operator(epochs.info, fwd, er_cov, 
-                                                           loose=0.2)
-    #Calculate Inverse solution
-    snr = 1.0  # use lower SNR for single epochs
-    lambda2 = 1.0 / snr ** 2
-    method = 'dSPM'  
-    stcs = mne.minimum_norm.apply_inverse_epochs(epochs, inverse_operator, lambda2, method,
-                                pick_ori="normal", return_generator=True)
-    
     data_info = epochs.info
     
-    #SUBJECTS_DIR=os.environ['SUBJECTS_DIR']
-    labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
+    from mne.beamformer import make_lcmv, apply_lcmv_epochs
+    filters = make_lcmv(epochs.info, fwd, cov, reg=0.01,
+                        noise_cov=er_cov, pick_ori='max-power',
+                        weight_norm='unit-noise-gain', rank=None)
+    
+    labels_lh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
                                         subjects_dir=subjects_dir, hemi='lh') 
-    labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
+    labels_rh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
                                         subjects_dir=subjects_dir, hemi='rh') 
     labels=labels_lh + labels_rh 
-        
-    label_ts=mne.extract_label_time_course(stcs, labels, src, mode='pca_flip') 
+    
+    results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
+    
+    #Monkey patch of mne.source_estimate to perform 15 component SVD
+    label_ts = mod_source_estimate.extract_label_time_course(results_stcs, 
+                                                             labels, 
+                                                             fwd['src'],
+                                                             mode='pca15_multitaper')
     
     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
     label_stack = np.stack(label_ts)
-    
-    
-    freq_bins, _ = label_psd(label_stack[:,0, :], data_info['sfreq'])
-    
+
+    #HACK HARDCODED FREQ BINS
+    freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+
     #Initialize 
     label_power = np.zeros([len(labels), len(freq_bins)])  
     alpha_peak = np.zeros(len(labels))
     
     #Create PSD for each label
     for label_idx in range(len(labels)):
-        _, current_psd = label_psd(label_stack[:,label_idx, :], 
-                                                data_info['sfreq'])
+        print(str(label_idx))
+        current_psd = label_stack[:,label_idx, :].mean(axis=0) 
         label_power[label_idx,:] = current_psd
         
         spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
-                                           labels[label_idx].name + '.png')
+                                            labels[label_idx].name + '.png')
 
-        
         try:
             tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
                             out_image_path=spectral_image_path)
@@ -335,10 +353,7 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
             else:
                 alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
         except:
-            alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<
-            
-        
-        
+            alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<    
         
     #Save the label spectrum to assemble the relative power
     freq_bin_names=[str(binval) for binval in freq_bins]
@@ -346,18 +361,12 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
     # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
     #     np.save(f, label_power)
-
-
-    
-    #label_power *= np.sqrt(freq_bins)  ###################### SCALE BY Frequency  <<<<<<<<<<<<<<<<< CHECK
-    
     
     relative_power = label_power / label_power.sum(axis=1, keepdims=True)
 
     #Define bands
     bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
     band_idxs = get_freq_idx(bands, freq_bins)
-
 
     #initialize output
     band_means = np.zeros([len(labels), len(bands)]) 
