@@ -256,7 +256,26 @@ def test_beamformer():
                 alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
         except:
             alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<
-            
+
+def assess_bads(raw_fname, is_eroom=False):
+    '''Code sampled from MNE python website
+    https://mne.tools/dev/auto_tutorials/preprocessing/\
+        plot_60_maxwell_filtering_sss.html'''
+    from mne import find_bad_channels_maxwell
+    raw = mne.io.read_raw_fif(raw_fname)
+    raw.crop(tmax=60)
+    raw.info['bads'] = []
+    raw_check = raw.copy()
+    if is_eroom==False:
+        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+            raw_check, cross_talk=None, calibration=None,
+            return_scores=True, verbose=True)
+    else:
+        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+            raw_check, cross_talk=None, calibration=None,
+            return_scores=True, verbose=True, coord_frame="meg")        
+    
+    return {'noisy':auto_noisy_chs, 'flat':auto_flat_chs}            
 
 def main(filename=None, subjid=None, trans=None, info=None, line_freq=None, 
          emptyroom_filename=None, subjects_dir=None):
@@ -267,6 +286,15 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
     
     if type(raw)==mne.io.ctf.ctf.RawCTF:
         raw.apply_gradient_compensation(3)
+    
+    ## Test SSS bad channel detection for non-Elekta data
+    # !!!!!!!!!!!  Currently no finecal or crosstalk used  !!!!!!!!!!!!!!!
+    if filename[-3:]=='fif':
+        raw_bads_dict = assess_bads(filename)
+        eraw_bads_dict = assess_bads(emptyroom_filename, is_eroom=True)
+        
+        raw.info['bads']=raw_bads_dict['noisy'] + raw_bads_dict['flat']
+        eraw.info['bads']=eraw_bads_dict['noisy'] + eraw_bads_dict['flat']
     
     resample_freq=300
     
