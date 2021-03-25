@@ -20,7 +20,8 @@ camcan_megdir = op.join(camcan_topdir,
                         'meg/pipeline/release004/BIDS_20190411')
 camcan_freesurfer_dir = ''
 
-camcan_new_bidsout = '/data/EnigmaMeg/CAMCAN/camcan_mne_bids'
+# camcan_new_bidsout = '/data/EnigmaMeg/CAMCAN/camcan_mne_bids'
+camcan_new_bidsout = '/data/EnigmaMeg/CAMCAN_testset/camcan'
 
 #Define the different MEG datasets
 tmp = glob.glob(camcan_megdir+'/*')
@@ -91,6 +92,7 @@ def create_links(dseries=None):
             for input_dset_path in glob.glob(dseries['input_'+task_id]+'/meg/*'):
                 dset_basename=op.basename(input_dset_path)
                 output_dset_path = op.join(dseries['output_meg_dir'], dset_basename)
+                output_dset_path = output_dset_path.replace('.fif', '_raw.fif')
                 if not os.path.exists(input_dset_path):
                     continue
                 if not os.path.exists(output_dset_path):
