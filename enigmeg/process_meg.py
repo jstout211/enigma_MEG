@@ -186,6 +186,7 @@ def test_beamformer():
     raw.resample(300)
     raw.filter(1.0, None)
     raw.notch_filter([60,120])
+    eraw.notch_filter([60,120])
     
     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
 
