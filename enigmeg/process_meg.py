@@ -64,7 +64,7 @@ def label_psd(epoch_vector, fs=None):
                                                     fs, 
                                                     fmin=1, fmax=45,
                                                     bandwidth=2, 
-                                                    n_jobs=4, 
+                                                    n_jobs=1, 
                                                     adaptive=True, 
                                                     low_bias=True) 
     
@@ -261,9 +261,10 @@ def assess_bads(raw_fname, is_eroom=False):
     '''Code sampled from MNE python website
     https://mne.tools/dev/auto_tutorials/preprocessing/\
         plot_60_maxwell_filtering_sss.html'''
-    from mne import find_bad_channels_maxwell
+    from mne.preprocessing import find_bad_channels_maxwell
     raw = mne.io.read_raw_fif(raw_fname)
-    raw.crop(tmax=60)
+    if raw.times[-1] > 60.0:
+        raw.crop(tmax=60)    
     raw.info['bads'] = []
     raw_check = raw.copy()
     if is_eroom==False:

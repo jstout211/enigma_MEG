@@ -33,7 +33,7 @@ def _pca15_fft(flip, data):
                                                 300,                    #!!!!################ HardCodede
                                                 fmin=1, fmax=45,
                                                 bandwidth=2, 
-                                                n_jobs=4, 
+                                                n_jobs=1, 
                                                 adaptive=True, 
                                                 low_bias=True, 
                                                 normalization='full') 
