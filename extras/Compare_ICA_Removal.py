@@ -49,11 +49,11 @@ def assign_repo_EEG_labels(dframe):
     dframe['ekg'] = None    
     
     dframe.loc[dframe.distribution=='CAMCAN', ['veog','heog','ekg']] = \
-        'EOG061','EOG062','ECG064'
+        'EOG061','EOG062','ECG063'
     dframe.loc[dframe.distribution=='MOUS', ['veog','heog','ekg']] = \
         'EEG058','EEG057','EEG059'
     dframe.loc[dframe.distribution=='HCP', ['veog','heog','ekg']] = \
-        'eog61','eog62','eeg64'
+        'VEOG','HEOG','ECG'
     dframe.loc[dframe.distribution=='NIH_HV', ['veog','heog','ekg']] = \
         None, None, None 
     return dframe
@@ -99,17 +99,49 @@ def get_consistent_ch_names(current_dframe):
     # freqs, _ =welch(tmp._data, fs=raw.info['sfreq'])
     return ch_names
 
-
+def calc_hcp_bipolar(row):
+    '''Load info from the mne-hcp and return bipolar calculated ECG, VEOG, HEOG'''
+    subjid = row.subjid
+    
+    #info read from mne-hcp not the same as the one tied to the raw dataset
+    info = mne.io.read_info(f'/fast/ICA/HCPinfo/{subjid}-info.fif')
+    
+    raw=mne.io.read_raw_fif(row.raw_fname, preload=True)
+    ecgPos_idx=info.ch_names.index('ECG+')
+    ecgNeg_idx=info.ch_names.index('ECG-')
+    veogPos_idx=info.ch_names.index('VEOG+')
+    veogNeg_idx=info.ch_names.index('VEOG-')
+    heogPos_idx=info.ch_names.index('HEOG+')
+    heogNeg_idx=info.ch_names.index('HEOG-')
+    
+    ecg=raw._data[ecgPos_idx,:]-raw._data[ecgNeg_idx,:]
+    veog=raw._data[veogPos_idx,:]-raw._data[veogNeg_idx,:]
+    heog=raw._data[heogPos_idx,:]-raw._data[heogNeg_idx,:]
+    
+    raw._data[ecgPos_idx,:]=ecg
+    raw._data[veogPos_idx,:]=veog
+    raw._data[heogPos_idx,:]=heog
+    
+    raw.rename_channels({raw.ch_names[ecgPos_idx]:'ECG'})
+    raw.rename_channels({raw.ch_names[veogPos_idx]:'VEOG'})
+    raw.rename_channels({raw.ch_names[heogPos_idx]:'HEOG'})
+    
+    raw.drop_channels(raw.ch_names[ecgNeg_idx])
+    raw.drop_channels(raw.ch_names[veogNeg_idx])
+    raw.drop_channels(raw.ch_names[heogNeg_idx])
+    
+    return raw
 
 def assess_ICA_properties(current_dframe):
     '''Loop over all datasets and return ICA metrics'''
-    # full_mat=pd.DataFrame(np.zeros([comp_num*len(current_dframe), len(ch_names)]), columns=ch_names)
     current_dframe.reset_index(inplace=True)
     
+    #Load first dataset to allocate size to the dataframe
     raw = mne.io.read_raw_fif(current_dframe.iloc[0]['raw_fname'])
     ch_names = get_consistent_ch_names(current_dframe)
     ica = mne.preprocessing.read_ica(current_dframe.iloc[0]['ica_filename'])
     ica_timeseries = ica.get_sources(raw, start=0, stop=100*raw.info['sfreq'])
+    
     
     
     comp_num, samples = ica_timeseries._data.shape
@@ -128,12 +160,15 @@ def assess_ICA_properties(current_dframe):
         ica = mne.preprocessing.read_ica(row['ica_filename'])
         component = ica.get_components()
         
-        raw = mne.io.read_raw_fif(row['raw_fname']) #, preload=True)
+        if row.distribution == 'HCP':
+            raw = calc_hcp_bipolar(row)
+        else:
+            raw = mne.io.read_raw_fif(row['raw_fname'], preload=True)
+        
         ch_indexs = set(raw.ch_names).intersection(ch_names)
         
-    #     full_mat.loc[index*comp_num:(index*comp_num + comp_num-1), ch_indexs]=component.T
         
-        raw = mne.io.read_raw_fif(row['raw_fname'], preload=True)
+        # raw = mne.io.read_raw_fif(row['raw_fname'], preload=True)
         
         ica_timeseries = ica.get_sources(raw, start=0, stop=100*raw.info['sfreq'])
         freqs, power = welch(ica_timeseries._data, fs=raw.info['sfreq'])
@@ -144,13 +179,13 @@ def assess_ICA_properties(current_dframe):
         spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'subjid'] = row['subjid']
         
         try :
-            bads_ecg=ica.find_bads_ecg(raw, ch_name=ekg_ch)[1]
+            bads_ecg=ica.find_bads_ecg(raw, ch_name=ekg_ch, method='correlation')[1]
             spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_corr'] = bads_ecg
         except:
             spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_corr'] = np.NaN
         
         try:
-            bads_ecg_ctps = ica.find_bads_ecg(raw,method='ctps')[1]
+            bads_ecg_ctps = ica.find_bads_ecg(raw, ch_name=ekg_ch, method='ctps')[1]
             spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_ctps'] = bads_ecg_ctps
         except:
             spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_ctps'] = np.NaN
@@ -189,77 +224,22 @@ for repo in ['CAMCAN', 'HCP','MOUS','NIH_HV']:
     tmp['distribution'] = repo
     dlist.append(tmp)
 combined = pd.concat(dlist)
+combined.reset_index(inplace=True)
+
+combined['ecg_bad']=combined['ecg_bads_ctps'] > 0.2
+combined['eog_bad']= (np.abs(combined.heog_bads_corr) > .25) | (np.abs(combined.veog_bads_corr) > .25)
 
 
-##########################
+####  TOPOMAP analysis - Requires all channels to be the same 
+##  Difficult across vendors.
 
-# dframe.distribution.unique()
-# dist = 'MOUS'
-# current_dframe = dframe[dframe.distribution==dist]
-# out_dframe = assess_ICA_properties(current_dframe)
-# out_dframe.to_csv(f'/fast/ICA/Spectra_{dist}.tsv', sep='\t', index=None)
+#chan_num, comp_num = component.shape
 
-# dist = 'CAMCAN'
-# current_dframe = dframe[dframe.distribution==dist]
-# out_dframe = assess_ICA_properties(current_dframe)
-# out_dframe.to_csv(f'/fast/ICA/Spectra_{dist}.tsv', sep='\t', index=None)
-
-# dist = 'HCP'
-# current_dframe = dframe[dframe.distribution==dist]
-# out_dframe = assess_ICA_properties(current_dframe)
-# out_dframe.to_csv(f'/fast/ICA/Spectra_{dist}.tsv', sep='\t', index=None)
-
-# dist = 'NIH_HV'
-# current_dframe = dframe[dframe.distribution==dist]
-# out_dframe = assess_ICA_properties(current_dframe)
-# out_dframe.to_csv(f'/fast/ICA/Spectra_{dist}.tsv', sep='\t', index=None)
-
-
-
-
-
-
-mous_idxs = dframe[dframe.distribution=='MOUS'].index
-
-
-ica = mne.preprocessing.read_ica(dframe['ica_filename'][mous_idxs[0]])
-component = ica.get_components()
-
-
-
-component.shape
-
-
-dframe.columns
-
-
-# chan_num, comp_num = component.shape
-
-# #full_mat=np.zeros([comp_num*len(dframe), chan_num])
+# full_mat=np.zeros([comp_num*len(current_dframe), chan_num])
 # # ctps_vec = np.zeros(comp_num*len(dframe))
-# ecg_corr = np.zeros(comp_num*len(dframe))
-# #eog_corr = np.zeros(comp_num*len(dframe))
-# eog_061_corr = np.zeros(comp_num*len(dframe))
-# eog_062_corr = np.zeros(comp_num*len(dframe))
-
-
-#test=ica.find_bads_eog(raw, ch_name='EEG051') #ch_name='EOG061')
-
-
-dframe.columns
-
-
-current_dframe=dframe[dframe.distribution=='MOUS']
-chan_num, comp_num = component.shape
-
-full_mat=np.zeros([comp_num*len(current_dframe), chan_num])
-# ctps_vec = np.zeros(comp_num*len(dframe))
-ekg_corr = np.zeros(comp_num*len(current_dframe))
-veog_corr = np.zeros(comp_num*len(current_dframe))
-heog_corr = np.zeros(comp_num*len(current_dframe))
-
-
-current_dframe.reset_index(inplace=True)
+# ekg_corr = np.zeros(comp_num*len(current_dframe))
+# veog_corr = np.zeros(comp_num*len(current_dframe))
+# heog_corr = np.zeros(comp_num*len(current_dframe))
 
 ## Necessary for topomap based analysis >>>>>
 # ### Get the full set of channel names
@@ -277,32 +257,19 @@ current_dframe.reset_index(inplace=True)
 
 ###  <<<<<
 
+# # ## Save outputs
 
+# output_dir = '/fast/ICA/output_vars'
+# proj_name = 'mous'
+# #Save dframe as csv
 
-    
-    
+# full_mat.to_csv(op.join(output_dir, proj_name+'_fullmat.csv'), index=False)
+# spectra_dframe.to_csv(op.join(output_dir, proj_name+'_spectra_dframe.csv', index=False))
 
-
-# ## Save outputs
-
-output_dir = '/fast/ICA/output_vars'
-proj_name = 'mous'
-#Save dframe as csv
-
-full_mat.to_csv(op.join(output_dir, proj_name+'_fullmat.csv'), index=False)
-spectra_dframe.to_csv(op.join(output_dir, proj_name+'_spectra_dframe.csv', index=False))
-
-#Save numpy arrays
-np.save(op.join(output_dir, proj_name+'_ekg_corr.npy'), ekg_corr)
-np.save(op.join(output_dir, proj_name+'_veog_corr.npy'), veog_corr) 
-np.save(op.join(output_dir, proj_name+'_heog_corr.npy'), heog_corr) 
-
-
-#ctps_vec.__len__()
-
-
-full_mat.shape
-
+# #Save numpy arrays
+# np.save(op.join(output_dir, proj_name+'_ekg_corr.npy'), ekg_corr)
+# np.save(op.join(output_dir, proj_name+'_veog_corr.npy'), veog_corr) 
+# np.save(op.join(output_dir, proj_name+'_heog_corr.npy'), heog_corr) 
 
 # # Calculate the UMAP embedding
 
@@ -319,6 +286,61 @@ reducer = umap.UMAP(n_components=3, n_neighbors=50, min_dist=0.0,
                     metric='cosine') #manhattan') #sine') #'manhattan')
 embedding = reducer.fit_transform(spectra_dframe.values)
 
+
+def plot_spectra_distr_ave(combined):
+    '''Plot average spectra for different open source repositories'''
+    freq_idxs = list(combined.columns[range(1,130)])
+    col_idxs = freq_idxs + ['subjid', 'distribution','ecg_bad', 'eog_bad']
+    tmp_dframe = combined.loc[:, col_idxs]
+    melted = pd.melt(tmp_dframe, id_vars=['distribution','subjid', 'ecg_bad', 'eog_bad'] ,
+                     value_vars=freq_idxs)
+    sns.lineplot(x='variable', y='value', hue='distribution', data=melted)
+    
+def plot_ecg_std(combined):
+    combined=combined[combined.distribution != 'NIH_HV']
+    freq_idxs = list(combined.columns[range(1,40)])
+    # freq_idxs = list(combined.columns[range(1,130)])
+    col_idxs = freq_idxs + ['subjid', 'distribution','ecg_bad']
+    tmp_dframe = combined.loc[:, col_idxs]
+    melted = pd.melt(tmp_dframe, id_vars=['distribution','subjid', 'ecg_bad'] , value_vars=freq_idxs)
+    # sns.lineplot(x='variable', y='value', hue='distribution', style='ecg_bad', data=melted)
+    sns.lineplot(x='variable', y='value', hue='distribution', style='ecg_bad', data=melted, ci=np.var)
+
+g = sns.FacetGrid(melted, col="distribution", col_wrap=2, margin_titles=True)
+g.map(sns.lineplot, 'variable', 'value', 'ecg_bad', ci='sd')
+g.add_legend()
+
+g = sns.FacetGrid(melted, col="distribution", col_wrap=2, margin_titles=True)
+g.map(sns.lineplot, 'variable', 'value', 'eog_bad', ci='sd')
+g.add_legend()
+
+g.savefig('/home/jstout/unormalized_group2.png')    
+    
+
+def plot_kurtosis_swarm(combined):
+    sns.swarmplot(x='distribution', y='kurtosis', hue='ecg_bad', data=combined,
+                  dodge=True)
+    
+
+def display_eog_correlation(combined_dframe):
+    spectra_dframe = pd.concat([combined_dframe.iloc[:,1:50],
+                                combined_dframe.iloc[:,130]],
+                               axis=1)
+   # spectra_dframe = combined_dframe.iloc[:,1:50]+
+    reducer = umap.UMAP(n_components=3, n_neighbors=20, min_dist=.1,
+                    metric='manhattan', low_memory=False) #sine') #'manhattan')
+    embedding = reducer.fit_transform(spectra_dframe.values)
+    
+    sns.scatterplot(x=embedding[:,0], y=embedding[:,1], 
+                    hue=np.abs(combined_dframe['ecg_bads_corr']))
+    sns.scatterplot(x=embedding[:,1], y=embedding[:,2], 
+                    hue=np.abs(combined_dframe['ecg_bads_corr']))
+    
+    
+    cmb.dropna(subset=['veog_bads_corr', 'heog_bads_corr']) #, 'ecg_bads_corr'])
+    combined['high_ctps'] = combined['ecg_bads_ctps'] > .3
+    embedding[np.abs(combined['ecg_bads_ctps'])>.3]
+    
 
 # ### Combined Clustering
 
@@ -387,6 +409,33 @@ sns.scatterplot(x=highheog_embedding[:,1], y=highheog_embedding[:,2])
 
 spectra_dframe
 
+def test_ica_extraction():
+    topdir = '/fast/ICA'
+    raw_fname = op.join(topdir, 
+                        'CAMCAN',
+                        'sub-CC723395_ses-rest_task-rest_proc-sss_300srate.fif')
+    ica_fname = op.join(topdir, 
+                        'CAMCAN', 
+                        'sub-CC723395_ses-rest_task-rest_proc-sss_0-ica.fif')
 
-
+    raw = mne.io.read_raw_fif(raw_fname)
+    ica = mne.preprocessing.read_ica(ica_fname)
+    
+def load_raw_and_ica(dframe, rownum=0):
+    '''Returns loaded raw and ica dataset from of dataframe'''
+    row=dframe.iloc[rownum]
+    raw = mne.io.read_raw_fif(row.raw_fname, preload=True)
+    ica = mne.preprocessing.read_ica(row.ica_filename)
+    return raw, ica
+    
+def plot_ecg_metrics():
+    mous =  pd.read_csv('Spectra_MOUS.tsv', delimiter='\t')
+    hcp = pd.read_csv('Spectra_HCP.tsv', delimiter='\t')
+    cam = pd.read_csv('Spectra_CAMCAN.tsv', delimiter='\t')
+    
+    
+    
+    pylab.plot(cam[ca])
+    
+    
 
