@@ -228,20 +228,11 @@ def assess_ICA_topographic_properties(current_dframe):
     
     current_dframe.reset_index(inplace=True, drop=True)
     
-    #Load first dataset to allocate size to the dataframe
-    # raw = mne.io.read_raw_fif(current_dframe.iloc[0]['raw_fname'])
-    # ch_names = get_consistent_ch_names(current_dframe)
     ica = mne.preprocessing.read_ica(current_dframe.iloc[0]['ica_filename'])
-    # ica_timeseries = ica.get_sources(raw, start=0, stop=100*raw.info['sfreq'])
-    
-    
     
     _, comp_num = ica.get_components().shape #_timeseries._data.shape
     
-    # freqs, _ = welch(ica_timeseries._data, fs=raw.info['sfreq'])
-    
     topo_dframe = pd.DataFrame(np.zeros([comp_num*len(current_dframe), 102]), columns = range(102))
-    # spectra_dframe['kurtosis'] = 0
 
 
     for index,row in current_dframe.iterrows():
@@ -250,7 +241,6 @@ def assess_ICA_topographic_properties(current_dframe):
         
         ica = mne.preprocessing.read_ica(row['ica_filename'])
         component = ica.get_components()
-        # component = (component.T * ica.pca_mean_).T
         
         convert_to_ref=mne.forward._map_meg_or_eeg_channels(ica.info,
                                                             ref_sens.info,
@@ -263,41 +253,9 @@ def assess_ICA_topographic_properties(current_dframe):
         maxs_ = normalized_topo.max(axis=0)
         standardized_topo = 2 * (normalized_topo - mins_ ) / (maxs_ - mins_) - 1 
         
-        # Normalize to the same total signal level
-        #standardized_topo = normalized_topo/np.abs(normalized_topo).sum(axis=0)
-
-        
         topo_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), range(102)]=standardized_topo.T
         topo_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'component_num']= range(comp_num)
         topo_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'subjid'] = row['subjid']
-        
-        # try :
-        #     bads_ecg=ica.find_bads_ecg(raw, ch_name=ekg_ch, method='correlation')[1]
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_corr'] = bads_ecg
-        # except:
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_corr'] = np.NaN
-        
-        # try:
-        #     bads_ecg_ctps = ica.find_bads_ecg(raw, ch_name=ekg_ch, method='ctps')[1]
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_ctps'] = bads_ecg_ctps
-        # except:
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_ctps'] = np.NaN
-        
-        # try:
-        #     bads_veog = ica.find_bads_eog(raw, ch_name=veog_ch)[1]
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'veog_bads_corr'] = bads_veog
-        # except:
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'veog_bads_corr'] = np.NaN
-
-        # try:
-        #     bads_heog = ica.find_bads_eog(raw, ch_name=heog_ch)[1]
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'heog_bads_corr'] = bads_heog
-        # except:
-        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'heog_bads_corr'] = np.NaN            
-            
-        #     # veog_corr[index*comp_num:(index*comp_num + comp_num)] = ica.find_bads_eog(raw, ch_name=veog_ch)[1]
-        #     # heog_corr[index*comp_num:(index*comp_num + comp_num)] = ica.find_bads_eog(raw, ch_name=heog_ch)[1]
-
     return topo_dframe
 
 
@@ -329,46 +287,63 @@ combined['ecg_bad']=combined['ecg_bads_ctps'] > 0.2
 combined['eog_bad']= (np.abs(combined.heog_bads_corr) > .25) | (np.abs(combined.veog_bads_corr) > .25)
 
 
-####  TOPOMAP analysis - Requires all channels to be the same 
-##  Difficult across vendors.
 
-#chan_num, comp_num = component.shape
-
-# full_mat=np.zeros([comp_num*len(current_dframe), chan_num])
-# # ctps_vec = np.zeros(comp_num*len(dframe))
-# ekg_corr = np.zeros(comp_num*len(current_dframe))
-# veog_corr = np.zeros(comp_num*len(current_dframe))
-# heog_corr = np.zeros(comp_num*len(current_dframe))
-
-## Necessary for topomap based analysis >>>>>
-# ### Get the full set of channel names
-
-# ch_names=set()
-
-# for index,row in current_dframe.iterrows():
-#     raw = mne.io.read_raw_fif(row['raw_fname'])
-#     ch_names=set(raw.ch_names).union(ch_names)
+def merge_dframes_topo_spectral():
+    spectral_dframe =combined[combined.distribution.isin(['CAMCAN','MOUS'])]
     
-# ch_names = [i for i in ch_names if i[0]=='M']    
+    bads = spectral_dframe[['subjid', 'ecg_bad','eog_bad','component_num','distribution']]
+    
+    topo_dframe = pd.read_csv('Topo_Dframe_ELEK102_MOUS_CAM.tsv', sep='\t')
+    
+    dframe=pd.merge(topo_dframe, bads, on=['subjid','component_num'])
+    dframe['bads'] = 'Good'
+    dframe.loc[dframe['ecg_bad'],'bads']='ECG'
+    dframe.loc[dframe['eog_bad'],'bads']='EOG'
+    
+    dframe = dframe.sample(frac=1).reset_index(drop=True)
+    
+    
+    full_mat = dframe.iloc[:,range(102)]
+    
+    reducer = umap.UMAP(n_components=2, n_neighbors=20, min_dist=0.2,
+                    metric='manhattan')#'cosine') #manhattan') #sine') #'manhattan')
+    embedding = reducer.fit_transform(full_mat.values) #normalized_data)
+    
+    fig, axes = matplotlib.pyplot.subplots(2,1, sharex=True, sharey=True,
+                                           figsize=(10,10))
+    
+    ###  Up to the above - works
+    
+    
+    #fig.suptitle(dist)
+    
+    sns.scatterplot(ax=axes[0], x=embedding[:,0], y=embedding[:,1], 
+                    hue=dframe['bads'])#, style=dframe['distribution']) #np.abs(combined_dframe['ecg_bad']))
+    sns.scatterplot(ax=axes[0], x=embedding[:,0], y=embedding[:,1], 
+                    hue=dframe['bads'])#, style=dframe['distribu
 
-# tmp=ica.get_sources(raw, start=0, stop=100*raw.info['sfreq'])
-# freqs, _ =welch(tmp._data, fs=raw.info['sfreq'])
+#    sns.scatterplot(ax=axes[0,1], x=embedding[:,1], y=embedding[:,2], 
+#                    hue=dframe['ecg_bad']) #np.abs(combined_dframe['ecg_bad']))
 
-###  <<<<<
+    sns.scatterplot(ax=axes[1], x=embedding[:,0], y=embedding[:,1], 
+                    hue=dframe['eog_bad'])#, style=dframe['distribution'])
+#    sns.scatterplot(ax=axes[1,1], x=embedding[:,1], y=embedding[:,2], 
+#                    hue=dframe['eog_bad'])
 
-# # ## Save outputs
+    fig, axes = matplotlib.pyplot.subplots(2,2, sharex=True, sharey=True,
+                                           figsize=(20,20))
+    #fig.suptitle(dist)
+    
+    sns.scatterplot(ax=axes[0,0], x=embedding[:,0], y=embedding[:,1], 
+                    hue=dframe['distribution'])#, style=dframe['distribution']) #np.abs(combined_dframe['ecg_bad']))
+#    sns.scatterplot(ax=axes[0,1], x=embedding[:,1], y=embedding[:,2], 
+#                    hue=dframe['ecg_bad']) #np.abs(combined_dframe['ecg_bad']))
 
-# output_dir = '/fast/ICA/output_vars'
-# proj_name = 'mous'
-# #Save dframe as csv
+    sns.scatterplot(ax=axes[1,0], x=embedding[:,0], y=embedding[:,1], 
+                    hue=dframe['eog_bad'])#, style=dframe['distribution'])
+    
+    
 
-# full_mat.to_csv(op.join(output_dir, proj_name+'_fullmat.csv'), index=False)
-# spectra_dframe.to_csv(op.join(output_dir, proj_name+'_spectra_dframe.csv', index=False))
-
-# #Save numpy arrays
-# np.save(op.join(output_dir, proj_name+'_ekg_corr.npy'), ekg_corr)
-# np.save(op.join(output_dir, proj_name+'_veog_corr.npy'), veog_corr) 
-# np.save(op.join(output_dir, proj_name+'_heog_corr.npy'), heog_corr) 
 
 # # Calculate the UMAP embedding
 
