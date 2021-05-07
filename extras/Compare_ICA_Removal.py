@@ -59,8 +59,6 @@ def assign_repo_EEG_labels(dframe):
     return dframe
 
 
-
-
 def populate_dframe(topdir='/fast/ICA/', load_ica=False):
     
     dsets=glob.glob(op.join(topdir, '*/*0-ica.fif'))    
@@ -132,7 +130,7 @@ def calc_hcp_bipolar(row):
     
     return raw
 
-def assess_ICA_properties(current_dframe):
+def assess_ICA_spectral_properties(current_dframe):
     '''Loop over all datasets and return ICA metrics'''
     current_dframe.reset_index(inplace=True)
     
@@ -206,6 +204,107 @@ def assess_ICA_properties(current_dframe):
             # heog_corr[index*comp_num:(index*comp_num + comp_num)] = ica.find_bads_eog(raw, ch_name=heog_ch)[1]
 
     return spectra_dframe
+
+def plot_topo_hack(normalized_topo):
+    ref_sens = mne.io.read_raw_fif('/fast/ICA/CAMCAN/sub-CC621184_ses-rest_task-rest_proc-sss_300srate.fif')
+    ref_sens.crop(0, 2)
+    ref_sens.pick_types(meg='mag')
+    ref_sens.load_data()    
+    epochs = mne.make_fixed_length_epochs(ref_sens)    
+    evoked = epochs.average()
+    evoked._data[:,:25]=normalized_topo
+    evoked.plot_topomap(times=evoked.times[0:25], ncols=5, nrows=5)
+
+
+def assess_ICA_topographic_properties(current_dframe):
+    '''Loop over all datasets and return ICA metrics'''
+    
+    ref_sens = mne.io.read_raw_fif('/fast/ICA/CAMCAN/sub-CC621184_ses-rest_task-rest_proc-sss_300srate.fif', preload=True)
+    ref_sens.pick_types(meg='mag')
+    
+    ref_ica_fname = '/fast/ICA/CAMCAN/sub-CC621184_ses-rest_task-rest_proc-sss_0-ica.fif'
+    ref_ica = mne.preprocessing.read_ica(ref_ica_fname)
+    
+    
+    current_dframe.reset_index(inplace=True, drop=True)
+    
+    #Load first dataset to allocate size to the dataframe
+    # raw = mne.io.read_raw_fif(current_dframe.iloc[0]['raw_fname'])
+    # ch_names = get_consistent_ch_names(current_dframe)
+    ica = mne.preprocessing.read_ica(current_dframe.iloc[0]['ica_filename'])
+    # ica_timeseries = ica.get_sources(raw, start=0, stop=100*raw.info['sfreq'])
+    
+    
+    
+    _, comp_num = ica.get_components().shape #_timeseries._data.shape
+    
+    # freqs, _ = welch(ica_timeseries._data, fs=raw.info['sfreq'])
+    
+    topo_dframe = pd.DataFrame(np.zeros([comp_num*len(current_dframe), 102]), columns = range(102))
+    # spectra_dframe['kurtosis'] = 0
+
+
+    for index,row in current_dframe.iterrows():
+        print(index)
+        veog_ch, heog_ch, ekg_ch = row[['veog', 'heog', 'ekg']]
+        
+        ica = mne.preprocessing.read_ica(row['ica_filename'])
+        component = ica.get_components()
+        # component = (component.T * ica.pca_mean_).T
+        
+        convert_to_ref=mne.forward._map_meg_or_eeg_channels(ica.info,
+                                                            ref_sens.info,
+                                 # reference_sens.info, 
+                                 'accurate',
+                                 (0., 0., 0.04))
+        
+        normalized_topo = convert_to_ref @ component
+        mins_= normalized_topo.min(axis=0)
+        maxs_ = normalized_topo.max(axis=0)
+        standardized_topo = 2 * (normalized_topo - mins_ ) / (maxs_ - mins_) - 1 
+        
+        # Normalize to the same total signal level
+        #standardized_topo = normalized_topo/np.abs(normalized_topo).sum(axis=0)
+
+        
+        topo_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), range(102)]=standardized_topo.T
+        topo_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'component_num']= range(comp_num)
+        topo_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'subjid'] = row['subjid']
+        
+        # try :
+        #     bads_ecg=ica.find_bads_ecg(raw, ch_name=ekg_ch, method='correlation')[1]
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_corr'] = bads_ecg
+        # except:
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_corr'] = np.NaN
+        
+        # try:
+        #     bads_ecg_ctps = ica.find_bads_ecg(raw, ch_name=ekg_ch, method='ctps')[1]
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_ctps'] = bads_ecg_ctps
+        # except:
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'ecg_bads_ctps'] = np.NaN
+        
+        # try:
+        #     bads_veog = ica.find_bads_eog(raw, ch_name=veog_ch)[1]
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'veog_bads_corr'] = bads_veog
+        # except:
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'veog_bads_corr'] = np.NaN
+
+        # try:
+        #     bads_heog = ica.find_bads_eog(raw, ch_name=heog_ch)[1]
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'heog_bads_corr'] = bads_heog
+        # except:
+        #     spectra_dframe.loc[index*comp_num:(index*comp_num + comp_num-1), 'heog_bads_corr'] = np.NaN            
+            
+        #     # veog_corr[index*comp_num:(index*comp_num + comp_num)] = ica.find_bads_eog(raw, ch_name=veog_ch)[1]
+        #     # heog_corr[index*comp_num:(index*comp_num + comp_num)] = ica.find_bads_eog(raw, ch_name=heog_ch)[1]
+
+    return topo_dframe
+
+
+
+
+
+
 
 # Make an input dataframe of paths
 dframe = populate_dframe()
@@ -317,30 +416,57 @@ g.add_legend()
 g.savefig('/home/jstout/unormalized_group2.png')    
     
 
-def plot_kurtosis_swarm(combined):
-    sns.swarmplot(x='distribution', y='kurtosis', hue='ecg_bad', data=combined,
+def plot_kurtosis_boxplot(combined):
+    sns.boxplot(x='distribution', y='kurtosis', hue='ecg_bad', data=combined,
                   dodge=True)
     
-
-def display_eog_correlation(combined_dframe):
+import copy
+def display_umap(dframe, dist=None): #, suptitle=None):
+    combined_dframe = copy.deepcopy(dframe)
+    combined_dframe = combined_dframe[combined_dframe.distribution==dist]
+    combined_dframe.reset_index(inplace=True, drop=True)
+    
     spectra_dframe = pd.concat([combined_dframe.iloc[:,1:50],
                                 combined_dframe.iloc[:,130]],
                                axis=1)
-   # spectra_dframe = combined_dframe.iloc[:,1:50]+
-    reducer = umap.UMAP(n_components=3, n_neighbors=20, min_dist=.1,
-                    metric='manhattan', low_memory=False) #sine') #'manhattan')
-    embedding = reducer.fit_transform(spectra_dframe.values)
+    normalized_data = StandardScaler().fit_transform(spectra_dframe)
+   # # spectra_dframe = combined_dframe.iloc[:,1:50]+
+   #  reducer = umap.UMAP(n_components=3, n_neighbors=10, min_dist=0,
+   #                  metric='manhattan', low_memory=False, densmap=True,
+   #                  dens_lambda=0.1) #sine') #'manhattan')
+    # reducer = umap.UMAP(n_components=3, n_neighbors=5, min_dist=0.5,
+    #                 metric='manhattan', low_memory=False)    
+    reducer = umap.UMAP(n_components=2)
     
-    sns.scatterplot(x=embedding[:,0], y=embedding[:,1], 
+    # embedding = reducer.fit_transform(spectra_dframe.values)
+    embedding = reducer.fit_transform(spectra_dframe) #normalized_data)
+    
+    fig, axes = matplotlib.pyplot.subplots(2,2, sharex=True, sharey=True,
+                                           figsize=(8,8))
+    #fig.suptitle(dist)
+    
+    sns.scatterplot(ax=axes[0,0], x=embedding[:,0], y=embedding[:,1], 
+                    hue=np.abs(combined_dframe['ecg_bad']))
+    sns.scatterplot(ax=axes[0,1], x=embedding[:,1], y=embedding[:,2], 
+                    hue=np.abs(combined_dframe['ecg_bad']))
+
+    sns.scatterplot(ax=axes[1,0], x=embedding[:,0], y=embedding[:,1], 
+                    hue=np.abs(combined_dframe['eog_bad']))
+    sns.scatterplot(ax=axes[1,1], x=embedding[:,1], y=embedding[:,2], 
+                    hue=np.abs(combined_dframe['eog_bad']))    
+    
+    
+    
+cmb.dropna(subset=['veog_bads_corr', 'heog_bads_corr']) #, 'ecg_bads_corr'])
+combined['high_ctps'] = combined['ecg_bads_ctps'] > .3
+embedding[np.abs(combined['ecg_bads_ctps'])>.3]
+
+# fig = matplotlib.pyplot.figure()
+fig, axes = matplotlib.pyplot.subplots(1,2) #fig.subplots(1,2)     
+sns.scatterplot(ax=axes[0], x=embedding[:,0], y=embedding[:,1], 
                     hue=np.abs(combined_dframe['ecg_bads_corr']))
-    sns.scatterplot(x=embedding[:,1], y=embedding[:,2], 
+sns.scatterplot(ax=axes[1], x=embedding[:,1], y=embedding[:,2], 
                     hue=np.abs(combined_dframe['ecg_bads_corr']))
-    
-    
-    cmb.dropna(subset=['veog_bads_corr', 'heog_bads_corr']) #, 'ecg_bads_corr'])
-    combined['high_ctps'] = combined['ecg_bads_ctps'] > .3
-    embedding[np.abs(combined['ecg_bads_ctps'])>.3]
-    
 
 # ### Combined Clustering
 
