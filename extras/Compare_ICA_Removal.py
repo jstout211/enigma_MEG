@@ -212,8 +212,12 @@ def plot_topo_hack(normalized_topo):
     ref_sens.load_data()    
     epochs = mne.make_fixed_length_epochs(ref_sens)    
     evoked = epochs.average()
-    evoked._data[:,:25]=normalized_topo
-    evoked.plot_topomap(times=evoked.times[0:25], ncols=5, nrows=5)
+    if normalized_topo.shape.__len__() == 1:
+         evoked._data[:,0]=normalized_topo
+         evoked.plot_topomap(times=evoked.times[0], colorbar=False)
+    else:
+        evoked._data[:,:25]=normalized_topo
+        evoked.plot_topomap(times=evoked.times[0:25], ncols=5, nrows=5, colorbar=False)
 
 
 def assess_ICA_topographic_properties(current_dframe):
@@ -289,25 +293,42 @@ combined['eog_bad']= (np.abs(combined.heog_bads_corr) > .25) | (np.abs(combined.
 
 
 def merge_dframes_topo_spectral():
-    spectral_dframe =combined[combined.distribution.isin(['CAMCAN','MOUS'])]
+    spectral_dframe =combined[combined.distribution.isin(['CAMCAN','MOUS'])].copy()
+    spectral_1_40 = spectral_dframe[spectral_dframe.columns[1:40]].copy()
+    mins_= spectral_1_40.min(axis=1).values #spectral_dframemalized_topo.min(axis=0)
+    maxs_ = spectral_1_40.max(axis=1).values # normalized_topo.max(axis=0)
+    # standardized_spetra = 2 * (spectral_1_40 - mins_ ) / (maxs_ - mins_) - 1 
+    denom = maxs_ - mins_
+    numer = spectral_1_40.values - mins_[:,np.newaxis]
+    standardized_spectra = 2 * numer/denom[:,np.newaxis] - 1
+    spectral_dframe.iloc[:,1:40]=standardized_spectra
+    from scipy.stats import zscore 
+    spectral_dframe.loc[spectral_dframe['kurtosis']>50,'kurtosis']=50
+    spectral_dframe.loc[:,'kurtosis']=zscore(spectral_dframe.loc[:,'kurtosis']).astype(np.float16)
     
-    bads = spectral_dframe[['subjid', 'ecg_bad','eog_bad','component_num','distribution']]
+    
+    
+    bads_info = spectral_dframe[['subjid', 'ecg_bad','eog_bad','component_num','distribution','kurtosis']]
+    bads_info = spectral_dframe[['subjid', 'ecg_bad','eog_bad','component_num','distribution','kurtosis']\
+                                + list(spectral_dframe.columns[1:40])]
     
     topo_dframe = pd.read_csv('Topo_Dframe_ELEK102_MOUS_CAM.tsv', sep='\t')
     
-    dframe=pd.merge(topo_dframe, bads, on=['subjid','component_num'])
-    dframe['bads'] = 'Good'
+    dframe=pd.merge(topo_dframe, bads_info, on=['subjid','component_num'])
+    dframe['bads'] = None# 'Good'
     dframe.loc[dframe['ecg_bad'],'bads']='ECG'
     dframe.loc[dframe['eog_bad'],'bads']='EOG'
     
     dframe = dframe.sample(frac=1).reset_index(drop=True)
     
     
-    full_mat = dframe.iloc[:,range(102)]
+    full_mat = pd.concat([dframe.iloc[:,range(102)],dframe.loc[:,spectral_dframe.columns[1:40]],
+                          dframe.loc[:,'kurtosis']],axis=1)
     
-    reducer = umap.UMAP(n_components=2, n_neighbors=20, min_dist=0.2,
-                    metric='manhattan')#'cosine') #manhattan') #sine') #'manhattan')
+    reducer = umap.UMAP(n_components=3, n_neighbors=10, min_dist=0.05,
+                    metric='manhattan')#'cosine')#'manhattan')#'cosine') #manhattan') #sine') #'manhattan')
     embedding = reducer.fit_transform(full_mat.values) #normalized_data)
+    # umap.plot(reducer, labels=dframe['bads'])
     
     fig, axes = matplotlib.pyplot.subplots(2,1, sharex=True, sharey=True,
                                            figsize=(10,10))
@@ -319,7 +340,7 @@ def merge_dframes_topo_spectral():
     
     sns.scatterplot(ax=axes[0], x=embedding[:,0], y=embedding[:,1], 
                     hue=dframe['bads'])#, style=dframe['distribution']) #np.abs(combined_dframe['ecg_bad']))
-    sns.scatterplot(ax=axes[0], x=embedding[:,0], y=embedding[:,1], 
+    sns.scatterplot(ax=axes[1], x=embedding[:,1], y=embedding[:,2], 
                     hue=dframe['bads'])#, style=dframe['distribu
 
 #    sns.scatterplot(ax=axes[0,1], x=embedding[:,1], y=embedding[:,2], 
@@ -379,6 +400,72 @@ def plot_ecg_std(combined):
     melted = pd.melt(tmp_dframe, id_vars=['distribution','subjid', 'ecg_bad'] , value_vars=freq_idxs)
     # sns.lineplot(x='variable', y='value', hue='distribution', style='ecg_bad', data=melted)
     sns.lineplot(x='variable', y='value', hue='distribution', style='ecg_bad', data=melted, ci=np.var)
+
+def topo_correlation_flip(reduced_dframe, ref_topo='first_val'):
+    if type(ref_topo)==str: #'first_val':
+        if ref_topo=='first_val':
+            ref_topo=reduced_dframe.iloc[0,range(102)]
+        elif ref_topo=='mean':
+            ref_topo=reduced_dframe.iloc[:,range(102)].mean(axis=0)
+    #If ref_topo is an array, this will be used as is
+
+    topos=reduced_dframe.copy().iloc[:,range(102)]
+    
+    corrvals = [np.correlate(topos.iloc[i], ref_topo)[0] for i in range(len(topos))]
+    corrvals = np.array(corrvals)
+    corrvals[corrvals<0]=-1
+    corrvals[corrvals>0]=1
+    
+    assert len(corrvals) == len(reduced_dframe)
+    reduced_dframe.iloc[:,range(102)] *= corrvals[:,np.newaxis]
+    
+    return reduced_dframe
+
+
+def plot_ecg_distribution():
+    topo_dframe = pd.read_csv('Topo_Dframe_ELEK102_MOUS_CAM.tsv', sep='\t')
+    
+    spectral_dframe = combined[combined.distribution.isin(['CAMCAN','MOUS'])].copy()
+    
+    bads_info = spectral_dframe[['subjid', 'ecg_bad','eog_bad','component_num','distribution','kurtosis']]
+    
+    
+    dframe=pd.merge(topo_dframe, bads_info, on=['subjid','component_num'])
+    dframe['bads'] = 'Good'
+    dframe.loc[dframe['ecg_bad'],'bads']='ECG'
+    dframe.loc[dframe['eog_bad'],'bads']='EOG'
+    
+    topo_idxs = [str(i) for i in range(102)]
+    # plot_topo_hack(dframe.loc[2,topo_idxs])
+    
+    eogs = dframe[dframe['bads']=='EOG'].copy()
+    ecgs = dframe[dframe['bads']=='ECG'].copy()
+    
+    #Flip the topography based on maximal correlation to reference
+    eogs = topo_correlation_flip(eogs, ref_topo='first_val')
+    ecgs = topo_correlation_flip(ecgs, ref_topo='first_val')
+    mean_eog = eogs.iloc[:,range(102)].mean()
+    mean_ecg = ecgs.iloc[:,range(102)].mean()
+    
+    mean_ecg.to_csv('./ecg_average_mous_camcan.tsv', sep='\t', index=False)
+    mean_eog.to_csv('./eog_average_mous_camcan.tsv', sep='\t', index=False)
+    
+    # eogs = topo_correlation_flip(eogs)
+    # ecgs = topo_correlation_flip(ecgs)
+    
+    
+    plot_topo_hack(ecgs.iloc[:,range(102)].mean())
+    plot_topo_hack(eogs.iloc[:,range(102)].mean())
+    
+    plot_topo_hack(ecgs.iloc[:,range(102)].var())
+    plot_topo_hack(eogs.iloc[:,range(102)].var())
+    
+
+    
+
+    
+    
+
 
 g = sns.FacetGrid(melted, col="distribution", col_wrap=2, margin_titles=True)
 g.map(sns.lineplot, 'variable', 'value', 'ecg_bad', ci='sd')
