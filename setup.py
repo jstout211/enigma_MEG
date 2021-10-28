@@ -18,7 +18,7 @@ setuptools.setup(
         "License :: OSI Approved :: UNLICENSE",
         "Operating System :: Linux/Unix",
     ],
-    python_requires='<3.9',
+    #python_requires='<3.9',
     install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof',
                       'statsmodels', 'nibabel', 'pytest', 'joblib', 'umap-learn', 'seaborn', 'pyvista', 'pyqt5','pyvistaqt'],
     scripts=['enigmeg/process_meg.py', 
