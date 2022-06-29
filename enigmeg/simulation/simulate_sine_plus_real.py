@@ -19,19 +19,52 @@ def data_fun(times, amplitude=1, freq=10):
     data = amplitude * 1e-9 * np.sin(2. * np.pi * freq * times)
     return data
 
+
+def check_datatype(filename):
+    '''Check datatype based on the vendor naming convention'''
+    if os.path.splitext(filename)[-1] == '.ds':
+        return 'ctf'
+    elif os.path.splitext(filename)[-1] == '.fif':
+        return 'elekta'
+    elif os.path.splitext(filename)[-1] == '.4d':
+        return '4d'
+    elif os.path.splitext(filename)[-1] == '.sqd':
+        return 'kit'
+    else:
+        raise ValueError('Could not detect datatype')
+        
+def return_dataloader(datatype):
+    '''Return the dataset loader for this dataset'''
+    if datatype == 'ctf':
+        return mne.io.read_raw_ctf
+    if datatype == 'elekta':
+        return mne.io.read_raw_fif
+    if datatype == '4d':
+        return mne.io.read_raw_bti
+    if datatype == 'kit':
+        return mne.io.read_raw_kit
+
+def load_data(filename):
+    datatype = check_datatype(filename)
+    dataloader = return_dataloader(datatype)
+    raw = dataloader(filename, preload=True)
+    return raw
+
+
 def check_make_fwd(fwd_fname, fname=None, subjects_dir=None, subjid=None, trans=None):
     '''Check if forward model is present, if not make it'''
     if op.exists(fwd_fname):
         return fwd_fname
-    if not os.path.exists(f'{subjects_idr}/{subjid}/bem/inner_skull.surf'):
-        mne.bem.make_watershed_bem(subject=subject_fs, subjects_dir=f'{topdir}/data/SUBJECTS_DIR',
+    if not os.path.exists(f'{subjects_dir}/{subjid}/bem/inner_skull.surf'):
+        mne.bem.make_watershed_bem(subject=subjid, subjects_dir=subjects_dir,
                                                      overwrite=True)
     task = 'rest' #os.path.basename(filename).split('_')[2]
-    fwd_fname = f'{op.basename(fname)}/{subjid}-{task}-fwd.fif'
+    fwd_fname = f'./{subjid}-{task}-fwd.fif'
     if not os.path.exists(fwd_fname):
-        bem = mne.make_bem_model(subject_fs, subjects_dir=f'{subjects_dir}', conductivity=[0.3])
+        bem = mne.make_bem_model(subjid, subjects_dir=f'{subjects_dir}', conductivity=[0.3])
         bem_sol = mne.make_bem_solution(bem)
-        src = mne.source_space.setup_volume_source_space(subject=subject_fs, subjects_dir=f'{topdir}/data/SUBJECTS_DIR', mri='T1.mgz', bem=bem_sol)
+        raw = load_data(fname)
+        src = mne.source_space.setup_volume_source_space(subject=subjid, subjects_dir=subjects_dir, mri='T1.mgz', bem=bem_sol)
         forward = mne.make_forward_solution(raw.info, trans, src, bem_sol, meg=True, eeg=False)
         mne.forward.write_forward_solution(fwd_fname, forward)
 
@@ -61,6 +94,7 @@ def generate_combined_simulation(raw_fname,
     labels_sim = [labels[label_index]]
     
     times = raw.times #[:int(raw.info['sfreq'] * epoch_duration)]
+    #fwd = check_make_fwd()
     src = fwd['src']
 
     sig_generator = partial(data_fun, amplitude=sine_amplitude, 
