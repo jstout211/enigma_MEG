@@ -19,6 +19,23 @@ def data_fun(times, amplitude=1, freq=10):
     data = amplitude * 1e-9 * np.sin(2. * np.pi * freq * times)
     return data
 
+def check_make_fwd(fwd_fname, fname=None, subjects_dir=None, subjid=None, trans=None):
+    '''Check if forward model is present, if not make it'''
+    if op.exists(fwd_fname):
+        return fwd_fname
+    if not os.path.exists(f'{subjects_idr}/{subjid}/bem/inner_skull.surf'):
+        mne.bem.make_watershed_bem(subject=subject_fs, subjects_dir=f'{topdir}/data/SUBJECTS_DIR',
+                                                     overwrite=True)
+    task = 'rest' #os.path.basename(filename).split('_')[2]
+    fwd_fname = f'{op.basename(fname)}/{subjid}-{task}-fwd.fif'
+    if not os.path.exists(fwd_fname):
+        bem = mne.make_bem_model(subject_fs, subjects_dir=f'{subjects_dir}', conductivity=[0.3])
+        bem_sol = mne.make_bem_solution(bem)
+        src = mne.source_space.setup_volume_source_space(subject=subject_fs, subjects_dir=f'{topdir}/data/SUBJECTS_DIR', mri='T1.mgz', bem=bem_sol)
+        forward = mne.make_forward_solution(raw.info, trans, src, bem_sol, meg=True, eeg=False)
+        mne.forward.write_forward_solution(fwd_fname, forward)
+
+
 from functools import partial
 def generate_combined_simulation(raw_fname, 
                                  fwd, 
