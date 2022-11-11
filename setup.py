@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="enigma", 
-    version="0.0.1",
+    version="0.0.2",
     author="Jeff Stout",
     author_email="stoutjd@nih.gov",
     description="Package to calculate metrics for the Enigma MEG consortium",
@@ -20,7 +20,7 @@ setuptools.setup(
     ],
     #python_requires='<3.9',
     install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof',
-                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'umap-learn', 'seaborn', 'pyvista', 'pyqt5','pyvistaqt'],
+                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'pyvista', 'pyqt5','pyvistaqt'],
     scripts=['enigmeg/process_meg.py', 
              'enigmeg/process_anatomical.py'],
 )

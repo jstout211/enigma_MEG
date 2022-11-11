@@ -33,13 +33,15 @@ class process():
             bids_root=None, 
             deriv_root=None,
             subjects_dir=None,
+            rest_tagname='rest',
+            emptyroom_tagname='emptyroom',
             session=1
             ):
         
 # =============================================================================
 #         #Initialize variables
 # =============================================================================
-        self.subject=subject
+        self.subject=subject.replace('sub-','')  #Strip header if present
         self.bids_root=bids_root
         if deriv_root is None:
             self.deriv_root = op.join(
@@ -74,23 +76,32 @@ class process():
             check=False
             )
         
-        self.meg_rest_raw = self.bids_path.upd
+        self.meg_rest_raw = self.bids_path.copy().update(
+            datatype='meg', 
+            task=rest_tagname
+            )
+        
+        self.meg_er_raw = self.bids_path.copy().update(
+            datatype='meg',
+            task=emptyroom_tagname
+            )
+        
+        #Check paths
         
         
-        self.fids=None
-        self.write_anat_json=write_anat_json
-        self.get_coordsys_fname()
-        self.get_fids()
-        self.get_fids_voxel_ctf()
-        self.anat_json_fname = self.bids_path.copy().update(datatype='anat',
-                                                            suffix='T1w',
-                                                            extension='.json')
-        self.anat_json_fname = str(self.anat_json_fname.fpath)
-        self.write_anat_json(anat_json=self.anat_json_fname, 
-                    fids=self.fids_T1w,
-                    overwrite=True)
+# =============================================================================
+#         Configure 
+# =============================================================================
+
+#%%
+# =============================================================================
+# TESTS
+# =============================================================================
+# process('
 
 
+
+#%%
 
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
