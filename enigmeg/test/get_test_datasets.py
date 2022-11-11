@@ -54,12 +54,18 @@ def test_load():
     proc = process_meg.process(subject='ON02747',
                         bids_root=op.join(download_path, openneuro_dset),
                         session='01',
-                        emptyroom_tagname='noise')
+                        emptyroom_tagname='noise', 
+                        mains=60)
     
     assert proc.check_paths() == None
     proc.load_data()
     assert type(proc.raw_rest) is mne.io.ctf.ctf.RawCTF
     assert type(proc.raw_eroom) is mne.io.ctf.ctf.RawCTF   
+    return proc
+
+proc = test_load()
+def test_preproc():
+    assert proc.do_preproc() == None
 
                       
 

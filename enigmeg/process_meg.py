@@ -3,14 +3,6 @@
 """
 Created on Fri Apr  3 16:08:12 2020
 
-TODO:
-    Add cleaning algorithm
-    Check inverse solution
-    Verify sum versus mean on bandwidth
-    Check number of bins during welch calculation
-    Type of covariance
-    
-
 
 @author: stoutjd
 """
@@ -38,7 +30,8 @@ class process():
             subjects_dir=None,
             rest_tagname='rest',
             emptyroom_tagname='emptyroom',
-            session=1
+            session=1, 
+            mains=60
             ):
         
 # =============================================================================
@@ -65,6 +58,13 @@ class process():
                 'freesurfer',
                 'subjects'
                 )
+        self.proc_vars=dict()
+        self.proc_vars['fmin'] = 1
+        self.proc_vars['fmax'] = 45
+        self.proc_vars['sfreq'] = 300
+        self.proc_vars['mains'] = mains
+        
+        
             
 # =============================================================================
 #             Configure bids paths
@@ -89,12 +89,7 @@ class process():
             task=emptyroom_tagname
             )
         
-# =============================================================================
-#         Add functions
-# =============================================================================
         self.check_paths()
-        
-
         
 # =============================================================================
 #       Load data
@@ -102,12 +97,13 @@ class process():
     def load_data(self):
         self.raw_rest = load_data(self.meg_rest_raw.fpath) 
         self.raw_eroom = load_data(self.meg_er_raw.fpath) 
+        
     
     def check_paths(self):
         '''Verify that data is present and can be found'''
-        #Check paths
         try:
             self.meg_rest_raw.fpath
+            self.vendor = check_datatype(self.meg_er_raw.fpath)
         except:
             logging.exception(f'Could not find rest dataset:\n')
             
@@ -115,6 +111,60 @@ class process():
             self.meg_er_raw.fpath
         except:
             logging.exception(f'Could not find emptyroom dataset:\n')
+
+# =============================================================================
+#       Vendor specific prep
+# =============================================================================
+    def vendor_prep(self):
+        '''Different vendor types require special cleaning / initialization'''
+        ## Elekta/MEGIN
+        if self.vendor == 'fif':
+            rest_bads_ = assess_bads(self.meg_rest_raw.fpath)
+            er_bads_ = assess_bads(self.meg_er_raw.fpath,
+                                   is_errom=True)
+            
+            self.raw_rest.info['bads'] = rest_bads_['noisy'] + rest_bads_['flat']
+            self.raw_eroom.info['bads'] = er_bads_['noisy'] + er_bads_['flat']
+        
+        ## CTF
+        if self.vendor == 'ctf':
+            if self.raw_rest.compensation_grade != 3:
+                logging.info(f'Applying 3rd order gradient to rest data')
+                self.apply_gradient_compensation(3)
+            if self.raw_eroom.compensation_grade != 3:
+                logging.info(f'Applying 3rd order gradient to emptyroom data')
+                self.apply_gradient_compensation(3)
+        
+        ## 4D
+        
+        ## KIT 
+        
+            
+# =============================================================================
+#       Preprocessing
+# =============================================================================
+    def preproc(self,
+                raw_inst=None):
+        raw_inst.resample(self.proc_vars['sfreq'])
+        raw_inst.notch_filter(self.proc_vars['mains']) 
+        raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'])
+
+    def do_preproc(self):
+        '''Preprocess both datasets'''
+        self.preproc(raw_inst=self.raw_rest)
+        self.preproc(raw_inst=self.raw_eroom)
+        
+        
+
+        
+        
+        
+        
+
+
+
+
+
         
         
         
