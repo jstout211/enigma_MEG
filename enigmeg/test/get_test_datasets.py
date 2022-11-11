@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Nov 11 13:52:35 2022
 
 @author: stoutjd
 """
@@ -9,6 +8,7 @@ Created on Fri Nov 11 13:52:35 2022
 import os, os.path as op
 import datalad.api as dl
 import glob
+import mne
 from enigmeg import process_meg
 
 
@@ -21,8 +21,10 @@ downloads=\
      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_channels.tsv',
      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_coordsystem.json',
      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.ds',
-     'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.json']
-
+     'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.json',
+     'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_channels.tsv',
+     'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.ds',
+     'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.json']
 
 def get_rest_data(dataset='ds004215',
                   download_location=download_path, 
@@ -45,7 +47,21 @@ get_rest_data(dataset='ds004215',
                   downloads=downloads
                   )
 
-proc = process_meg.process(subject='ON02747',
-                    bids_root=op.join(download_path, openneuro_dset),
-                    session='01')
+# =============================================================================
+# Build object instance
+# =============================================================================
+def test_load():
+    proc = process_meg.process(subject='ON02747',
+                        bids_root=op.join(download_path, openneuro_dset),
+                        session='01',
+                        emptyroom_tagname='noise')
+    
+    assert proc.check_paths() == None
+    proc.load_data()
+    assert type(proc.raw_rest) is mne.io.ctf.ctf.RawCTF
+    assert type(proc.raw_eroom) is mne.io.ctf.ctf.RawCTF   
+
+                      
+
+
 

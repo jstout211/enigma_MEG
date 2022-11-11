@@ -22,6 +22,9 @@ import numpy as np
 import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.mod_label_extract import mod_source_estimate
+import logging
+
+logger=logging.basicConfig()
 
 from mne_bids import BIDSPath
 import functools
@@ -86,21 +89,35 @@ class process():
             task=emptyroom_tagname
             )
         
+# =============================================================================
+#         Add functions
+# =============================================================================
+        self.check_paths()
+        
+
+        
+# =============================================================================
+#       Load data
+# =============================================================================
+    def load_data(self):
+        self.raw_rest = load_data(self.meg_rest_raw.fpath) 
+        self.raw_eroom = load_data(self.meg_er_raw.fpath) 
+    
+    def check_paths(self):
+        '''Verify that data is present and can be found'''
         #Check paths
+        try:
+            self.meg_rest_raw.fpath
+        except:
+            logging.exception(f'Could not find rest dataset:\n')
+            
+        try:
+            self.meg_er_raw.fpath
+        except:
+            logging.exception(f'Could not find emptyroom dataset:\n')
         
         
-# =============================================================================
-#         Configure 
-# =============================================================================
-
-#%%
-# =============================================================================
-# TESTS
-# =============================================================================
-# process('
-
-
-
+        
 #%%
 
 def check_datatype(filename):
