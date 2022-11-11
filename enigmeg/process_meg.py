@@ -23,6 +23,8 @@ import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.mod_label_extract import mod_source_estimate
 
+import functools
+
 
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
@@ -34,13 +36,15 @@ def check_datatype(filename):
         return '4d'
     elif os.path.splitext(filename)[-1] == '.sqd':
         return 'kit'
+    elif os.path.splitext(filename)[-1] == 'con':
+        return 'kit'
     else:
         raise ValueError('Could not detect datatype')
         
 def return_dataloader(datatype):
     '''Return the dataset loader for this dataset'''
     if datatype == 'ctf':
-        return mne.io.read_raw_ctf
+        return functools.partial(mne.io.read_raw_ctf, system_clock='ignore')
     if datatype == 'elekta':
         return mne.io.read_raw_fif
     if datatype == '4d':
