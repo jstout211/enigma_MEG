@@ -23,7 +23,73 @@ import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.mod_label_extract import mod_source_estimate
 
+from mne_bids import BIDSPath
 import functools
+
+class process():
+    def __init__(
+            self, 
+            subject=None, 
+            bids_root=None, 
+            deriv_root=None,
+            subjects_dir=None,
+            session=1
+            ):
+        
+# =============================================================================
+#         #Initialize variables
+# =============================================================================
+        self.subject=subject
+        self.bids_root=bids_root
+        if deriv_root is None:
+            self.deriv_root = op.join(
+                bids_root, 
+                'derivatives'
+                )
+        else:
+            self.deriv_root = deriv_root
+            
+        self.enigma_root = op.join(
+            self.deriv_root,
+            'ENIGMA_MEG'
+            )
+        
+        if subjects_dir is None:
+            self.subjects_dir = op.join(
+                self.deriv_root,
+                'freesurfer',
+                'subjects'
+                )
+            
+# =============================================================================
+#             Configure bids paths
+# =============================================================================
+        self.bids_path = BIDSPath(
+            root=bids_root, 
+            subject=subject, 
+            session=session)
+        
+        self.deriv_path=self.bids_path.copy().update(
+            root=deriv_root,
+            check=False
+            )
+        
+        self.meg_rest_raw = self.bids_path.upd
+        
+        
+        self.fids=None
+        self.write_anat_json=write_anat_json
+        self.get_coordsys_fname()
+        self.get_fids()
+        self.get_fids_voxel_ctf()
+        self.anat_json_fname = self.bids_path.copy().update(datatype='anat',
+                                                            suffix='T1w',
+                                                            extension='.json')
+        self.anat_json_fname = str(self.anat_json_fname.fpath)
+        self.write_anat_json(anat_json=self.anat_json_fname, 
+                    fids=self.fids_T1w,
+                    overwrite=True)
+
 
 
 def check_datatype(filename):
