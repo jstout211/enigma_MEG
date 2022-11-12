@@ -80,8 +80,21 @@ class process():
             session=session)
         
         self.deriv_path=self.bids_path.copy().update(
-            root=deriv_root,
-            check=False
+            root=self.enigma_root,
+            check=False,
+            extension='.fif',
+            datatype='meg', 
+            suffix='meg'
+            )
+        
+        if not op.exists(self.deriv_path.directory): self.deriv_path.directory.mkdir()
+        
+        self.rest_derivpath = self.deriv_path.copy().update(
+            task=rest_tagname
+            )
+        
+        self.eroom_derivpath = self.deriv_path.copy().update(
+            task=emptyroom_tagname
             )
         
         self.meg_rest_raw = self.bids_path.copy().update(
@@ -128,7 +141,10 @@ class process():
         _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
         
         # Cast all bids paths to paths and save in bunch object
-        return bunch.Bunch(**{key:i.fpath for key,i in _tmp.items()})
+        new_bunch=bunch.Bunch()
+        for key,i in _tmp.items():
+            new_bunch[key]=str(i.fpath)
+        return new_bunch  #bunch.Bunch({key:str(i.fpath) for key,i in _tmp.items()})
         
         
 # =============================================================================
@@ -184,28 +200,38 @@ class process():
 #       Preprocessing
 # =============================================================================
     def _preproc(self,
-                raw_inst=None):
+                raw_inst=None,
+                deriv_path=None):
         raw_inst.resample(self.proc_vars['sfreq'])
         raw_inst.notch_filter(self.proc_vars['mains']) 
         raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'])
+        raw_inst.save(deriv_path.copy().update(processing='filt'), overwrite=True)
 
     def do_preproc(self):
         '''Preprocess both datasets'''
-        self._preproc(raw_inst=self.raw_rest)
-        self._preproc(raw_inst=self.raw_eroom)
+        self._preproc(raw_inst=self.raw_rest, deriv_path=self.rest_derivpath)
+        self._preproc(raw_inst=self.raw_eroom, deriv_path=self.eroom_derivpath)
         
     def _proc_epochs(self,
-                     raw_inst=None):
+                     raw_inst=None,
+                     deriv_path=None):
+        '''Create and save epochs
+        Create and save covariance'''
         epochs = mne.make_fixed_length_epochs(raw_inst, 
                                               duration=self.proc_vars['epoch_len'], 
                                               preload=True)
-        # epochs.save()
-        # epochs.apply_baseline(baseline=(0,None))
+        epochs_fname = deriv_path.copy().update(suffix='epo')
+        epochs.save(epochs_fname, overwrite=True)
+        
         cov = mne.compute_covariance(epochs)
+        cov_fname = deriv_path.copy().update(suffix='cov')
+        cov.save(cov_fname, overwrite=True)
         
     def do_proc_epochs(self):
-        self._proc_epochs(raw_inst=self.raw_rest)
-        self._proc_epochs(raw_inst=self.raw_eroom)
+        self._proc_epochs(raw_inst=self.raw_rest,
+                          deriv_path=self.rest_derivpath)
+        self._proc_epochs(raw_inst=self.raw_eroom, 
+                          deriv_path=self.eroom_derivpath)
         
     def do_proc_allsteps(self):
         self.load_data()
