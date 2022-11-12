@@ -20,7 +20,7 @@ setuptools.setup(
     ],
     #python_requires='<3.9',
     install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof',
-                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'pyvista', 'pyqt5','pyvistaqt'],
+                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'pyvista', 'pyqt5','pyvistaqt', 'mne_bids'],
     scripts=['enigmeg/process_meg.py', 
              'enigmeg/process_anatomical.py'],
 )

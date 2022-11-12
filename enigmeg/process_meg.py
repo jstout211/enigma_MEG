@@ -143,7 +143,7 @@ class process():
 # =============================================================================
 #       Preprocessing
 # =============================================================================
-    def preproc(self,
+    def _preproc(self,
                 raw_inst=None):
         raw_inst.resample(self.proc_vars['sfreq'])
         raw_inst.notch_filter(self.proc_vars['mains']) 
@@ -151,10 +151,25 @@ class process():
 
     def do_preproc(self):
         '''Preprocess both datasets'''
-        self.preproc(raw_inst=self.raw_rest)
-        self.preproc(raw_inst=self.raw_eroom)
+        self._preproc(raw_inst=self.raw_rest)
+        self._preproc(raw_inst=self.raw_eroom)
         
+    # def 
         
+    # epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+    # epochs.apply_baseline(baseline=(0,None))
+    # cov = mne.compute_covariance(epochs)
+    
+    # er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
+    # er_epochs.apply_baseline(baseline=(0,None))
+    # er_cov = mne.compute_covariance(er_epochs)
+    
+    # os.environ['SUBJECTS_DIR']=subjects_dir
+    # src = mne.read_source_spaces(info.src_filename)
+    # bem = mne.read_bem_solution(info.bem_sol_filename)
+    # fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
+
+
 
         
         
