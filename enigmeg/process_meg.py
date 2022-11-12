@@ -17,6 +17,7 @@ from enigmeg.mod_label_extract import mod_source_estimate
 import logging
 import munch 
 from collections import OrderedDict
+import mne_bids
 
 logger=logging.basicConfig()
 
@@ -33,7 +34,9 @@ class process():
             rest_tagname='rest',
             emptyroom_tagname='emptyroom',
             session=1, 
-            mains=60
+            mains=60,
+            run='1',
+            t1_override=None
             ):
         
 # =============================================================================
@@ -67,6 +70,8 @@ class process():
         self.proc_vars['mains'] = mains
         self.proc_vars['epoch_len']=4.0  #seconds
         
+        self._t1_override = t1_override
+        
         
         
         
@@ -88,10 +93,12 @@ class process():
             suffix='meg'
             )
         
-        if not op.exists(self.deriv_path.directory): self.deriv_path.directory.mkdir()
+        if not op.exists(self.deriv_path.directory): 
+            self.deriv_path.directory.mkdir(parents=True)
         
         self.rest_derivpath = self.deriv_path.copy().update(
-            task=rest_tagname
+            task=rest_tagname, 
+            run=run
             )
         
         self.eroom_derivpath = self.deriv_path.copy().update(
@@ -100,13 +107,18 @@ class process():
         
         self.meg_rest_raw = self.bids_path.copy().update(
             datatype='meg', 
-            task=rest_tagname
+            task=rest_tagname, 
+            run=run
             )
         
         self.meg_er_raw = self.bids_path.copy().update(
             datatype='meg',
             task=emptyroom_tagname
             )
+        
+        self.anat_bidspath = self.bids_path.copy().update(root=self.subjects_dir,
+                                                          session=None,
+                                                          check=False)
         
         self.check_paths()
         
@@ -115,10 +127,8 @@ class process():
     def initialize_fnames(self, rest_tagname, emptyroom_tagname):
         '''Use the bids paths to generate output names'''
         _tmp=munch.Munch()
-        rest_deriv = self.deriv_path.copy().update(task=rest_tagname,
-                                                   extension='.fif')
-        eroom_deriv = self.deriv_path.copy().update(task=emptyroom_tagname,
-                                                    extension='.fif')
+        rest_deriv = self.rest_derivpath.copy().update(extension='.fif')
+        eroom_deriv = self.eroom_derivpath.copy().update(extension='.fif')
         
         ## Setup bids paths for all 
         # Conversion to actual paths at end
@@ -141,6 +151,11 @@ class process():
         _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
         _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
         
+        # _tmp['src']=
+        # _tmp['bem']=self.anat_bidspath.copy().update(suffix='bem')
+        _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
+        _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
+        
         # Cast all bids paths to paths and save in bunch object
         return munch.Munch({key:str(i.fpath) for key,i in _tmp.items()})
         
@@ -154,7 +169,7 @@ class process():
         
     
     def check_paths(self):
-        '''Verify that data is present and can be found'''
+        '''Verify that the raw data is present and can be found'''
         try:
             self.meg_rest_raw.fpath
             self.vendor = check_datatype(self.meg_er_raw.fpath)
@@ -231,19 +246,48 @@ class process():
         self._proc_epochs(raw_inst=self.raw_eroom, 
                           deriv_path=self.eroom_derivpath)
         
+    def proc_mri(self, t1_override=None):
+        if t1_override is not None:
+            entities=mne_bids.get_entities_from_fname(t1_override)
+            t1_bids_path = BIDSPath(**entities)
+        else:
+            t1_bids_path = self.bids_path.copy().update(datatype='anat', 
+                                                    suffix='T1w')
+                                                    
+        os.environ['SUBJECTS_DIR']=self.subjects_dir
+        
+        trans = mne_bids.get_head_mri_trans(self.meg_rest_raw,
+                                                t1_bids_path=self.bids_path,
+                                                fs_subject='sub-'+self.bids_path.subject) 
+        trans_fname = self.rest_derivpath.copy().update(suffix='trans')
+        if op.exists(trans_fname):
+            os.remove(trans_fname)
+        trans.save(trans_fname)
+        
+        # bem = mne.
+        # src
+        # src = mne.read_source_spaces(info.src_filename)
+        # bem = mne.read_bem_solution(info.bem_sol_filename)
+        # fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
+        
+  
+        
     def do_proc_allsteps(self):
         self.load_data()
         self.do_preproc()
         self.do_proc_epochs()
+        self.proc_mri(t1_override=self._t1_override)
     
-    # er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
-    # er_epochs.apply_baseline(baseline=(0,None))
-    # er_cov = mne.compute_covariance(er_epochs)
-    
-    # os.environ['SUBJECTS_DIR']=subjects_dir
-    # src = mne.read_source_spaces(info.src_filename)
-    # bem = mne.read_bem_solution(info.bem_sol_filename)
-    # fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
+    # This probably doesn't work currently
+    def check_alignment(self):
+        if not self.trans:
+            self.trans = mne.read_trans(self.fnames['rest_trans'])
+        mne.viz.plot_alignment(self.raw_rest.info,
+                                    trans=self.trans,
+                                    subject='sub-'+self.bids_path.subject, 
+                                    dig=True)
+        
+        
 
 
 
@@ -254,12 +298,14 @@ class process():
 
 
 
-def load_test_data():
+def load_test_data(**kwargs):
     proc = process(subject='ON02747',
                         bids_root=op.join('/home/stoutjd/ds004215'),
                         session='01',
                         emptyroom_tagname='noise', 
-                        mains=60)
+                        mains=60,
+                        t1_override='/home/stoutjd/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
+                        **kwargs)
     # proc.load_data()
     return proc
 
@@ -300,6 +346,9 @@ def load_data(filename):
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
     return raw
+
+proc = load_test_data(run='01')
+
 
 
 #%% 

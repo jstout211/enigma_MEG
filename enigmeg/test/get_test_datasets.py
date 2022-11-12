@@ -15,25 +15,27 @@ from enigmeg import process_meg
 
 download_path = os.path.expanduser('~')
 openneuro_dset='ds004215'
-# downloads=\
-#     ['sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.json',
-#      'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
-#      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_channels.tsv',
-#      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_coordsystem.json',
-#      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.ds',
-#      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.json',
-#      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_channels.tsv',
-#      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.ds',
-#      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.json']
+downloads=\
+    ['sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.json',
+      'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
+      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_channels.tsv',
+      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_coordsystem.json',
+      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.ds',
+      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.json',
+      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_channels.tsv',
+      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.ds',
+      'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.json']
 
 # def get_rest_data(dataset='ds004215',
+#                   branch='1.0.1',
 #                   download_location=download_path, 
 #                   downloads=downloads
 #                   ):
 #     '''Retrieve CTF rest data from NIMH HV dataset'''
 #     dl.install(
 #         path=op.join(download_path,dataset),
-#         source=f'https://github.com/OpenNeuroDatasets/{openneuro_dset}.git'
+#         source=f'https://github.com/OpenNeuroDatasets/{openneuro_dset}.git',
+#         branch=branch
 #         )
 
 #     curr_dir = os.getcwd()
@@ -54,6 +56,7 @@ def test_load():
     proc = process_meg.process(subject='ON02747',
                         bids_root=op.join(download_path, openneuro_dset),
                         session='01',
+                        run='01',
                         emptyroom_tagname='noise', 
                         mains=60)
     
@@ -73,6 +76,10 @@ def test_create_epochs():
     assert op.exists(proc.fnames.rest_cov)
     assert op.exists(proc.fnames.eroom_epo)
     assert op.exists(proc.fnames.eroom_cov)
+
+def test_mriproc():
+    # assert proc.proc_mri() == None
+    assert op.exists(proc.fnames.rest_trans)
 
                       
 
