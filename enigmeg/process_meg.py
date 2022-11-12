@@ -15,7 +15,8 @@ import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.mod_label_extract import mod_source_estimate
 import logging
-import bunch
+import munch 
+from collections import OrderedDict
 
 logger=logging.basicConfig()
 
@@ -59,7 +60,7 @@ class process():
                 'freesurfer',
                 'subjects'
                 )
-        self.proc_vars=bunch.Bunch()
+        self.proc_vars=munch.Munch()
         self.proc_vars['fmin'] = 1
         self.proc_vars['fmax'] = 45
         self.proc_vars['sfreq'] = 300
@@ -113,7 +114,7 @@ class process():
     
     def initialize_fnames(self, rest_tagname, emptyroom_tagname):
         '''Use the bids paths to generate output names'''
-        _tmp=bunch.Bunch()
+        _tmp=munch.Munch()
         rest_deriv = self.deriv_path.copy().update(task=rest_tagname,
                                                    extension='.fif')
         eroom_deriv = self.deriv_path.copy().update(task=emptyroom_tagname,
@@ -141,10 +142,10 @@ class process():
         _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
         
         # Cast all bids paths to paths and save in bunch object
-        new_bunch=bunch.Bunch()
+        new_bunch = munch.Munch() #bunch doens't work with py3
         for key,i in _tmp.items():
             new_bunch[key]=str(i.fpath)
-        return new_bunch  #bunch.Bunch({key:str(i.fpath) for key,i in _tmp.items()})
+        return munch.Munch(new_bunch)  #bunch.Bunch({key:str(i.fpath) for key,i in _tmp.items()})
         
         
 # =============================================================================
