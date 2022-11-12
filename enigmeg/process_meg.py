@@ -142,10 +142,7 @@ class process():
         _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
         
         # Cast all bids paths to paths and save in bunch object
-        new_bunch = munch.Munch() #bunch doens't work with py3
-        for key,i in _tmp.items():
-            new_bunch[key]=str(i.fpath)
-        return munch.Munch(new_bunch)  #bunch.Bunch({key:str(i.fpath) for key,i in _tmp.items()})
+        return munch.Munch({key:str(i.fpath) for key,i in _tmp.items()})
         
         
 # =============================================================================
