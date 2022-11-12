@@ -15,6 +15,7 @@ import pandas as pd
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.mod_label_extract import mod_source_estimate
 import logging
+import bunch
 
 logger=logging.basicConfig()
 
@@ -58,11 +59,15 @@ class process():
                 'freesurfer',
                 'subjects'
                 )
-        self.proc_vars=dict()
+        self.proc_vars=bunch.Bunch()
         self.proc_vars['fmin'] = 1
         self.proc_vars['fmax'] = 45
         self.proc_vars['sfreq'] = 300
         self.proc_vars['mains'] = mains
+        self.proc_vars['epoch_len']=4.0  #seconds
+        
+        
+        
         
         
             
@@ -90,6 +95,41 @@ class process():
             )
         
         self.check_paths()
+        
+        self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
+    
+    def initialize_fnames(self, rest_tagname, emptyroom_tagname):
+        '''Use the bids paths to generate output names'''
+        _tmp=bunch.Bunch()
+        rest_deriv = self.deriv_path.copy().update(task=rest_tagname,
+                                                   extension='.fif')
+        eroom_deriv = self.deriv_path.copy().update(task=emptyroom_tagname,
+                                                    extension='.fif')
+        
+        ## Setup bids paths for all 
+        # Conversion to actual paths at end
+        
+        _tmp['raw_rest']=self.meg_rest_raw
+        _tmp['raw_eroom']=self.meg_er_raw
+        
+        _tmp['rest_filt']=rest_deriv.copy().update(processing='filt')
+        _tmp['eroom_filt']=eroom_deriv.copy().update(processing='filt')
+        
+        _tmp['rest_clean']=rest_deriv.copy().update(processing='clean')
+        _tmp['eroom_clean']=eroom_deriv.copy().update(processing='clean')
+        
+        _tmp['rest_epo']=rest_deriv.copy().update(suffix='epo')
+        _tmp['eroom_epo']=eroom_deriv.copy().update(suffix='epo')
+        
+        _tmp['rest_epo_clean']=_tmp['rest_epo'].copy().update(processing='clean')
+        _tmp['eroom_epo_clean']=_tmp['eroom_epo'].copy().update(processing='clean')
+        
+        _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
+        _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
+        
+        # Cast all bids paths to paths and save in bunch object
+        return bunch.Bunch(**{key:i.fpath for key,i in _tmp.items()})
+        
         
 # =============================================================================
 #       Load data
@@ -154,11 +194,23 @@ class process():
         self._preproc(raw_inst=self.raw_rest)
         self._preproc(raw_inst=self.raw_eroom)
         
-    # def 
+    def _proc_epochs(self,
+                     raw_inst=None):
+        epochs = mne.make_fixed_length_epochs(raw_inst, 
+                                              duration=self.proc_vars['epoch_len'], 
+                                              preload=True)
+        # epochs.save()
+        # epochs.apply_baseline(baseline=(0,None))
+        cov = mne.compute_covariance(epochs)
         
-    # epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
-    # epochs.apply_baseline(baseline=(0,None))
-    # cov = mne.compute_covariance(epochs)
+    def do_proc_epochs(self):
+        self._proc_epochs(raw_inst=self.raw_rest)
+        self._proc_epochs(raw_inst=self.raw_eroom)
+        
+    def do_proc_allsteps(self):
+        self.load_data()
+        self.do_preproc()
+        self.do_proc_epochs()
     
     # er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
     # er_epochs.apply_baseline(baseline=(0,None))
@@ -178,12 +230,20 @@ class process():
 
 
 
+def load_test_data():
+    proc = process(subject='ON02747',
+                        bids_root=op.join('/home/stoutjd/ds004215'),
+                        session='01',
+                        emptyroom_tagname='noise', 
+                        mains=60)
+    # proc.load_data()
+    return proc
+
+
 
 
         
         
-        
-#%%
 
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
@@ -216,7 +276,10 @@ def load_data(filename):
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
     return raw
-    
+
+
+#%% 
+   
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
     # from scipy.signal import welch
