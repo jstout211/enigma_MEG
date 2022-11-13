@@ -20,6 +20,7 @@ from collections import OrderedDict
 import mne_bids
 
 logger=logging.basicConfig()
+n_jobs = 10  #extract this from the configuration file
 
 from mne_bids import BIDSPath
 import functools
@@ -151,10 +152,13 @@ class process():
         _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
         _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
         
-        # _tmp['src']=
-        # _tmp['bem']=self.anat_bidspath.copy().update(suffix='bem')
         _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
+        _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
+        _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
+        
+        
+        
         
         # Cast all bids paths to paths and save in bunch object
         return munch.Munch({key:str(i.fpath) for key,i in _tmp.items()})
@@ -246,7 +250,8 @@ class process():
         self._proc_epochs(raw_inst=self.raw_eroom, 
                           deriv_path=self.eroom_derivpath)
         
-    def proc_mri(self, t1_override=None):
+    def proc_mri(self, t1_override=None):#,
+                 # redo_all=False):
         if t1_override is not None:
             entities=mne_bids.get_entities_from_fname(t1_override)
             t1_bids_path = BIDSPath(**entities)
@@ -254,23 +259,61 @@ class process():
             t1_bids_path = self.bids_path.copy().update(datatype='anat', 
                                                     suffix='T1w')
                                                     
+        # Configure filepaths
         os.environ['SUBJECTS_DIR']=self.subjects_dir
+        deriv_path = self.rest_derivpath.copy()
+        # Update path so src/bem are not saved as task/run specific
+        src_fname = deriv_path.copy().update(suffix='src', extension='.fif',
+                                             task=None, run=None)
+        bem_fname = deriv_path.copy().update(suffix='bem', extension='.fif',
+                                             task=None, run=None)
+        # Specific to task = rest / run = run#
+        fwd_fname = deriv_path.copy().update(suffix='fwd', extension='.fif')
+        trans_fname = deriv_path.copy().update(suffix='trans',extension='.fif')
+                
+        if fwd_fname.fpath.exists():
+            fwd = mne.read_forward_solution(fwd_fname)
+            return fwd
         
-        trans = mne_bids.get_head_mri_trans(self.meg_rest_raw,
-                                                t1_bids_path=self.bids_path,
-                                                fs_subject='sub-'+self.bids_path.subject) 
-        trans_fname = self.rest_derivpath.copy().update(suffix='trans')
-        if op.exists(trans_fname):
-            os.remove(trans_fname)
-        trans.save(trans_fname)
+        watershed_check_path=op.join(self.subjects_dir,
+                                     f'sub-{self.subject}',
+                                     'bem',
+                                     'inner_skull.surf'
+                                     )
+        if not os.path.exists(watershed_check_path):
+            mne.bem.make_watershed_bem(f'sub-{self.subject}',
+                                       self.subjects_dir,
+                                       overwrite=True
+                                       )
+        if not bem_fname.fpath.exists():
+            bem = mne.make_bem_model(f'sub-{self.subject}', 
+                                     subjects_dir=self.subjects_dir, 
+                                     conductivity=[0.3])
+            bem_sol = mne.make_bem_solution(bem)
+            
+            mne.write_bem_solution(bem_fname, bem_sol, overwrite=True)
+        else:
+            bem_sol = mne.read_bem_solution(bem_fname)
+            
+        if not src_fname.fpath.exists():
+            src = mne.setup_source_space(f'sub-{self.subject}',
+                                         spacing='oct6', add_dist='patch',
+                                 subjects_dir=self.subjects_dir)
+            src.save(src_fname.fpath, overwrite=True)
+        else:
+            src = mne.read_source_spaces(src_fname.fpath)
         
-        # bem = mne.
-        # src
-        # src = mne.read_source_spaces(info.src_filename)
-        # bem = mne.read_bem_solution(info.bem_sol_filename)
-        # fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
-        
-  
+        if not trans_fname.fpath.exists():
+            trans = mne_bids.get_head_mri_trans(self.meg_rest_raw,
+                                                    t1_bids_path=t1_bids_path,
+                                                    fs_subject='sub-'+self.bids_path.subject) 
+            mne.write_trans(trans_fname.fpath, trans, overwrite=True)
+        else:
+            trans = mne.read_trans(trans_fname.fpath)
+        fwd = mne.make_forward_solution(self.raw_rest.info, trans, src, bem_sol, eeg=False, 
+                                        n_jobs=n_jobs)
+        mne.write_forward_solution(fwd_fname.fpath, fwd)
+ 
         
     def do_proc_allsteps(self):
         self.load_data()

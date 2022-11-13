@@ -78,9 +78,12 @@ def test_create_epochs():
     assert op.exists(proc.fnames.eroom_cov)
 
 def test_mriproc():
-    # assert proc.proc_mri() == None
+    proc.proc_mri()
+    #assert proc.proc_mri() == None
     assert op.exists(proc.fnames.rest_trans)
-
+    assert op.exists(proc.fnames.bem)
+    assert op.exists(proc.fnames.rest_fwd)
+    assert op.exists(proc.fnames.src)
                       
 
 
