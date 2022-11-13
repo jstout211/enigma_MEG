@@ -250,8 +250,7 @@ class process():
         self._proc_epochs(raw_inst=self.raw_eroom, 
                           deriv_path=self.eroom_derivpath)
         
-    def proc_mri(self, t1_override=None):#,
-                 # redo_all=False):
+    def proc_mri(self, t1_override=None,redo_all=False):
         if t1_override is not None:
             entities=mne_bids.get_entities_from_fname(t1_override)
             t1_bids_path = BIDSPath(**entities)
@@ -271,7 +270,7 @@ class process():
         fwd_fname = deriv_path.copy().update(suffix='fwd', extension='.fif')
         trans_fname = deriv_path.copy().update(suffix='trans',extension='.fif')
                 
-        if fwd_fname.fpath.exists():
+        if fwd_fname.fpath.exists() and (redo_all is False):
             fwd = mne.read_forward_solution(fwd_fname)
             return fwd
         
@@ -280,12 +279,12 @@ class process():
                                      'bem',
                                      'inner_skull.surf'
                                      )
-        if not os.path.exists(watershed_check_path):
+        if (not os.path.exists(watershed_check_path)) or (redo_all is True):
             mne.bem.make_watershed_bem(f'sub-{self.subject}',
                                        self.subjects_dir,
                                        overwrite=True
                                        )
-        if not bem_fname.fpath.exists():
+        if (not bem_fname.fpath.exists()) or (redo_all is True):
             bem = mne.make_bem_model(f'sub-{self.subject}', 
                                      subjects_dir=self.subjects_dir, 
                                      conductivity=[0.3])
@@ -295,7 +294,7 @@ class process():
         else:
             bem_sol = mne.read_bem_solution(bem_fname)
             
-        if not src_fname.fpath.exists():
+        if (not src_fname.fpath.exists()) or (redo_all is True):
             src = mne.setup_source_space(f'sub-{self.subject}',
                                          spacing='oct6', add_dist='patch',
                                  subjects_dir=self.subjects_dir)
@@ -303,7 +302,7 @@ class process():
         else:
             src = mne.read_source_spaces(src_fname.fpath)
         
-        if not trans_fname.fpath.exists():
+        if (not trans_fname.fpath.exists()) or (redo_all is True):
             trans = mne_bids.get_head_mri_trans(self.meg_rest_raw,
                                                     t1_bids_path=t1_bids_path,
                                                     fs_subject='sub-'+self.bids_path.subject) 
@@ -312,8 +311,19 @@ class process():
             trans = mne.read_trans(trans_fname.fpath)
         fwd = mne.make_forward_solution(self.raw_rest.info, trans, src, bem_sol, eeg=False, 
                                         n_jobs=n_jobs)
-        mne.write_forward_solution(fwd_fname.fpath, fwd)
- 
+        mne.write_forward_solution(fwd_fname.fpath, fwd, overwrite=True)
+        
+    
+    # def do_make_subaparc(self):
+        
+    def list_outputs(self):
+        exists = [i for i in self.fnames if op.exists(self.fnames[i])]
+        missing = [i for i in self.fnames if not op.exists(self.fnames[i])]
+        for i in exists:
+            print(f'Present: {self.fnames[i]}')
+        print('\n\n')
+        for i in missing:
+            print(f'Missing: {self.fnames[i]}')
         
     def do_proc_allsteps(self):
         self.load_data()
@@ -323,8 +333,8 @@ class process():
     
     # This probably doesn't work currently
     def check_alignment(self):
-        if not self.trans:
-            self.trans = mne.read_trans(self.fnames['rest_trans'])
+        self.trans = mne.read_trans(self.fnames['rest_trans'])
+        self.load_data()
         mne.viz.plot_alignment(self.raw_rest.info,
                                     trans=self.trans,
                                     subject='sub-'+self.bids_path.subject, 
