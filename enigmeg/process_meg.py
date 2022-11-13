@@ -140,14 +140,15 @@ class process():
         _tmp['rest_filt']=rest_deriv.copy().update(processing='filt')
         _tmp['eroom_filt']=eroom_deriv.copy().update(processing='filt')
         
-        _tmp['rest_clean']=rest_deriv.copy().update(processing='clean')
-        _tmp['eroom_clean']=eroom_deriv.copy().update(processing='clean')
+        # MEGNET post
+        #_tmp['rest_clean']=rest_deriv.copy().update(processing='clean')
+        #_tmp['eroom_clean']=eroom_deriv.copy().update(processing='clean')
         
         _tmp['rest_epo']=rest_deriv.copy().update(suffix='epo')
         _tmp['eroom_epo']=eroom_deriv.copy().update(suffix='epo')
         
-        _tmp['rest_epo_clean']=_tmp['rest_epo'].copy().update(processing='clean')
-        _tmp['eroom_epo_clean']=_tmp['eroom_epo'].copy().update(processing='clean')
+        #_tmp['rest_epo_clean']=_tmp['rest_epo'].copy().update(processing='clean')
+        #_tmp['eroom_epo_clean']=_tmp['eroom_epo'].copy().update(processing='clean')
         
         _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
         _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
@@ -168,14 +169,16 @@ class process():
 #       Load data
 # =============================================================================
     def load_data(self):
-        self.raw_rest = load_data(self.meg_rest_raw.fpath) 
-        self.raw_eroom = load_data(self.meg_er_raw.fpath) 
+        if not hasattr(self, 'raw_rest'):
+            self.raw_rest = load_data(self.meg_rest_raw.fpath) 
+        if not hasattr(self, 'raw_eroom'):
+            self.raw_eroom = load_data(self.meg_er_raw.fpath) 
         
     
     def check_paths(self):
         '''Verify that the raw data is present and can be found'''
         try:
-            self.meg_rest_raw.fpath
+            self.meg_rest_raw.fpath  #Errors if not present
             self.vendor = check_datatype(self.meg_er_raw.fpath)
         except:
             logging.exception(f'Could not find rest dataset:\n')
@@ -331,13 +334,13 @@ class process():
         self.do_proc_epochs()
         self.proc_mri(t1_override=self._t1_override)
     
-    # This probably doesn't work currently
     def check_alignment(self):
         self.trans = mne.read_trans(self.fnames['rest_trans'])
         self.load_data()
         mne.viz.plot_alignment(self.raw_rest.info,
                                     trans=self.trans,
-                                    subject='sub-'+self.bids_path.subject, 
+                                    subject='sub-'+self.bids_path.subject,
+                                    subjects_dir=self.subjects_dir,
                                     dig=True)
         
         
