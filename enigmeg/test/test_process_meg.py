@@ -100,5 +100,19 @@ def test_beamformer():
         os.remove(proc.fnames.lcmv)
     proc.do_beamformer()
     assert op.exists(proc.fnames.lcmv)
+    
+def test_label_psds():
+    proc.load_data()
+    proc.proc_mri()
+    proc.do_beamformer()
+    
+    'Reduce the epoch count to 3 for compute purposes'
+    tmp = []
+    for i in 0,1,2:
+        tmp.append(next(proc.stcs))
+    proc.stcs = tmp
+    proc.do_label_psds()
+    assert hasattr(proc, 'label_ts')
+    
 
 

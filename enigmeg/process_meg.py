@@ -288,7 +288,7 @@ class process():
                 
         if fwd_fname.fpath.exists() and (redo_all is False):
             fwd = mne.read_forward_solution(fwd_fname)
-            return fwd
+            self.rest_fwd = fwd
         
         watershed_check_path=op.join(self.subjects_dir,
                                      f'sub-{self.subject}',
@@ -327,6 +327,7 @@ class process():
             trans = mne.read_trans(trans_fname.fpath)
         fwd = mne.make_forward_solution(self.raw_rest.info, trans, src, bem_sol, eeg=False, 
                                         n_jobs=n_jobs)
+        self.rest_fwd=fwd
         mne.write_forward_solution(fwd_fname.fpath, fwd, overwrite=True)
             
     
@@ -350,6 +351,29 @@ class process():
         stcs = apply_lcmv_epochs(epochs, filters, return_generator=True) 
         self.stcs = stcs
         
+    def do_label_psds(self):
+        labels_lh=mne.read_labels_from_annot(f'sub-{self.subject}',
+                                             parc='aparc_sub',
+                                            subjects_dir=self.subjects_dir,
+                                            hemi='lh') 
+        labels_rh=mne.read_labels_from_annot(f'sub-{self.subject}',
+                                             parc='aparc_sub',
+                                             subjects_dir=self.subjects_dir,
+                                             hemi='rh') 
+        labels=labels_lh + labels_rh 
+        self.labels = labels
+        
+        # results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
+        
+        #Monkey patch of mne.source_estimate to perform 15 component SVD
+        label_ts = mod_source_estimate.extract_label_time_course(self.stcs, 
+                                                                 labels, 
+                                                                 self.rest_fwd['src'],
+                                                                 mode='pca15_multitaper')
+        
+        #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
+        self.label_ts = np.stack(label_ts)
+        
         
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
@@ -365,7 +389,10 @@ class process():
         self.do_preproc()
         self.do_proc_epochs()
         self.proc_mri(t1_override=self._t1_override)
-        self.proc_beamformer()
+        self.do_beamformer()
+        self.do_make_aparc_sub()
+        self.do_label_psds()
+        
     
     def check_alignment(self):
         self.trans = mne.read_trans(self.fnames['rest_trans'])
@@ -451,8 +478,7 @@ proc = load_test_data(run='01')
 
 
 
-#%% 
-   
+# !!! Fix hardcoded variables   
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
     # from scipy.signal import welch
@@ -482,6 +508,8 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
+
+#%%
 def parse_proc_inputs(proc_file):
     # Load csv processing tab separated file
     proc_dframe = pd.read_csv(proc_file, sep='\t')    
@@ -562,51 +590,51 @@ def make_report(subject, subjects_dir, meg_filename, output_dir):
     report_filename = op.join(output_dir, 'QA_report.html')
     report.save(report_filename)
         
-def test_beamformer():
+# def test_beamformer():
    
-    #Load filenames from test datasets
-    from enigmeg.test_data.get_test_data import datasets
-    test_dat = datasets().ctf
+#     #Load filenames from test datasets
+#     from enigmeg.test_data.get_test_data import datasets
+#     test_dat = datasets().ctf
 
-    meg_filename = test_dat['meg_rest'] 
-    subjid = test_dat['subject']
-    subjects_dir = test_dat['SUBJECTS_DIR'] 
-    trans_fname = test_dat['trans']
-    src_fname = test_dat['src']
-    bem = test_dat['bem']
+#     meg_filename = test_dat['meg_rest'] 
+#     subjid = test_dat['subject']
+#     subjects_dir = test_dat['SUBJECTS_DIR'] 
+#     trans_fname = test_dat['trans']
+#     src_fname = test_dat['src']
+#     bem = test_dat['bem']
     
-    outfolder = './tmp'  #<<< Change this ############################
+#     outfolder = './tmp'  #<<< Change this ############################
     
-    raw = mne.io.read_raw_ctf(meg_filename, preload=True)
-    trans = mne.read_trans(trans_fname)
-    # info.subjid, info.subjects_dir = subjid, subjects_dir
+#     raw = mne.io.read_raw_ctf(meg_filename, preload=True)
+#     trans = mne.read_trans(trans_fname)
+#     # info.subjid, info.subjects_dir = subjid, subjects_dir
     
-    raw.apply_gradient_compensation(3)
-    raw.resample(300)
-    raw.filter(1.0, None)
-    raw.notch_filter([60,120])
-    eraw.notch_filter([60,120])
+#     raw.apply_gradient_compensation(3)
+#     raw.resample(300)
+#     raw.filter(1.0, None)
+#     raw.notch_filter([60,120])
+#     eraw.notch_filter([60,120])
     
-    epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
+#     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
 
-    data_cov = mne.compute_covariance(epochs, method='empirical')  
+#     data_cov = mne.compute_covariance(epochs, method='empirical')  
     
-    eroom_filename = test_dat['meg_eroom'] 
-    eroom_raw = mne.io.read_raw_ctf(eroom_filename, preload=True)
-    eroom_raw.resample(300)
-    eroom_raw.notch_filter([60,120])
-    eroom_raw.filter(1.0, None)
+#     eroom_filename = test_dat['meg_eroom'] 
+#     eroom_raw = mne.io.read_raw_ctf(eroom_filename, preload=True)
+#     eroom_raw.resample(300)
+#     eroom_raw.notch_filter([60,120])
+#     eroom_raw.filter(1.0, None)
     
-    eroom_epochs = mne.make_fixed_length_epochs(eroom_raw, duration=4.0)
-    noise_cov = mne.compute_covariance(eroom_epochs)
+#     eroom_epochs = mne.make_fixed_length_epochs(eroom_raw, duration=4.0)
+#     noise_cov = mne.compute_covariance(eroom_epochs)
 
-    fwd = mne.make_forward_solution(epochs.info, trans, src_fname, 
-                                    bem)
+#     fwd = mne.make_forward_solution(epochs.info, trans, src_fname, 
+#                                     bem)
     
-    from mne.beamformer import make_lcmv, apply_lcmv_epochs
-    filters = make_lcmv(epochs.info, fwd, data_cov, reg=0.01,
-                        noise_cov=noise_cov, pick_ori='max-power',
-                        weight_norm='unit-noise-gain', rank=None)
+#     from mne.beamformer import make_lcmv, apply_lcmv_epochs
+#     filters = make_lcmv(epochs.info, fwd, data_cov, reg=0.01,
+#                         noise_cov=noise_cov, pick_ori='max-power',
+#                         weight_norm='unit-noise-gain', rank=None)
     
     labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
                                         subjects_dir=subjects_dir, hemi='lh') 
@@ -834,7 +862,7 @@ if __name__=='__main__':
                 deriv_root=None,
                 subjects_dir=None,
                 rest_tagname='rest',
-                emptyroom_tagname='emptyroom', #!!! FIX 
+                emptyroom_tagname='noise', #!!! FIX 
                 session='1', 
                 mains=60,
                 run='1',
