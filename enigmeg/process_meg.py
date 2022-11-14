@@ -160,10 +160,14 @@ class process():
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
         
         _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', extension='.h5')
-        # _tmp['parc'] = self.
         
-        # Cast all bids paths to paths and save in bunch object
-        return munch.Munch({key:str(i.fpath) for key,i in _tmp.items()})
+        # Cast all bids paths to paths and save as dictionary
+        path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
+        
+        # Additional non-bids path files
+        path_dict['parc'] = op.join(self.subjects_dir, 'morph-maps', 
+                               f'sub-{self.subject}-fsaverage-morph.fif') 
+        return munch.Munch(path_dict)
         
         
 # =============================================================================
