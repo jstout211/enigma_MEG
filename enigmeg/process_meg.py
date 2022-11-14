@@ -187,6 +187,14 @@ class process():
             self.meg_er_raw.fpath
         except:
             logging.exception(f'Could not find emptyroom dataset:\n')
+        
+        subj_fsdir= op.join(f'{self.subjects_dir}', f'sub-{self.subject}')
+        if not op.exists(subj_fsdir):
+            errtxt = f'There is no freesurfer folder for {self.subject}:\
+                              \n{subj_fsdir}'.replace('  ',' ')
+            logging.exception(errtxt)
+                         
+                         
 
 # =============================================================================
 #       Vendor specific prep
@@ -316,8 +324,44 @@ class process():
                                         n_jobs=n_jobs)
         mne.write_forward_solution(fwd_fname.fpath, fwd, overwrite=True)
         
-    
     # def do_make_subaparc(self):
+        
+        
+        
+        
+        
+    def do_beamformer(self):
+        dat_cov = mne.read_cov(self.fnames.rest_cov)
+        noise_cov = mne.read_cov(self.fnames.eroom_cov)
+        forward = mne.read_forward_solution(self.fnames.rest_fwd)
+        epochs = mne.read_epochs(self.fnames.rest_epo)
+        fname_lcmv = bids_path.copy().update(suffix='lcmv', extension='h5')
+        
+        
+        # fname_fwd = bids_path.copy().update(suffix='fwd')
+        # fname_cov = bids_path.copy().update(suffix='cov')
+        # fname_inv = bids_path.copy().update(suffix='inv')
+        # fname_lcmv = bids_path.copy().update(suffix='lcmv', extension='h5')
+        # fname_epo = bids_path.copy().update(processing='clean', suffix='epo')
+    
+        # info = mne.io.read_info(fname_info)
+    
+        epo_rank = mne.compute_rank(epochs)
+        filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.01, 
+                            noise_cov=noise_cov,  pick_ori='max-power',
+                            weight_norm='unit-noise-gain', rank='info')
+        
+        filters.save(fname_lcmv, overwrite=True)
+        stcs = apply_lcmv_epochs(epochs, filters, return_generator=True) 
+        hemi_str = 'hemi'  # MNE will auto-append '-lh' and '-rh'.
+        fname_stc = bids_path.copy().update(
+            suffix=f'lcmv+{hemi_str}',
+            extension=None)
+        self.stcs = stcs
+        # stcs[0].save(fname_stc, overwrite=True)
+        
+        
+        
         
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
@@ -356,11 +400,11 @@ class process():
 
 def load_test_data(**kwargs):
     proc = process(subject='ON02747',
-                        bids_root=op.join('/home/stoutjd/ds004215'),
+                        bids_root=op.expanduser('~/ds004215'),
                         session='01',
                         emptyroom_tagname='noise', 
                         mains=60,
-                        t1_override='/home/stoutjd/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
+                        t1_override='~/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
                         **kwargs)
     # proc.load_data()
     return proc

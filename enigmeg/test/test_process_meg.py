@@ -26,28 +26,34 @@ downloads=\
       'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.ds',
       'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.json']
 
-# def get_rest_data(dataset='ds004215',
-#                   branch='1.0.1',
-#                   download_location=download_path, 
-#                   downloads=downloads
-#                   ):
-#     '''Retrieve CTF rest data from NIMH HV dataset'''
-#     dl.install(
-#         path=op.join(download_path,dataset),
-#         source=f'https://github.com/OpenNeuroDatasets/{openneuro_dset}.git',
-#         branch=branch
-#         )
+def get_rest_data(dataset='ds004215',
+                  branch='1.0.1',
+                  download_location=download_path, 
+                  downloads=downloads
+                  ):
+    '''Retrieve CTF rest data from NIMH HV dataset'''
+    dl.install(
+        path=op.join(download_path,dataset),
+        source=f'https://github.com/OpenNeuroDatasets/{openneuro_dset}.git',
+        branch=branch
+        )
+    curr_dir = os.getcwd()
+    os.chdir(op.join(download_path, dataset))    
+    dl.get(path=downloads)
+    
+    os.chdir(curr_dir)    
 
-#     curr_dir = os.getcwd()
-#     os.chdir(op.join(download_path, dataset))    
-#     dl.get(path=downloads)
-    
-#     os.chdir(curr_dir)    
-    
-# get_rest_data(dataset='ds004215',
-#                   download_location=download_path, 
-#                   downloads=downloads
-#                   )
+if not os.path.exists(op.join(download_path,openneuro_dset)):
+    get_rest_data(dataset='ds004215',
+                      download_location=download_path, 
+                      downloads=downloads
+                      )
+
+rm_files = ['sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.json',
+        'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz']
+rm_files = [op.join(os.path.expanduser('~'),openneuro_dset,i) for i in rm_files]
+if os.path.exists(rm_files[0]): os.remove(rm_files[0])
+if os.path.exists(rm_files[1]): os.remove(rm_files[1])
 
 # =============================================================================
 # Build object instance
