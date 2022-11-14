@@ -18,6 +18,7 @@ import logging
 import munch 
 from collections import OrderedDict
 import mne_bids
+from mne.beamformer import make_lcmv, apply_lcmv_epochs
 
 logger=logging.basicConfig()
 n_jobs = 10  #extract this from the configuration file
@@ -158,8 +159,7 @@ class process():
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
         
-        
-        
+        _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', extension='.h5')
         
         # Cast all bids paths to paths and save in bunch object
         return munch.Munch({key:str(i.fpath) for key,i in _tmp.items()})
@@ -329,22 +329,14 @@ class process():
         
         
         
+     
         
     def do_beamformer(self):
         dat_cov = mne.read_cov(self.fnames.rest_cov)
         noise_cov = mne.read_cov(self.fnames.eroom_cov)
         forward = mne.read_forward_solution(self.fnames.rest_fwd)
         epochs = mne.read_epochs(self.fnames.rest_epo)
-        fname_lcmv = bids_path.copy().update(suffix='lcmv', extension='h5')
-        
-        
-        # fname_fwd = bids_path.copy().update(suffix='fwd')
-        # fname_cov = bids_path.copy().update(suffix='cov')
-        # fname_inv = bids_path.copy().update(suffix='inv')
-        # fname_lcmv = bids_path.copy().update(suffix='lcmv', extension='h5')
-        # fname_epo = bids_path.copy().update(processing='clean', suffix='epo')
-    
-        # info = mne.io.read_info(fname_info)
+        fname_lcmv = self.fnames.lcmv
     
         epo_rank = mne.compute_rank(epochs)
         filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.01, 
@@ -353,14 +345,7 @@ class process():
         
         filters.save(fname_lcmv, overwrite=True)
         stcs = apply_lcmv_epochs(epochs, filters, return_generator=True) 
-        hemi_str = 'hemi'  # MNE will auto-append '-lh' and '-rh'.
-        fname_stc = bids_path.copy().update(
-            suffix=f'lcmv+{hemi_str}',
-            extension=None)
         self.stcs = stcs
-        # stcs[0].save(fname_stc, overwrite=True)
-        
-        
         
         
     def list_outputs(self):
@@ -377,6 +362,7 @@ class process():
         self.do_preproc()
         self.do_proc_epochs()
         self.proc_mri(t1_override=self._t1_override)
+        self.proc_beamformer()
     
     def check_alignment(self):
         self.trans = mne.read_trans(self.fnames['rest_trans'])

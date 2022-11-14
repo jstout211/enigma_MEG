@@ -91,6 +91,10 @@ def test_mriproc():
     assert op.exists(proc.fnames.rest_fwd)
     assert op.exists(proc.fnames.src)
                       
-
+def test_beamformer():
+    if op.exists(proc.fnames.lcmv):
+        os.remove(proc.fnames.lcmv)
+    proc.do_beamformer()
+    assert op.exists(proc.fnames.lcmv)
 
 
