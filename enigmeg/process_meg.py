@@ -160,6 +160,7 @@ class process():
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
         
         _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', extension='.h5')
+        # _tmp['parc'] = self.
         
         # Cast all bids paths to paths and save in bunch object
         return munch.Munch({key:str(i.fpath) for key,i in _tmp.items()})
@@ -323,13 +324,11 @@ class process():
         fwd = mne.make_forward_solution(self.raw_rest.info, trans, src, bem_sol, eeg=False, 
                                         n_jobs=n_jobs)
         mne.write_forward_solution(fwd_fname.fpath, fwd, overwrite=True)
-        
-    # def do_make_subaparc(self):
-        
-        
-        
-        
-     
+            
+    
+    def do_make_aparc_sub(self):
+        write_aparc_sub(subjid=f'sub-{self.subject}', 
+                        subjects_dir=self.subjects_dir)
         
     def do_beamformer(self):
         dat_cov = mne.read_cov(self.fnames.rest_cov)
@@ -374,32 +373,7 @@ class process():
                                     dig=True)
         
         
-
-
-
-        
-        
-        
-        
-
-
-
-def load_test_data(**kwargs):
-    proc = process(subject='ON02747',
-                        bids_root=op.expanduser('~/ds004215'),
-                        session='01',
-                        emptyroom_tagname='noise', 
-                        mains=60,
-                        t1_override='~/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
-                        **kwargs)
-    # proc.load_data()
-    return proc
-
-
-
-
-        
-        
+      
 
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
@@ -433,6 +407,42 @@ def load_data(filename):
     raw = dataloader(filename, preload=True)
     return raw
 
+def write_aparc_sub(subjid=None, subjects_dir=None):
+    '''Check for fsaverage and aparc_sub and download
+    Morph fsaverage aparc_sub labels to single subject data
+    
+    https://mne.tools/stable/auto_examples/visualization/plot_parcellation.html
+    '''
+    mne.datasets.fetch_fsaverage(verbose='ERROR') #True requires TQDM
+    mne.datasets.fetch_aparc_sub_parcellation(subjects_dir=subjects_dir,
+                                          verbose='ERROR')
+    
+    sub_labels=mne.read_labels_from_annot('fsaverage',parc='aparc_sub', 
+                                   subjects_dir=subjects_dir)        
+    subject_labels=mne.morph_labels(sub_labels, subject_to=subjid, 
+                                 subjects_dir=subjects_dir)
+    mne.write_labels_to_annot(subject_labels, subject=subjid, 
+                              parc='aparc_sub', subjects_dir=subjects_dir, 
+                              overwrite=True)
+
+
+
+
+
+def load_test_data(**kwargs):
+    proc = process(subject='ON02747',
+                        bids_root=op.expanduser('~/ds004215'),
+                        session='01',
+                        emptyroom_tagname='noise', 
+                        mains=60,
+                        t1_override='~/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
+                        **kwargs)
+    # proc.load_data()
+    return proc
+
+# print(__name__)
+# # For Testing run this cell
+# if __name__!='__main__':
 proc = load_test_data(run='01')
 
 
@@ -804,57 +814,30 @@ def main(filename=None, subjid=None, trans=None, info=None, line_freq=None,
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-subjects_dir', help='''Freesurfer subjects_dir can be 
-                        assigned at the commandline if not already exported.''')
-    parser.add_argument('-subjid', help='''Define subjects id (folder name)
-                        in the SUBJECTS_DIR''')
-    parser.add_argument('-meg_file', help='''Location of meg rest dataset''')
-    parser.add_argument('-er_meg_file', help='''Emptyroom dataset assiated with meg
-                        file''')
-    parser.add_argument('-viz_coreg', help='''Open up a window to vizualize the 
-                        coregistration between head surface and MEG sensors''',
-                        action='store_true')
-    parser.add_argument('-trans', help='''Transfile from mne python -trans.fif''')
-    parser.add_argument('-line_f', help='''Line frequecy''', type=float)
-    parser.add_argument('-proc_file', help='''Process file to batch submit 
-                        subjects.  Use proc_template.csv as a template''')
+    parser.add_argument('-bids_root',
+                        help='''Top level directory of the bids data'''
+                        )
+    parser.add_argument('-config', 
+                        help='''Config file for processing data'''
+                        )
+    parser.add_argument('-subject',
+                        help='''Subject to process'''
+                        )
+    args = parser.parse_args()
     
-    args=parser.parse_args()
+    proc = process(subject=args.subject, 
+                bids_root=args.bids_root, 
+                deriv_root=None,
+                subjects_dir=None,
+                rest_tagname='rest',
+                emptyroom_tagname='emptyroom', #!!! FIX 
+                session='1', 
+                mains=60,
+                run='1',
+                t1_override=None
+                )
+    proc.load_data()
+    proc.do_proc_allsteps()
     
-    if args.proc_file:
-        proc_file = args.proc_file
-        parse_proc_inputs(proc_file)
-        exit(0)
-    
-    if not args.subjects_dir:
-        subjects_dir = os.environ['SUBJECTS_DIR']
-    else:
-        subjects_dir = args.subjects_dir
-    subjid = args.subjid
-    
-    #Load the anatomical information
-    import pickle
-    from enigmeg.process_anatomical import anat_info
-    enigma_dir=os.environ['ENIGMA_REST_DIR']
-    with open(os.path.join(enigma_dir,subjid,'info.pkl'),'rb') as e:
-        info=pickle.load(e)
-        
-    raw=load_data(args.meg_file)
-    
-    trans = mne.read_trans(args.trans)
-        
-    if args.viz_coreg:
-        plot_QA_head_sensor_align(info, raw, trans)
-        # visualize_coreg(raw, info, trans=trans)
-        # _ = input('Enter anything to exit')
-        exit(0)
-    
-    del raw
-    main(args.meg_file, subjid=subjid, trans=trans, info=info, 
-         line_freq=args.line_f, emptyroom_filename=args.er_meg_file,
-         subjects_dir=subjects_dir)
-    
-    
-
 
     
