@@ -855,17 +855,40 @@ if __name__=='__main__':
     parser.add_argument('-subject',
                         help='''Subject to process'''
                         )
+    parser.add_argument('-run',
+                        help='''Run number.  \nNOTE: 01 is different from 1''',
+                        default='1'
+                        )
+    parser.add_argument('-session',
+                        default=None,
+                        )
+    parser.add_argument('-mains',
+                        help='Electric mains frequency  (50 or 60)',
+                        default=60.0,
+                        )
+    parser.add_argument('-rest_tag',
+                        help='Override in case task name is other than rest\
+                            for example - resteyesopen',
+                        default='rest'
+                        )
+    parser.add_argument('-emptyroom_tag',
+                        help='Override in case emptryoom is other than \
+                            emptyroom',
+                        default='emptyroom'
+                        )
+                            
+        
     args = parser.parse_args()
     
     proc = process(subject=args.subject, 
                 bids_root=args.bids_root, 
                 deriv_root=None,
                 subjects_dir=None,
-                rest_tagname='rest',
-                emptyroom_tagname='noise', #!!! FIX 
-                session='1', 
-                mains=60,
-                run='1',
+                rest_tagname=args.rest_tag,
+                emptyroom_tagname=args.emptyroom_tag, 
+                session=args.session, 
+                mains=float(args.mains),
+                run=args.run,
                 t1_override=None
                 )
     proc.load_data()
