@@ -374,6 +374,78 @@ class process():
         #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
         self.label_ts = np.stack(label_ts)
         
+    def do_spectral_paramerization(self):
+        '''
+        Passes spectra to fooof alg for peak and 1/f analysis
+
+        Returns
+        -------
+        None.
+
+        '''
+        #HACK HARDCODED FREQ BINS
+        freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+    
+        #Initialize 
+        label_power = np.zeros([len(labels), len(freq_bins)])  
+        alpha_peak = np.zeros(len(labels))
+        
+        #Create PSD for each label
+        for label_idx in range(len(labels)):
+            print(str(label_idx))
+            current_psd = label_stack[:,label_idx, :].mean(axis=0) 
+            label_power[label_idx,:] = current_psd
+            
+            spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
+                                                labels[label_idx].name + '.png')
+    
+            try:
+                tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
+                                out_image_path=spectral_image_path)
+                
+                #FIX FOR MULTIPLE ALPHA PEAKS
+                potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
+                                        (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
+                if len(potential_alpha_idx) != 1:
+                    alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
+                else:
+                    alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
+            except:
+                alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<    
+            
+        #Save the label spectrum to assemble the relative power
+        freq_bin_names=[str(binval) for binval in freq_bins]
+        label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
+        label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
+        # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
+        #     np.save(f, label_power)
+        
+        relative_power = label_power / label_power.sum(axis=1, keepdims=True)
+    
+        #Define bands
+        bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
+        band_idxs = get_freq_idx(bands, freq_bins)
+    
+        #initialize output
+        band_means = np.zeros([len(labels), len(bands)]) 
+        #Loop over all bands, select the indexes assocaited with the band and average    
+        for mean_band, band_idx in enumerate(band_idxs):
+            band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
+        
+        output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
+        
+    
+        bands_str = [str(i) for i in bands]
+        label_names = [i.name for i in labels]
+        
+        output_dframe = pd.DataFrame(band_means, columns=bands_str, 
+                                     index=label_names)
+        output_dframe['AlphaPeak'] = alpha_peak
+        output_dframe.to_csv(output_filename, sep='\t')    
+
+
+
+        
         
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
@@ -438,14 +510,38 @@ def load_data(filename):
     raw = dataloader(filename, preload=True)
     return raw
 
+def assess_bads(raw_fname, is_eroom=False):
+    '''Code sampled from MNE python website
+    https://mne.tools/dev/auto_tutorials/preprocessing/\
+        plot_60_maxwell_filtering_sss.html'''
+    from mne.preprocessing import find_bad_channels_maxwell
+    raw = mne.io.read_raw_fif(raw_fname)
+    if raw.times[-1] > 60.0:
+        raw.crop(tmax=60)    
+    raw.info['bads'] = []
+    raw_check = raw.copy()
+    if is_eroom==False:
+        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+            raw_check, cross_talk=None, calibration=None,
+            return_scores=True, verbose=True)
+    else:
+        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+            raw_check, cross_talk=None, calibration=None,
+            return_scores=True, verbose=True, coord_frame="meg")        
+    
+    return {'noisy':auto_noisy_chs, 'flat':auto_flat_chs}            
+
 def write_aparc_sub(subjid=None, subjects_dir=None):
     '''Check for fsaverage and aparc_sub and download
     Morph fsaverage aparc_sub labels to single subject data
     
     https://mne.tools/stable/auto_examples/visualization/plot_parcellation.html
     '''
-    mne.datasets.fetch_fsaverage(verbose='ERROR') #True requires TQDM
-    mne.datasets.fetch_aparc_sub_parcellation(subjects_dir=subjects_dir,
+    if not op.exists(op.join(subjects_dir, 'fs_average')):
+        mne.datasets.fetch_fsaverage(verbose='ERROR') #True requires TQDM
+    if not op.exists(op.join(subjects_dir, 'fs_average', 'label', 
+                             'lh.aparc_sub.annot')):
+        mne.datasets.fetch_aparc_sub_parcellation(subjects_dir=subjects_dir,
                                           verbose='ERROR')
     
     sub_labels=mne.read_labels_from_annot('fsaverage',parc='aparc_sub', 
@@ -590,257 +686,143 @@ def make_report(subject, subjects_dir, meg_filename, output_dir):
     report_filename = op.join(output_dir, 'QA_report.html')
     report.save(report_filename)
         
-# def test_beamformer():
-   
-#     #Load filenames from test datasets
-#     from enigmeg.test_data.get_test_data import datasets
-#     test_dat = datasets().ctf
 
-#     meg_filename = test_dat['meg_rest'] 
-#     subjid = test_dat['subject']
-#     subjects_dir = test_dat['SUBJECTS_DIR'] 
-#     trans_fname = test_dat['trans']
-#     src_fname = test_dat['src']
-#     bem = test_dat['bem']
+
+# def main(filename=None, subjid=None, trans=None, info=None, line_freq=None, 
+#          emptyroom_filename=None, subjects_dir=None):
     
-#     outfolder = './tmp'  #<<< Change this ############################
+#     ## Load and prefilter continuous data
+#     raw=load_data(filename)
+#     eraw=load_data(emptyroom_filename)
     
-#     raw = mne.io.read_raw_ctf(meg_filename, preload=True)
-#     trans = mne.read_trans(trans_fname)
-#     # info.subjid, info.subjects_dir = subjid, subjects_dir
+#     if type(raw)==mne.io.ctf.ctf.RawCTF:
+#         raw.apply_gradient_compensation(3)
     
-#     raw.apply_gradient_compensation(3)
-#     raw.resample(300)
-#     raw.filter(1.0, None)
-#     raw.notch_filter([60,120])
-#     eraw.notch_filter([60,120])
+#     ## Test SSS bad channel detection for non-Elekta data
+#     # !!!!!!!!!!!  Currently no finecal or crosstalk used  !!!!!!!!!!!!!!!
+#     if filename[-3:]=='fif':
+#         raw_bads_dict = assess_bads(filename)
+#         eraw_bads_dict = assess_bads(emptyroom_filename, is_eroom=True)
+        
+#         raw.info['bads']=raw_bads_dict['noisy'] + raw_bads_dict['flat']
+#         eraw.info['bads']=eraw_bads_dict['noisy'] + eraw_bads_dict['flat']
     
+#     resample_freq=300
+    
+#     raw.resample(resample_freq)
+#     eraw.resample(resample_freq)
+    
+#     raw.filter(0.5, 140)
+#     eraw.filter(0.5, 140)
+    
+#     if line_freq==None:
+#         try:
+#             line_freq = raw.info['line_freq']  # this isn't present in all files
+#         except:
+#             raise(ValueError('Could not determine line_frequency'))
+#     notch_freqs = np.arange(line_freq, 
+#                             resample_freq/2, 
+#                             line_freq)
+#     raw.notch_filter(notch_freqs)
+    
+    
+#     ## Create Epochs and covariance 
 #     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
-
-#     data_cov = mne.compute_covariance(epochs, method='empirical')  
+#     epochs.apply_baseline(baseline=(0,None))
+#     cov = mne.compute_covariance(epochs)
     
-#     eroom_filename = test_dat['meg_eroom'] 
-#     eroom_raw = mne.io.read_raw_ctf(eroom_filename, preload=True)
-#     eroom_raw.resample(300)
-#     eroom_raw.notch_filter([60,120])
-#     eroom_raw.filter(1.0, None)
+#     er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
+#     er_epochs.apply_baseline(baseline=(0,None))
+#     er_cov = mne.compute_covariance(er_epochs)
     
-#     eroom_epochs = mne.make_fixed_length_epochs(eroom_raw, duration=4.0)
-#     noise_cov = mne.compute_covariance(eroom_epochs)
-
-#     fwd = mne.make_forward_solution(epochs.info, trans, src_fname, 
-#                                     bem)
+#     os.environ['SUBJECTS_DIR']=subjects_dir
+#     src = mne.read_source_spaces(info.src_filename)
+#     bem = mne.read_bem_solution(info.bem_sol_filename)
+#     fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
+    
+#     data_info = epochs.info
     
 #     from mne.beamformer import make_lcmv, apply_lcmv_epochs
-#     filters = make_lcmv(epochs.info, fwd, data_cov, reg=0.01,
-#                         noise_cov=noise_cov, pick_ori='max-power',
+#     filters = make_lcmv(epochs.info, fwd, cov, reg=0.01,
+#                         noise_cov=er_cov, pick_ori='max-power',
 #                         weight_norm='unit-noise-gain', rank=None)
     
-    labels_lh=mne.read_labels_from_annot(subjid, parc='aparc',
-                                        subjects_dir=subjects_dir, hemi='lh') 
-    labels_rh=mne.read_labels_from_annot(subjid, parc='aparc',
-                                        subjects_dir=subjects_dir, hemi='rh') 
-    labels=labels_lh + labels_rh 
+#     labels_lh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
+#                                         subjects_dir=subjects_dir, hemi='lh') 
+#     labels_rh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
+#                                         subjects_dir=subjects_dir, hemi='rh') 
+#     labels=labels_lh + labels_rh 
     
-    # labels[1].center_of_mass()
+#     results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
     
-    results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
+#     #Monkey patch of mne.source_estimate to perform 15 component SVD
+#     label_ts = mod_source_estimate.extract_label_time_course(results_stcs, 
+#                                                              labels, 
+#                                                              fwd['src'],
+#                                                              mode='pca15_multitaper')
     
-    #Monkey patch of mne.source_estimate to perform 15 component SVD
-    label_ts = mod_source_estimate.extract_label_time_course(results_stcs, labels, 
-                                                         fwd['src'],
-                                       mode='pca15_multitaper')
-    
-    #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
-    label_stack = np.stack(label_ts)
-    # label_stack = np.mean(label_stack, axis=0)
+#     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
+#     label_stack = np.stack(label_ts)
 
-#    freq_bins, _ = label_psd(label_stack[:,0, :], raw.info['sfreq'])
-    freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+#     #HACK HARDCODED FREQ BINS
+#     freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
 
-    #Initialize 
-    label_power = np.zeros([len(labels), len(freq_bins)])  
-    alpha_peak = np.zeros(len(labels))
+#     #Initialize 
+#     label_power = np.zeros([len(labels), len(freq_bins)])  
+#     alpha_peak = np.zeros(len(labels))
     
-    #Create PSD for each label
-    for label_idx in range(len(labels)):
-        print(str(label_idx))
-        current_psd = label_stack[:,label_idx, :].mean(axis=0) 
-        label_power[label_idx,:] = current_psd
+#     #Create PSD for each label
+#     for label_idx in range(len(labels)):
+#         print(str(label_idx))
+#         current_psd = label_stack[:,label_idx, :].mean(axis=0) 
+#         label_power[label_idx,:] = current_psd
         
-        spectral_image_path = os.path.join(outfolder, 'Spectra_'+
-                                            labels[label_idx].name + '.png')
+#         spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
+#                                             labels[label_idx].name + '.png')
 
-        try:
-            tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
-                            out_image_path=spectral_image_path)
+#         try:
+#             tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
+#                             out_image_path=spectral_image_path)
             
-            #FIX FOR MULTIPLE ALPHA PEAKS
-            potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
-                                    (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
-            if len(potential_alpha_idx) != 1:
-                alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
-            else:
-                alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
-        except:
-            alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<
-
-def assess_bads(raw_fname, is_eroom=False):
-    '''Code sampled from MNE python website
-    https://mne.tools/dev/auto_tutorials/preprocessing/\
-        plot_60_maxwell_filtering_sss.html'''
-    from mne.preprocessing import find_bad_channels_maxwell
-    raw = mne.io.read_raw_fif(raw_fname)
-    if raw.times[-1] > 60.0:
-        raw.crop(tmax=60)    
-    raw.info['bads'] = []
-    raw_check = raw.copy()
-    if is_eroom==False:
-        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
-            raw_check, cross_talk=None, calibration=None,
-            return_scores=True, verbose=True)
-    else:
-        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
-            raw_check, cross_talk=None, calibration=None,
-            return_scores=True, verbose=True, coord_frame="meg")        
-    
-    return {'noisy':auto_noisy_chs, 'flat':auto_flat_chs}            
-
-def main(filename=None, subjid=None, trans=None, info=None, line_freq=None, 
-         emptyroom_filename=None, subjects_dir=None):
-    
-    ## Load and prefilter continuous data
-    raw=load_data(filename)
-    eraw=load_data(emptyroom_filename)
-    
-    if type(raw)==mne.io.ctf.ctf.RawCTF:
-        raw.apply_gradient_compensation(3)
-    
-    ## Test SSS bad channel detection for non-Elekta data
-    # !!!!!!!!!!!  Currently no finecal or crosstalk used  !!!!!!!!!!!!!!!
-    if filename[-3:]=='fif':
-        raw_bads_dict = assess_bads(filename)
-        eraw_bads_dict = assess_bads(emptyroom_filename, is_eroom=True)
+#             #FIX FOR MULTIPLE ALPHA PEAKS
+#             potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
+#                                     (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
+#             if len(potential_alpha_idx) != 1:
+#                 alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
+#             else:
+#                 alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
+#         except:
+#             alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<    
         
-        raw.info['bads']=raw_bads_dict['noisy'] + raw_bads_dict['flat']
-        eraw.info['bads']=eraw_bads_dict['noisy'] + eraw_bads_dict['flat']
+#     #Save the label spectrum to assemble the relative power
+#     freq_bin_names=[str(binval) for binval in freq_bins]
+#     label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
+#     label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
+#     # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
+#     #     np.save(f, label_power)
     
-    resample_freq=300
-    
-    raw.resample(resample_freq)
-    eraw.resample(resample_freq)
-    
-    raw.filter(0.5, 140)
-    eraw.filter(0.5, 140)
-    
-    if line_freq==None:
-        try:
-            line_freq = raw.info['line_freq']  # this isn't present in all files
-        except:
-            raise(ValueError('Could not determine line_frequency'))
-    notch_freqs = np.arange(line_freq, 
-                            resample_freq/2, 
-                            line_freq)
-    raw.notch_filter(notch_freqs)
-    
-    
-    ## Create Epochs and covariance 
-    epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
-    epochs.apply_baseline(baseline=(0,None))
-    cov = mne.compute_covariance(epochs)
-    
-    er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
-    er_epochs.apply_baseline(baseline=(0,None))
-    er_cov = mne.compute_covariance(er_epochs)
-    
-    os.environ['SUBJECTS_DIR']=subjects_dir
-    src = mne.read_source_spaces(info.src_filename)
-    bem = mne.read_bem_solution(info.bem_sol_filename)
-    fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
-    
-    data_info = epochs.info
-    
-    from mne.beamformer import make_lcmv, apply_lcmv_epochs
-    filters = make_lcmv(epochs.info, fwd, cov, reg=0.01,
-                        noise_cov=er_cov, pick_ori='max-power',
-                        weight_norm='unit-noise-gain', rank=None)
-    
-    labels_lh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
-                                        subjects_dir=subjects_dir, hemi='lh') 
-    labels_rh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
-                                        subjects_dir=subjects_dir, hemi='rh') 
-    labels=labels_lh + labels_rh 
-    
-    results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
-    
-    #Monkey patch of mne.source_estimate to perform 15 component SVD
-    label_ts = mod_source_estimate.extract_label_time_course(results_stcs, 
-                                                             labels, 
-                                                             fwd['src'],
-                                                             mode='pca15_multitaper')
-    
-    #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
-    label_stack = np.stack(label_ts)
+#     relative_power = label_power / label_power.sum(axis=1, keepdims=True)
 
-    #HACK HARDCODED FREQ BINS
-    freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+#     #Define bands
+#     bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
+#     band_idxs = get_freq_idx(bands, freq_bins)
 
-    #Initialize 
-    label_power = np.zeros([len(labels), len(freq_bins)])  
-    alpha_peak = np.zeros(len(labels))
+#     #initialize output
+#     band_means = np.zeros([len(labels), len(bands)]) 
+#     #Loop over all bands, select the indexes assocaited with the band and average    
+#     for mean_band, band_idx in enumerate(band_idxs):
+#         band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
     
-    #Create PSD for each label
-    for label_idx in range(len(labels)):
-        print(str(label_idx))
-        current_psd = label_stack[:,label_idx, :].mean(axis=0) 
-        label_power[label_idx,:] = current_psd
-        
-        spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
-                                            labels[label_idx].name + '.png')
-
-        try:
-            tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
-                            out_image_path=spectral_image_path)
-            
-            #FIX FOR MULTIPLE ALPHA PEAKS
-            potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
-                                    (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
-            if len(potential_alpha_idx) != 1:
-                alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
-            else:
-                alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
-        except:
-            alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<    
-        
-    #Save the label spectrum to assemble the relative power
-    freq_bin_names=[str(binval) for binval in freq_bins]
-    label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
-    label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
-    # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
-    #     np.save(f, label_power)
-    
-    relative_power = label_power / label_power.sum(axis=1, keepdims=True)
-
-    #Define bands
-    bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
-    band_idxs = get_freq_idx(bands, freq_bins)
-
-    #initialize output
-    band_means = np.zeros([len(labels), len(bands)]) 
-    #Loop over all bands, select the indexes assocaited with the band and average    
-    for mean_band, band_idx in enumerate(band_idxs):
-        band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
-    
-    output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
+#     output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
     
 
-    bands_str = [str(i) for i in bands]
-    label_names = [i.name for i in labels]
+#     bands_str = [str(i) for i in bands]
+#     label_names = [i.name for i in labels]
     
-    output_dframe = pd.DataFrame(band_means, columns=bands_str, 
-                                 index=label_names)
-    output_dframe['AlphaPeak'] = alpha_peak
-    output_dframe.to_csv(output_filename, sep='\t')    
+#     output_dframe = pd.DataFrame(band_means, columns=bands_str, 
+#                                  index=label_names)
+#     output_dframe['AlphaPeak'] = alpha_peak
+#     output_dframe.to_csv(output_filename, sep='\t')    
         
     
 if __name__=='__main__':
