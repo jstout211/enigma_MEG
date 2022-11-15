@@ -885,6 +885,13 @@ if __name__=='__main__':
                             emptyroom',
                         default='emptyroom'
                         )
+    parser.add_argument('-fs_ave_fids',
+                        help='''If no fiducials have been localized to the mri
+                        manually, this provides a coarse fit from the ave brain
+                        which is fine tuned with the headshape.  This is less
+                        acurate than a manually assessed fid placement''',
+                        default=False
+                        )
                             
         
     args = parser.parse_args()
@@ -898,7 +905,8 @@ if __name__=='__main__':
                 session=args.session, 
                 mains=float(args.mains),
                 run=args.run,
-                t1_override=None
+                t1_override=None,
+                fs_ave_fids=args.fs_ave_fids
                 )
     proc.load_data()
     proc.do_proc_allsteps()
