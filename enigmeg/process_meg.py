@@ -890,6 +890,7 @@ if __name__=='__main__':
                         manually, this provides a coarse fit from the ave brain
                         which is fine tuned with the headshape.  This is less
                         acurate than a manually assessed fid placement''',
+                        action='store_true',
                         default=False
                         )
                             
