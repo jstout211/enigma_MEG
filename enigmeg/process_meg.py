@@ -342,7 +342,7 @@ class process():
     def do_auto_coreg(self):
         '''Localize coarse fiducials based on fsaverage coregistration
         and fine tuned with iterative headshape fit.'''
-        coreg = mne.coreg.Coregistration(self.rest_raw.info, 
+        coreg = mne.coreg.Coregistration(self.raw_rest.info, 
                                          f'sub-{self.subject}', 
                                          subjects_dir=self.subjects_dir, 
                                          fiducials='estimated')
