@@ -18,6 +18,7 @@ import logging
 import munch 
 from collections import OrderedDict
 import mne_bids
+from mne_bids import get_head_mri_trans
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 
 logger=logging.basicConfig()
@@ -38,7 +39,8 @@ class process():
             session=1, 
             mains=60,
             run='1',
-            t1_override=None
+            t1_override=None,
+            fs_ave_fids=False
             ):
         
 # =============================================================================
@@ -73,6 +75,10 @@ class process():
         self.proc_vars['epoch_len']=4.0  #seconds
         
         self._t1_override = t1_override
+        if fs_ave_fids==True:
+            self._use_fsave_coreg=True
+        else:
+            self._use_fsave_coreg=False
         
         
         
@@ -319,9 +325,12 @@ class process():
             src = mne.read_source_spaces(src_fname.fpath)
         
         if (not trans_fname.fpath.exists()) or (redo_all is True):
-            trans = mne_bids.get_head_mri_trans(self.meg_rest_raw,
-                                                    t1_bids_path=t1_bids_path,
-                                                    fs_subject='sub-'+self.bids_path.subject) 
+            if self._use_fsave_coreg==True:
+                trans = self.do_auto_coreg()
+            else:
+                trans = get_head_mri_trans(self.meg_rest_raw,
+                                           t1_bids_path=t1_bids_path,
+                                           fs_subject='sub-'+self.bids_path.subject) 
             mne.write_trans(trans_fname.fpath, trans, overwrite=True)
         else:
             trans = mne.read_trans(trans_fname.fpath)
@@ -329,6 +338,18 @@ class process():
                                         n_jobs=n_jobs)
         self.rest_fwd=fwd
         mne.write_forward_solution(fwd_fname.fpath, fwd, overwrite=True)
+        
+    def do_auto_coreg(self):
+        '''Localize coarse fiducials based on fsaverage coregistration
+        and fine tuned with iterative headshape fit.'''
+        coreg = mne.coreg.Coregistration(self.rest_raw.info, 
+                                         f'sub-{self.subject}', 
+                                         subjects_dir=self.subjects_dir, 
+                                         fiducials='estimated')
+        coreg.fit_fiducials(verbose=True)
+        coreg.omit_head_shape_points(distance=5. / 1000)  # distance is in meters
+        coreg.fit_icp(n_iterations=6, nasion_weight=.5, hsp_weight= 5, verbose=True)
+        return coreg.trans
             
     
     def do_make_aparc_sub(self):
@@ -337,15 +358,23 @@ class process():
         
     def do_beamformer(self):
         dat_cov = mne.read_cov(self.fnames.rest_cov)
-        noise_cov = mne.read_cov(self.fnames.eroom_cov)
         forward = mne.read_forward_solution(self.fnames.rest_fwd)
         epochs = mne.read_epochs(self.fnames.rest_epo)
-        fname_lcmv = self.fnames.lcmv
-    
-        epo_rank = mne.compute_rank(epochs)
-        filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.01, 
-                            noise_cov=noise_cov,  pick_ori='max-power',
-                            weight_norm='unit-noise-gain', rank='info')
+        fname_lcmv = self.fnames.lcmv #Pre-assign output name
+        
+        # If emptyroom present - use in beamformer
+        if hasattr(self, 'meg_er_raw'):
+            noise_cov = mne.read_cov(self.fnames.eroom_cov)
+            noise_rank = mne.compute_rank(self.raw_eroom)
+            filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, 
+                    noise_cov=noise_cov,  pick_ori='max-power',
+                    weight_norm='unit-noise-gain', rank=noise_rank)
+        else:
+            #Build beamformer without emptyroom noise
+            epo_rank = mne.compute_rank(epochs)
+            filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, 
+                            pick_ori='max-power',
+                            weight_norm='unit-noise-gain', rank=epo_rank)
         
         filters.save(fname_lcmv, overwrite=True)
         stcs = apply_lcmv_epochs(epochs, filters, return_generator=True) 
@@ -362,8 +391,6 @@ class process():
                                              hemi='rh') 
         labels=labels_lh + labels_rh 
         self.labels = labels
-        
-        # results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
         
         #Monkey patch of mne.source_estimate to perform 15 component SVD
         label_ts = mod_source_estimate.extract_label_time_course(self.stcs, 
