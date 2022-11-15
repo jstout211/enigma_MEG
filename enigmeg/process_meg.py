@@ -182,8 +182,10 @@ class process():
     def load_data(self):
         if not hasattr(self, 'raw_rest'):
             self.raw_rest = load_data(self.meg_rest_raw.fpath) 
+            self.raw_rest.pick_types(meg=True, eeg=False)
         if not hasattr(self, 'raw_eroom'):
             self.raw_eroom = load_data(self.meg_er_raw.fpath) 
+            self.raw_eroom.pick_types(meg=True, eeg=False)
         
     
     def check_paths(self):
