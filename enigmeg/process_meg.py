@@ -192,7 +192,7 @@ class process():
         '''Verify that the raw data is present and can be found'''
         try:
             self.meg_rest_raw.fpath  #Errors if not present
-            self.vendor = check_datatype(self.meg_er_raw.fpath)
+            self.vendor = check_datatype(str(self.meg_rest_raw.fpath))
         except:
             logging.exception(f'Could not find rest dataset:\n')
             
