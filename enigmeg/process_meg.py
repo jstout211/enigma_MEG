@@ -416,17 +416,23 @@ class process():
         freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
     
         #Initialize 
+        labels = self.labels
         label_power = np.zeros([len(labels), len(freq_bins)])  
         alpha_peak = np.zeros(len(labels))
         
+        outfolder = self.deriv_path.directory / 'foof_results'
+        self.results_dir = outfolder
+        if not os.path.exists(outfolder): os.mkdir(outfolder)
+        
         #Create PSD for each label
-        for label_idx in range(len(labels)):
+        label_stack = self.label_ts
+        for label_idx in range(len(self.labels)):
             print(str(label_idx))
             current_psd = label_stack[:,label_idx, :].mean(axis=0) 
             label_power[label_idx,:] = current_psd
             
-            spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
-                                                labels[label_idx].name + '.png')
+            spectral_image_path = os.path.join(outfolder, 'Spectra_'+
+                                                labels[label_idx].name + '.png')   
     
             try:
                 tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
@@ -445,7 +451,7 @@ class process():
         #Save the label spectrum to assemble the relative power
         freq_bin_names=[str(binval) for binval in freq_bins]
         label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
-        label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
+        label_spectra_dframe.to_csv( os.path.join(outfolder, 'label_spectra.csv') , index=False)
         # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
         #     np.save(f, label_power)
         
@@ -461,7 +467,7 @@ class process():
         for mean_band, band_idx in enumerate(band_idxs):
             band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
         
-        output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
+        output_filename = os.path.join(outfolder, 'Band_rel_power.csv')
         
     
         bands_str = [str(i) for i in bands]
@@ -493,6 +499,7 @@ class process():
         self.do_beamformer()
         self.do_make_aparc_sub()
         self.do_label_psds()
+        self.do_spectral_paramerization()
         
     
     def check_alignment(self):
