@@ -27,13 +27,16 @@ def _pca15_fft(flip, data):
     U, s, V = linalg.svd(data, full_matrices=False)
     
     maxeig=15
-    
+    if 'n_jobs' in locals():
+        n_jobs = locals()['n_jobs']
+    else:
+        n_jobs=1
     # use average power in label for scaling
     epoch_spectra, freq_bins = psd_array_multitaper(V[0:maxeig], 
                                                 300,                    #!!!!################ HardCodede
                                                 fmin=1, fmax=45,
                                                 bandwidth=2, 
-                                                n_jobs=1, 
+                                                n_jobs=n_jobs, 
                                                 adaptive=True, 
                                                 low_bias=True, 
                                                 normalization='full') 
