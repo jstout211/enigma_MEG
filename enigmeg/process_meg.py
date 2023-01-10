@@ -205,10 +205,17 @@ class process():
         except:
             logging.exception(f'Could not find rest dataset:\n')
             
-        try:
-            self.meg_er_raw.fpath
-        except:
-            logging.exception(f'Could not find emptyroom dataset:\n')
+        if hasattr(self, 'meg_er_raw'): 
+            if self.meg_er_raw != None:
+                try:
+                    self.meg_er_raw.fpath
+                except:
+                    logging.exception(f'Could not find emptyroom dataset:\n')
+            else:
+                self.raw_eroom = None
+        else:
+            self.meg_er_raw = None
+            self.raw_eroom = None
         
         subj_fsdir= op.join(f'{self.subjects_dir}', f'sub-{self.subject}')
         if not op.exists(subj_fsdir):
