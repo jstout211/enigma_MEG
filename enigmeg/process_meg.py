@@ -193,7 +193,7 @@ class process():
         '''Verify that the raw data is present and can be found'''
         try:
             self.meg_rest_raw.fpath  #Errors if not present
-            self.vendor = check_datatype(str(self.meg_rest_raw.fpath))
+            self.vendor, self.extra_params = check_datatype(str(self.meg_rest_raw.fpath))
         except:
             logging.exception(f'Could not find rest dataset:\n')
             
@@ -518,15 +518,15 @@ class process():
 def check_datatype(filename):
     '''Check datatype based on the vendor naming convention'''
     if os.path.splitext(filename)[-1] == '.ds':
-        return 'ctf'
+        return 'ctf', dict(system_clock='ignore')
     elif os.path.splitext(filename)[-1] == '.fif':
-        return 'elekta'
+        return 'elekta', dict(allow_maxshield=True)
     elif os.path.splitext(filename)[-1] == '.4d':
-        return '4d'
+        return '4d', None
     elif os.path.splitext(filename)[-1] == '.sqd':
-        return 'kit'
+        return 'kit', None
     elif os.path.splitext(filename)[-1] == 'con':
-        return 'kit'
+        return 'kit', None
     else:
         raise ValueError('Could not detect datatype')
         
@@ -542,7 +542,7 @@ def return_dataloader(datatype):
         return mne.io.read_raw_kit
 
 def load_data(filename):
-    datatype = check_datatype(filename)
+    datatype, _ = check_datatype(filename)
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
     return raw
