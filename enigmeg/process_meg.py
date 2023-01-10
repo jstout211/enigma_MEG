@@ -260,7 +260,8 @@ class process():
     def do_preproc(self):
         '''Preprocess both datasets'''
         self._preproc(raw_inst=self.raw_rest, deriv_path=self.rest_derivpath)
-        self._preproc(raw_inst=self.raw_eroom, deriv_path=self.eroom_derivpath)
+        if self.raw_eroom != None:
+            self._preproc(raw_inst=self.raw_eroom, deriv_path=self.eroom_derivpath)
         
     def _proc_epochs(self,
                      raw_inst=None,
@@ -280,8 +281,9 @@ class process():
     def do_proc_epochs(self):
         self._proc_epochs(raw_inst=self.raw_rest,
                           deriv_path=self.rest_derivpath)
-        self._proc_epochs(raw_inst=self.raw_eroom, 
-                          deriv_path=self.eroom_derivpath)
+        if self.raw_eroom != None:
+            self._proc_epochs(raw_inst=self.raw_eroom, 
+                              deriv_path=self.eroom_derivpath)
         
     def proc_mri(self, t1_override=None,redo_all=False):
         if t1_override is not None:
@@ -375,7 +377,7 @@ class process():
         fname_lcmv = self.fnames.lcmv #Pre-assign output name
         
         # If emptyroom present - use in beamformer
-        if hasattr(self, 'meg_er_raw'):
+        if self.meg_er_raw != None:
             noise_cov = mne.read_cov(self.fnames.eroom_cov)
             noise_rank = mne.compute_rank(self.raw_eroom)
             epo_rank = mne.compute_rank(epochs)
