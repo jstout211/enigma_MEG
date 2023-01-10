@@ -140,29 +140,34 @@ class process():
         '''Use the bids paths to generate output names'''
         _tmp=munch.Munch()
         rest_deriv = self.rest_derivpath.copy().update(extension='.fif')
-        eroom_deriv = self.eroom_derivpath.copy().update(extension='.fif')
+        if emptyroom_tagname!=None:
+            eroom_deriv = self.eroom_derivpath.copy().update(extension='.fif')
         
         ## Setup bids paths for all 
         # Conversion to actual paths at end
         
         _tmp['raw_rest']=self.meg_rest_raw
-        _tmp['raw_eroom']=self.meg_er_raw
+        if emptyroom_tagname!=None:
+            _tmp['raw_eroom']=self.meg_er_raw
         
         _tmp['rest_filt']=rest_deriv.copy().update(processing='filt')
-        _tmp['eroom_filt']=eroom_deriv.copy().update(processing='filt')
+        if emptyroom_tagname!=None:
+            _tmp['eroom_filt']=eroom_deriv.copy().update(processing='filt')
         
         # MEGNET post
         #_tmp['rest_clean']=rest_deriv.copy().update(processing='clean')
         #_tmp['eroom_clean']=eroom_deriv.copy().update(processing='clean')
         
         _tmp['rest_epo']=rest_deriv.copy().update(suffix='epo')
-        _tmp['eroom_epo']=eroom_deriv.copy().update(suffix='epo')
+        if emptyroom_tagname!=None:
+            _tmp['eroom_epo']=eroom_deriv.copy().update(suffix='epo')
         
         #_tmp['rest_epo_clean']=_tmp['rest_epo'].copy().update(processing='clean')
         #_tmp['eroom_epo_clean']=_tmp['eroom_epo'].copy().update(processing='clean')
         
         _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
-        _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
+        if emptyroom_tagname!=None:
+            _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
         
         _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
@@ -609,6 +614,17 @@ def load_test_data(**kwargs):
                         bids_root=op.expanduser('~/ds004215'),
                         session='01',
                         emptyroom_tagname='noise', 
+                        mains=60,
+                        t1_override='~/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
+                        **kwargs)
+    # proc.load_data()
+    return proc
+
+def load_test_data_noer(**kwargs):
+    proc = process(subject='ON02747',
+                        bids_root=op.expanduser('~/ds004215'),
+                        session='01',
+                        emptyroom_tagname=None, 
                         mains=60,
                         t1_override='~/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
                         **kwargs)
