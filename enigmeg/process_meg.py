@@ -914,7 +914,9 @@ if __name__=='__main__':
                             
         
     args = parser.parse_args()
-    
+    if args.run=='None': args.run=None
+    if args.session=='None': args.session=None
+     
     proc = process(subject=args.subject, 
                 bids_root=args.bids_root, 
                 deriv_root=None,
