@@ -333,7 +333,8 @@ class process():
             else:
                 trans = get_head_mri_trans(self.meg_rest_raw,
                                            t1_bids_path=t1_bids_path,
-                                           fs_subject='sub-'+self.bids_path.subject) 
+                                           fs_subject='sub-'+self.bids_path.subject,
+                                           extra_params=self.extra_params) 
             mne.write_trans(trans_fname.fpath, trans, overwrite=True)
         else:
             trans = mne.read_trans(trans_fname.fpath)
