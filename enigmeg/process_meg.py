@@ -22,7 +22,8 @@ from mne_bids import get_head_mri_trans
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 
 logger=logging.basicConfig()
-n_jobs = 10  #extract this from the configuration file
+n_jobs = 5  #extract this from the configuration file
+os.environ['n_jobs'] = str(n_jobs)
 
 from mne_bids import BIDSPath
 import functools
@@ -243,9 +244,9 @@ class process():
     def _preproc(self,
                 raw_inst=None,
                 deriv_path=None):
-        raw_inst.resample(self.proc_vars['sfreq'])
-        raw_inst.notch_filter(self.proc_vars['mains']) 
-        raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'])
+        raw_inst.resample(self.proc_vars['sfreq'], n_jobs=n_jobs)
+        raw_inst.notch_filter(self.proc_vars['mains'], n_jobs=n_jobs) 
+        raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'], n_jobs=n_jobs)
         raw_inst.save(deriv_path.copy().update(processing='filt'), overwrite=True)
 
     def do_preproc(self):

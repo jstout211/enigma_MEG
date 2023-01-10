@@ -17,7 +17,7 @@ import numpy as np
 from numpy import linalg
 from mne.time_frequency import psd_array_multitaper
 from scipy.stats import trim_mean
-
+import os
 
 num_freq_bins=177  #Hardcoded freq bins - Bad form
 
@@ -27,8 +27,8 @@ def _pca15_fft(flip, data):
     U, s, V = linalg.svd(data, full_matrices=False)
     
     maxeig=15
-    if 'n_jobs' in locals():
-        n_jobs = locals()['n_jobs']
+    if 'n_jobs' in os.environ:
+        n_jobs = int(os.environ['n_jobs'])
     else:
         n_jobs=1
     # use average power in label for scaling
