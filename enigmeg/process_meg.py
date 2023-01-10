@@ -370,6 +370,13 @@ class process():
         if hasattr(self, 'meg_er_raw'):
             noise_cov = mne.read_cov(self.fnames.eroom_cov)
             noise_rank = mne.compute_rank(self.raw_eroom)
+            epo_rank = mne.compute_rank(epochs)
+            if 'mag' in epo_rank:
+                if epo_rank['mag'] < noise_rank['mag']:
+                    noise_rank['mag']=epo_rank['mag']
+            if 'grad' in epo_rank:
+                if epo_rank['grad'] < noise_rank['grad']:
+                    noise_rank['grad']=epo_rank['grad']
             filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, 
                     noise_cov=noise_cov,  pick_ori='max-power',
                     weight_norm='unit-noise-gain', rank=noise_rank)
