@@ -120,10 +120,13 @@ class process():
             run=run
             )
         
-        self.meg_er_raw = self.bids_path.copy().update(
-            datatype='meg',
-            task=emptyroom_tagname
-            )
+        if emptyroom_tagname == None:
+            self.meg_er_raw = None
+        else:
+            self.meg_er_raw = self.bids_path.copy().update(
+                datatype='meg',
+                task=emptyroom_tagname
+                )
         
         self.anat_bidspath = self.bids_path.copy().update(root=self.subjects_dir,
                                                           session=None,
@@ -184,7 +187,7 @@ class process():
         if not hasattr(self, 'raw_rest'):
             self.raw_rest = load_data(self.meg_rest_raw.fpath) 
             self.raw_rest.pick_types(meg=True, eeg=False)
-        if not hasattr(self, 'raw_eroom'):
+        if (not hasattr(self, 'raw_eroom')) and (self.meg_er_raw != None):
             self.raw_eroom = load_data(self.meg_er_raw.fpath) 
             self.raw_eroom.pick_types(meg=True, eeg=False)
         
@@ -900,7 +903,7 @@ if __name__=='__main__':
                         )
     parser.add_argument('-emptyroom_tag',
                         help='Override in case emptryoom is other than \
-                            emptyroom',
+                            emptyroom.  In case of no emptyroom, set as None on cmdline',
                         default='emptyroom'
                         )
     parser.add_argument('-fs_ave_fids',
@@ -914,8 +917,9 @@ if __name__=='__main__':
                             
         
     args = parser.parse_args()
-    if args.run=='None': args.run=None
-    if args.session=='None': args.session=None
+    if args.run.lower()=='none': args.run=None
+    if args.session.lower()=='none': args.session=None
+    if args.emptyroom_tag.lower()=='none': args.emptyroom_tag=None
      
     proc = process(subject=args.subject, 
                 bids_root=args.bids_root, 
