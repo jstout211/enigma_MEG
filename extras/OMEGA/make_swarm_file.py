@@ -7,14 +7,15 @@ Created on Tue Jan 10 21:45:53 2023
 """
 import pandas as pd
 import os, os.path as op
+import glob
 
 bids_dir = '/data/EnigmaMeg/BIDS/Omega'
 os.chdir(bids_dir)
 
 #fname = 'OMEGA_rest_sets.csv'
+#dframe = pd.read_csv(fname)
 inputs=glob.glob('sub-*/ses-*/meg/*rest*.ds')
 dframe = pd.DataFrame(inputs, columns=['rest_fname'])
-dframe = pd.read_csv(fname)
 
 def get_subjid(fname):
     return fname.split('/')[0]
@@ -45,7 +46,7 @@ dframe.drop_duplicates(subset='subjid',
 
 swarm_list = []
 for i, row in dframe.iterrows():
-    outmsg=f'process_meg.py -bids_root {bids_dir} -subject {row.subjid} -session {row.session} -run \
+    outmsg=f'process_meg.py -bids_root {bids_dir} -subject {row.subjid[4:]} -session {row.session} -run \
           {row.run} -emptyroom_tag noise -rest_tag rest  -fs_ave_fids -mains 60.0'
     outmsg=' '.join(outmsg.split())+'\n'
     swarm_list.append(outmsg)
