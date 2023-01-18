@@ -8,6 +8,12 @@ Created on Wed Jan 11 16:41:33 2023
 
 import os
 import pandas as pd
+import glob
+import mne
+from mne.viz import Brain
+import nibabel as nib
+import numpy as np
+
 topdir = '/home/jstout/src/enigma_OHBM/RESULTS_OHBM'
 os.chdir(topdir)
 
