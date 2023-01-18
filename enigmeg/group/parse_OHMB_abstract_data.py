@@ -6,13 +6,20 @@ Created on Wed Jan 11 16:41:33 2023
 @author: jstout
 """
 
-import os
+import os, os.path as op
 import pandas as pd
 import glob
 import mne
 from mne.viz import Brain
 import nibabel as nib
 import numpy as np
+import seaborn as sns
+import pylab
+import nibabel as nib
+
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
 
 topdir = '/home/jstout/src/enigma_OHBM/RESULTS_OHBM'
 os.chdir(topdir)
