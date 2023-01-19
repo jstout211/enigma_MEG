@@ -177,7 +177,9 @@ class process():
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
         
-        _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', extension='.h5')
+        _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', 
+                                                     run=self.meg_rest_raw.run,
+                                                     extension='.h5')
         
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -450,7 +452,7 @@ class process():
         alpha_peak = np.zeros(len(labels))
         
         outfolder = self.deriv_path.directory / \
-            f'sub-{self.subject}_fooof_results_run-{self.meg_rest_raw.run}'
+            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
         self.results_dir = outfolder
         if not os.path.exists(outfolder): os.mkdir(outfolder)
         
