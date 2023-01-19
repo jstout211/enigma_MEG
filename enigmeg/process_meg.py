@@ -449,7 +449,8 @@ class process():
         label_power = np.zeros([len(labels), len(freq_bins)])  
         alpha_peak = np.zeros(len(labels))
         
-        outfolder = self.deriv_path.directory / 'fooof_results'
+        outfolder = self.deriv_path.directory / \
+            f'sub-{self.subject}_fooof_results_run-{self.meg_rest_raw.run}'
         self.results_dir = outfolder
         if not os.path.exists(outfolder): os.mkdir(outfolder)
         
