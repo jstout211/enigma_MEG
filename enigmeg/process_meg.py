@@ -41,7 +41,8 @@ class process():
             mains=60,
             run='1',
             t1_override=None,
-            fs_ave_fids=False
+            fs_ave_fids=False, 
+            check_paths=True
             ):
         
 # =============================================================================
@@ -111,7 +112,8 @@ class process():
             )
         
         self.eroom_derivpath = self.deriv_path.copy().update(
-            task=emptyroom_tagname
+            task=emptyroom_tagname,
+            run=run
             )
         
         self.meg_rest_raw = self.bids_path.copy().update(
@@ -125,16 +127,17 @@ class process():
         else:
             self.meg_er_raw = self.bids_path.copy().update(
                 datatype='meg',
-                task=emptyroom_tagname
+                task=emptyroom_tagname, 
+                run=run
                 )
         
         self.anat_bidspath = self.bids_path.copy().update(root=self.subjects_dir,
                                                           session=None,
                                                           check=False)
         
-        self.check_paths()
-        
-        self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
+        if check_paths==True:
+            self.check_paths()
+            self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
     
     def initialize_fnames(self, rest_tagname, emptyroom_tagname):
         '''Use the bids paths to generate output names'''
