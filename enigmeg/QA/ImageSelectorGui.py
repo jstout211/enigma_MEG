@@ -116,10 +116,22 @@ class sub_qa_info():
         self.qa_type=qa_type
         self.status = self.check_status()  
         self.subject = self.get_subjid()
+    
+    def set_status(self):
+        '''Set up toggle for GOOD/BAD'''
+        if self.status=='Unchecked':
+            self.status = 'BAD'
+        if self.status=='GOOD':
+            self.status = 'BAD'
+        if self.status=='BAD':
+            self.status = 'GOOD'
         
     #!!! FIX Need to make a QA list that is queried to determine good/bad/unchecked
-    def check_status(self):    
-        return 'Unchecked'
+    def check_status(self):
+        if not hasattr(self, 'status'):
+            return 'Unchecked'
+        else:
+            return self.status
     
     def get_subjid(self):
         base = op.basename(self.fname)
@@ -128,29 +140,26 @@ class sub_qa_info():
         except:
             return None
     
-def test_sub_qa_info():
-    qai = sub_qa_info(idx=10, fname='/home/jstout/sub-ON10001_task-yadayada_session-1_meg.ds')
-    print(qai.status)
-
-
-tmp = test_sub_qa_info()
-
-
+import enigmeg
+NULL_IMAGE = op.join(enigmeg.__path__[0], 'QA', 'Null.png')
 QA_type='FSrecon'
-def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None, grid_size=GRID_SIZE,
-                    frame_start_idx=0, resize_xy=(600,600)):
+def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None, 
+                         grid_size=GRID_SIZE, frame_start_idx=0, 
+                         resize_xy=(600,600)):
     layout = [[sg.Text(f'QA: {qa_type}')]]
     frame_end_idx=frame_start_idx+grid_size[0]*grid_size[1]
     current_idx = copy.deepcopy(frame_start_idx)
     for i in range(grid_size[0]):
         row = []
         for j in range(grid_size[1]):
-            if current_idx > len(image_list):
-                print('None Available')    #!!! FIX - show a null image
-            image_ = resize_image(image_list[current_idx], resize=resize_xy)
-            
-            button_name = sub_obj_list[current_idx].subject
-            row.append(sg.Button(image_data=image_, border_width=5, key=sub_obj_list[current_idx], 
+            if current_idx >= len(image_list):
+                image_ = resize_image(NULL_IMAGE, resize=resize_xy)
+                row.append(sg.Button(image_data=image_, border_width=5, key=None, 
+                                 image_size=resize_xy, expand_x=True, expand_y=True))
+            else:
+                image_ = resize_image(image_list[current_idx], resize=resize_xy)
+                button_name = sub_obj_list[current_idx].subject
+                row.append(sg.Button(image_data=image_, border_width=5, key=sub_obj_list[current_idx], 
                                  image_size=resize_xy, expand_x=True, expand_y=True))
             current_idx +=1
         layout.append(row)
@@ -187,13 +196,26 @@ while True:             # Event Loop
         else:
             idx-=(GRID_SIZE[0]*GRID_SIZE[1])
             modify_frame = True
+    if type(event) is sub_qa_info:
+        event.set_status()
     if modify_frame == True:
         window.close()
         window=create_window_layout(image_list, sub_obj_list,
                                         qa_type=QA_type, grid_size=GRID_SIZE,
                                         frame_start_idx=idx)
         modify_frame = False
+for subj_qa in sub_obj_list:
+    print(f'{subj_qa.subject}:{subj_qa.fname}:{subj_qa.status}')
 window.close()
+
+
+#%%
+def test_sub_qa_info():
+    qai = sub_qa_info(idx=10, fname='/home/jstout/sub-ON10001_task-yadayada_session-1_meg.ds')
+    assert qai.subject == 'ON10001'
+    assert qai.status == 'Unchecked'
+
+tmp = test_sub_qa_info()
 
 
 #%%
