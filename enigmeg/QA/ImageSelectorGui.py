@@ -155,10 +155,37 @@ class sub_qa_info():
         except:
             return None
     
-    
+def load_logfile():
+    '''
+    Load the file and check for subject entries.  Make a dictionary that can 
+    be queried during qa_info creation to load the status
+
+    Returns
+    -------
+    None.
+
+    '''
+    return 
+
+def write_logfile(obj_list):
+    '''
+    Loop over all subjects in list and write the status to the logfile
+
+    Parameters
+    ----------
+    obj_list : [sub_qa_info]
+        List of subject info objects.
+        Each entry has a status tag that will be written to the logfile
+
+    Returns
+    -------
+    None.
+
+    '''
+    return    
 
 
-def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None, 
+def create_window_layout(sub_obj_list=None, qa_type=None, 
                          grid_size=GRID_SIZE, frame_start_idx=0, 
                          resize_xy=(600,600)):
     layout = [[sg.Text(f'QA: {qa_type}')]]
@@ -167,7 +194,7 @@ def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None,
     for i in range(grid_size[0]):
         row = []
         for j in range(grid_size[1]):
-            if current_idx >= len(image_list):
+            if current_idx >= len(sub_obj_list):
                 image_ = resize_image(NULL_IMAGE, resize=resize_xy)
                 row.append(sg.Button(image_data=image_, border_width=5, key=None, 
                                  image_size=resize_xy, expand_x=True, expand_y=True))
@@ -180,7 +207,8 @@ def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None,
                                      expand_y=True))
             current_idx +=1
         layout.append(row)
-    layout.append([sg.Button('PREV'), sg.Button('NEXT'), sg.Button('EXIT')])
+    layout.append([sg.Button('PREV'), sg.Button('NEXT'), sg.Button('EXIT'), 
+                   sg.Button('SAVE')])
     window = sg.Window(QA_type, layout, resizable=True, auto_size_buttons=True,
                    scaling=True)
     return window
@@ -193,7 +221,7 @@ sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
 
 GRID_SIZE=(3,6)
 idx=0
-window = create_window_layout(image_list, sub_obj_list, qa_type=QA_type, 
+window = create_window_layout(sub_obj_list, qa_type=QA_type, 
                               grid_size=GRID_SIZE,
                               frame_start_idx=idx)
 
@@ -205,7 +233,7 @@ while True:             # Event Loop
     if event in (sg.WIN_CLOSED, 'EXIT'):
         break
     if event=='NEXT':
-        if idx+GRID_SIZE[0]*GRID_SIZE[1] < len(image_list):
+        if idx+GRID_SIZE[0]*GRID_SIZE[1] < len(sub_obj_list):
             idx+= GRID_SIZE[0]*GRID_SIZE[1]
             modify_frame = True
         else:
@@ -216,11 +244,13 @@ while True:             # Event Loop
         else:
             idx-=(GRID_SIZE[0]*GRID_SIZE[1])
             modify_frame = True
+    if event=='SAVE':
+        write_logfile(sub_obj_list)
     if type(event) is sub_qa_info:
         event.set_status()
     if modify_frame == True:
         window.close()
-        window=create_window_layout(image_list, sub_obj_list,
+        window=create_window_layout(sub_obj_list,
                                         qa_type=QA_type, grid_size=GRID_SIZE,
                                         frame_start_idx=idx)
         modify_frame = False
