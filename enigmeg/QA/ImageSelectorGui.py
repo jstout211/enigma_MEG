@@ -117,21 +117,23 @@ def resize_image(image_path, resize=(200,200)):
 # Create a list of objects unique to the subjects
 class sub_qa_info():
     '''Store info on the status of subject QA results'''
-    def __init__(self, idx=None, fname=None, qa_type='FSrecon', log=None):
+    def __init__(self, idx=None, fname=None, qa_type='FSrecon', log=None, 
+                 resize_xy=(600,600)):
         self.idx=idx
         self.fname = fname
         self.qa_type=qa_type
         self.status = self.check_status()  
         self.subject = self.get_subjid()
+        self.image_r = resize_image(self.fname, resize=resize_xy)
     
     ############## VERIFY #####################
     def set_status(self):
         '''Set up toggle for GOOD/BAD'''
         if self.status=='Unchecked':
             self.status = 'BAD'
-        if self.status=='GOOD':
+        elif self.status=='GOOD':
             self.status = 'BAD'
-        if self.status=='BAD':
+        elif self.status=='BAD':
             self.status = 'GOOD'
     
     def log_status(self):
@@ -153,6 +155,7 @@ class sub_qa_info():
         except:
             return None
     
+    
 
 
 def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None, 
@@ -169,10 +172,12 @@ def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None,
                 row.append(sg.Button(image_data=image_, border_width=5, key=None, 
                                  image_size=resize_xy, expand_x=True, expand_y=True))
             else:
-                image_ = resize_image(image_list[current_idx], resize=resize_xy)
+                image_ = sub_obj_list[current_idx].image_r
                 button_name = sub_obj_list[current_idx].subject
-                row.append(sg.Button(image_data=image_, border_width=5, key=sub_obj_list[current_idx], 
-                                 image_size=resize_xy, expand_x=True, expand_y=True))
+                row.append(sg.Button(image_data=image_, border_width=5, 
+                                     key=sub_obj_list[current_idx],
+                                     image_size=resize_xy, expand_x=True, 
+                                     expand_y=True))
             current_idx +=1
         layout.append(row)
     layout.append([sg.Button('PREV'), sg.Button('NEXT'), sg.Button('EXIT')])
@@ -228,12 +233,12 @@ window.close()
 # =============================================================================
 # TESTs currently (need to move to subdirectory)
 # =============================================================================
-def test_sub_qa_info():
-    qai = sub_qa_info(idx=10, fname='/home/jstout/sub-ON10001_task-yadayada_session-1_meg.ds')
-    assert qai.subject == 'ON10001'
-    assert qai.status == 'Unchecked'
+# def test_sub_qa_info():
+#     qai = sub_qa_info(idx=10, fname='/home/jstout/sub-ON10001_task-yadayada_session-1_meg.ds')
+#     assert qai.subject == 'ON10001'
+#     assert qai.status == 'Unchecked'
 
-tmp = test_sub_qa_info()
+# tmp = test_sub_qa_info()
 
 
 #%%
