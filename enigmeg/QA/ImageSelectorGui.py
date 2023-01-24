@@ -15,8 +15,13 @@ import PIL.Image
 import io
 import base64
 import copy
+import enigmeg
+import logging
 
+NULL_IMAGE = op.join(enigmeg.__path__[0], 'QA', 'Null.png')
 sg.set_options(font='Courier 18')
+QA_type='FSrecon'
+
 
 image = '/home/jstout/Desktop/Plot1.png'
 subject = 'DEC105'
@@ -24,9 +29,17 @@ session = '1'
 run = '01'
 GRID_SIZE=(2,2)
 
-# bids_root = '/fast/oberman_test/BIDS'
-# deriv_root = op.join(bids_root, 'derivatives', 'ENIGMA_MEG')
-# subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')
+bids_root = '/fast/oberman_test/BIDS'
+deriv_root = op.join(bids_root, 'derivatives', 'ENIGMA_MEG')
+subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')
+
+# Set up logging
+log = op.join(deriv_root, 'enigma_QA_logfile.txt')
+logging.basicConfig(filename=log, encoding='utf-8', level=logging.DEBUG, 
+                    format='%(levelname)s:%(message)s')
+
+format='%(levelname)s:%(message)s'
+
 # deriv_path = BIDSPath(root=deriv_root, 
 #                       check=False,
 #                       subject=subject,
@@ -74,23 +87,23 @@ GRID_SIZE=(2,2)
 
 
 
-## Define Grid
-# Make a def to loop over images and 
-
-
-## Create Left/Right Arrows to loop through all subjects
-# Loop numbers are total / (GRID_SIZE[0]* GRID_SIZE[1])
-
-## If clicked - write class identifier as bad
-# If clicked a second time - undo
-
-# At the end of loop save all bads into QA folders
-
-#%%
-
-
-
 def resize_image(image_path, resize=(200,200)): 
+    '''
+    Configure images to be used as PySimpleGUI buttons
+
+    Parameters
+    ----------
+    image_path : path string
+        Path to input image
+    resize : Tuple, optional
+        Pixel X Pixel Dimension. The default is (200,200).
+
+    Returns
+    -------
+    Base64 encoded string
+        Base64 string for use as button image.
+
+    '''
     if isinstance(image_path, str):
         img = PIL.Image.open(image_path)
     else:
@@ -103,20 +116,22 @@ def resize_image(image_path, resize=(200,200)):
     if resize:
         new_width, new_height = resize
         scale = min(new_height/cur_height, new_width/cur_width)
-        img = img.resize((int(cur_width*scale), int(cur_height*scale)))#, PIL.Image.ANTIALIAS)
+        img = img.resize((int(cur_width*scale), int(cur_height*scale)))
     bio = io.BytesIO()
     img.save(bio, format="PNG")
     return base64.b64encode(bio.getvalue())
 
 # Create a list of objects unique to the subjects
 class sub_qa_info():
-    def __init__(self, idx=None, fname=None, qa_type='FSrecon'):
+    '''Store info on the status of subject QA results'''
+    def __init__(self, idx=None, fname=None, qa_type='FSrecon', log=None):
         self.idx=idx
         self.fname = fname
         self.qa_type=qa_type
         self.status = self.check_status()  
         self.subject = self.get_subjid()
     
+    ############## VERIFY #####################
     def set_status(self):
         '''Set up toggle for GOOD/BAD'''
         if self.status=='Unchecked':
@@ -125,6 +140,10 @@ class sub_qa_info():
             self.status = 'BAD'
         if self.status=='BAD':
             self.status = 'GOOD'
+    
+    def log_status(self):
+        '''Check if this has been previously set in the log'''
+        return 
         
     #!!! FIX Need to make a QA list that is queried to determine good/bad/unchecked
     def check_status(self):
@@ -132,6 +151,7 @@ class sub_qa_info():
             return 'Unchecked'
         else:
             return self.status
+    ###########################################
     
     def get_subjid(self):
         base = op.basename(self.fname)
@@ -140,9 +160,8 @@ class sub_qa_info():
         except:
             return None
     
-import enigmeg
-NULL_IMAGE = op.join(enigmeg.__path__[0], 'QA', 'Null.png')
-QA_type='FSrecon'
+
+
 def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None, 
                          grid_size=GRID_SIZE, frame_start_idx=0, 
                          resize_xy=(600,600)):
@@ -168,7 +187,9 @@ def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None,
                    scaling=True)
     return window
 
-
+# =============================================================================
+# GUI component
+# =============================================================================
 image_list = glob.glob('/home/jstout/Pictures/*.png')    
 sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
 
@@ -210,6 +231,9 @@ window.close()
 
 
 #%%
+# =============================================================================
+# TESTs currently (need to move to subdirectory)
+# =============================================================================
 def test_sub_qa_info():
     qai = sub_qa_info(idx=10, fname='/home/jstout/sub-ON10001_task-yadayada_session-1_meg.ds')
     assert qai.subject == 'ON10001'
