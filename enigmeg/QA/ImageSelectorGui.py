@@ -24,67 +24,60 @@ QA_type='FSrecon'
 
 
 image = '/home/jstout/Desktop/Plot1.png'
-subject = 'DEC105'
+subject = '23520'
 session = '1'
 run = '01'
 GRID_SIZE=(2,2)
 
-bids_root = '/fast/oberman_test/BIDS'
-deriv_root = op.join(bids_root, 'derivatives', 'ENIGMA_MEG')
-subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')
-
+# =============================================================================
+# Create dictionary of dictionaries to access the different QA 
+# =============================================================================
 # Set up logging
-log = op.join(deriv_root, 'enigma_QA_logfile.txt')
-logging.basicConfig(filename=log, encoding='utf-8', level=logging.DEBUG, 
-                    format='%(levelname)s:%(message)s')
+# log = op.join(deriv_root, 'enigma_QA_logfile.txt')
+# logging.basicConfig(filename=log, encoding='utf-8', level=logging.DEBUG, 
+#                     format='%(levelname)s:%(message)s')
+# format='%(levelname)s:%(message)s'
+bids_root = '/fast/tmp_QA/BIDS_stringaris'
 
-format='%(levelname)s:%(message)s'
+def generate_QA_images(bids_root, subject=None, session=None, 
+                       run='1'):
+    deriv_root = op.join(bids_root, 'derivatives', 'ENIGMA_MEG')
+    deriv_root_qa = op.join(bids_root, 'derivatives', 'ENIGMA_MEG_QA')
+    subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')
 
-# deriv_path = BIDSPath(root=deriv_root, 
-#                       check=False,
-#                       subject=subject,
-#                       session=session,
-#                       run=run,
-#                       datatype='meg'
-#                       )
-# QA_path = deriv_path.directory / 'ENIGMA_QA'
+    deriv_path = BIDSPath(root=deriv_root, 
+                          check=False,
+                          subject=subject,
+                          session=session,
+                          run=run,
+                          datatype='meg'
+                          )
+    qa_path = deriv_path.copy().update(root=deriv_root_qa, description='QAfsrecon',
+                                       extension='.png',  suffix='lh').fpath   #!!! FIX Hemi needs to be a declared var
+    lh_brain_fname = save_brain_images(deriv_path, hemi='lh', out_fname=qa_path)
 
-
-# def save_brain_images(deriv_path, hemi=None, qa_subdir='ENIGMA_QA'):
-#     # out_path = deriv_path.directory / qa_subdir
-#     out_fname = deriv_path.copy().update(description=f'QAfsrecon',
-#                                          suffix=hemi,
-#                                          extension='.png').fpath
-#     if not op.exists(out_fname):
-#         brain = Brain(subject='sub-'+deriv_path.subject,
-#              subjects_dir=subjects_dir,
-#              hemi=hemi,
-#              title=deriv_path.subject
-#              )
-#         brain.save_image(filename=out_fname)
-#         brain.close()
-#     return out_fname
-
-# def merge_and_convert():
-#     ...
-
-# lh_brain_fname = save_brain_images(deriv_path, hemi='lh')
-# rh_brain_fname = save_brain_images(deriv_path, hemi='rh')
-
-
-
-# ## Find all completed datasets 
-# # If completed load filename info
-# def compile_completed(deriv_path):
-#     '''Identify all subject QA files'''
-#     tmp_ = op.join(deriv_path.root,
-#                    'sub-*','ses-*','meg', '*QAfsrecon*lh.png'  #FIX - Only lh hemi !!
-#                    )
-#     return glob.glob(tmp_)
+def save_brain_images(deriv_path, hemi=None, out_fname=None):
+    # out_path = deriv_path.directory / qa_subdir
+    # out_fname = deriv_path.copy().update(description=f'QAfsrecon',
+    #                                       suffix=hemi,
+    #                                       extension='.png').fpath
+    os.makedirs(op.dirname(out_fname), exist_ok=True)
+    if not op.exists(out_fname):
+        brain = Brain(subject='sub-'+deriv_path.subject,
+              subjects_dir=subjects_dir,
+              hemi=hemi,
+              title=deriv_path.subject
+              )
+        brain.save_image(filename=out_fname)
+        brain.close()
+    return out_fname
 
 
-# grid_images = compile_completed(deriv_path)
-
+for subj in glob.glob(op.join(bids_root, 'sub-*')):
+    subj = op.basename(subj)[4:]
+    generate_QA_images(bids_root, subject=subj, session=None, 
+                       run='1')
+    
 
 
 def resize_image(image_path, resize=(200,200)): 
@@ -190,10 +183,10 @@ def create_window_layout(image_list=None, sub_obj_list=None, qa_type=None,
 # =============================================================================
 # GUI component
 # =============================================================================
-image_list = glob.glob('/home/jstout/Pictures/*.png')    
+image_list = glob.glob('/fast/tmp_QA/BIDS_stringaris/derivatives/ENIGMA_MEG_QA/sub-*/meg/*QAfsrecon*.png')
 sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
 
-GRID_SIZE=(2,2)
+GRID_SIZE=(3,6)
 idx=0
 window = create_window_layout(image_list, sub_obj_list, qa_type=QA_type, 
                               grid_size=GRID_SIZE,
