@@ -192,6 +192,7 @@ window = create_window_layout(image_list, sub_obj_list, qa_type=QA_type,
                               grid_size=GRID_SIZE,
                               frame_start_idx=idx)
 
+modify_frame=False
 while True:             # Event Loop
     # print(idx)
     event, values = window.read()
