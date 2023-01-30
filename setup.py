@@ -19,7 +19,7 @@ setuptools.setup(
         "Operating System :: Linux/Unix",
     ],
     #python_requires='<3.9',
-    install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof',
+    install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui',
                       'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids'], #'pyvista', 'pyqt5','pyvistaqt', 'mne_bids'],
     scripts=['enigmeg/process_meg.py', 
              'enigmeg/process_anatomical.py'],
