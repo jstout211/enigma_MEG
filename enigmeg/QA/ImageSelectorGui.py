@@ -19,21 +19,37 @@ import enigmeg
 import logging
 from PIL import Image, ImageDraw
 
+# =============================================================================
+# Defaults
+# =============================================================================
 NULL_IMAGE = op.join(enigmeg.__path__[0], 'QA', 'Null.png')
 sg.set_options(font='Courier 18')
 QA_type='FSrecon'
-
-
-image = '/home/jstout/Desktop/Plot1.png'
-subject = '23520'
-session = '1'
-run = '01'
-GRID_SIZE=(2,2)
-
 status_color_dict = {'Unchecked':'grey',
                    'GOOD':'green',
                    'BAD':'red'
                    }
+GRID_SIZE=(3,6)
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-bids_root',
+                        help='''Location of bids directory used for enigma
+                        processing''')
+    args = parser.parse_args()
+    bids_root=args.bids_root
+    
+deriv_root = op.join(bids_root, 'derivatives')                       
+                        
+
+# image = '/home/jstout/Desktop/Plot1.png'
+# subject = '23520'
+# session = '1'
+# run = '01'
+# GRID_SIZE=(2,2)
+
+
 
 # =============================================================================
 # Create dictionary of dictionaries to access the different QA 
@@ -43,7 +59,8 @@ status_color_dict = {'Unchecked':'grey',
 # logging.basicConfig(filename=log, encoding='utf-8', level=logging.DEBUG, 
 #                     format='%(levelname)s:%(message)s')
 # format='%(levelname)s:%(message)s'
-bids_root = '/fast/tmp_QA/BIDS_stringaris'
+# logging.IFNO
+# bids_root = '/fast/tmp_QA/BIDS_stringaris'
 
 def generate_QA_images(bids_root, subject=None, session=None, 
                        run='1'):
@@ -144,7 +161,7 @@ class sub_qa_info():
     
     ############## VERIFY #####################
     def set_status(self):
-        '''Set up toggle for GOOD/BAD'''
+        '''Set up toggle for Unchecked/GOOD/BAD'''
         if self.status=='Unchecked':
             self.status = 'GOOD'
         elif self.status=='GOOD':
@@ -237,10 +254,9 @@ def create_window_layout(sub_obj_list=None, qa_type=None,
 # =============================================================================
 # GUI component
 # =============================================================================
-image_list = glob.glob('/fast/tmp_QA/BIDS_stringaris/derivatives/ENIGMA_MEG_QA/sub-*/meg/*QAfsrecon*.png')
+image_list = glob.glob(op.join(deriv_root, 'ENIGMA_MEG_QA/sub-*/meg/*QAfsrecon*.png'))
 sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
 
-GRID_SIZE=(3,6)
 idx=0
 window = create_window_layout(sub_obj_list, qa_type=QA_type, 
                               grid_size=GRID_SIZE,
