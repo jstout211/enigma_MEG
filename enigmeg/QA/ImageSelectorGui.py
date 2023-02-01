@@ -24,7 +24,6 @@ from PIL import Image, ImageDraw
 # =============================================================================
 NULL_IMAGE = op.join(enigmeg.__path__[0], 'QA', 'Null.png')
 sg.set_options(font='Courier 18')
-QA_type='FSrecon'
 status_color_dict = {'Unchecked':'grey',
                    'GOOD':'green',
                    'BAD':'red'
@@ -32,6 +31,7 @@ status_color_dict = {'Unchecked':'grey',
 GRID_SIZE=(3,6)
 PROJECT = 'ENIGMA_MEG_QA'
 SEARCH_DICT = {'FSrecon': f'{PROJECT}/sub-*/meg/*QAfsrecon*.png'}
+qa_types = SEARCH_DICT.keys()
 # =============================================================================
 # Commandline Interface
 # =============================================================================
@@ -41,8 +41,12 @@ if __name__ == '__main__':
     parser.add_argument('-bids_root',
                         help='''Location of bids directory used for enigma
                         processing''')
+    parser.add_argument('-qa_type',
+                        help='''Type of image to lookup''',
+                        default='FSrecon')
     args = parser.parse_args()
     bids_root=args.bids_root
+    QA_type=args.qa_type
     
 deriv_root = op.join(bids_root, 'derivatives')                       
                         
@@ -201,21 +205,24 @@ def load_logfile(logfile):
         history = f.readlines()
     return history
 
-# def parse_history(history):
-#     '''
+def parse_history(history):  #!!!FIX Empty function
+    '''
+    Identify the last time the log was initiated
+    Generate a dictionary with subject ids to readout the status
     
 
-#     Parameters
-#     ----------
-#     history : TYPE
-#         DESCRIPTION.
+    Parameters
+    ----------
+    history : TYPE
+        DESCRIPTION.
 
-#     Returns
-#     -------
-#     None.
+    Returns
+    -------
+    None.
 
-#    '''
-    
+    '''
+    return 
+
 
 def write_logfile(obj_list):
     '''
