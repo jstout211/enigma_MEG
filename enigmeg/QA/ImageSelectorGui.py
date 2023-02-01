@@ -17,6 +17,7 @@ import base64
 import copy
 import enigmeg
 import logging
+from PIL import Image, ImageDraw
 
 NULL_IMAGE = op.join(enigmeg.__path__[0], 'QA', 'Null.png')
 sg.set_options(font='Courier 18')
@@ -79,8 +80,19 @@ for subj in glob.glob(op.join(bids_root, 'sub-*')):
                        run='1')
     
 
+# def build_textbox(resize):
+#     canvas = Image.new('RGB', resize, 'white')
+#     img_draw = ImageDraw.Draw(canvas)
+#     img_draw.rectangle((0, 180, 200, 200), outline=None, fill=status)
+#     img_draw.text((20, 190), subjid, align='center', fill='black', spacing=10)
+#     canvas.show()
 
-def resize_image(image_path, resize=(200,200)): 
+status_color_dict = {'Unchecked':'grey',
+                   'GOOD':'green',
+                   'BAD':'red'
+                   }
+def resize_image(image_path, resize=(200,200), status=None, 
+                 text_val=None): 
     '''
     Configure images to be used as PySimpleGUI buttons
 
@@ -106,13 +118,37 @@ def resize_image(image_path, resize=(200,200)):
             data_bytes_io = io.BytesIO(image_path)
             img = PIL.Image.open(data_bytes_io)
     cur_width, cur_height = img.size
+    status_color = status_color_dict[status]
     if resize:
         new_width, new_height = resize
         scale = min(new_height/cur_height, new_width/cur_width)
         img = img.resize((int(cur_width*scale), int(cur_height*scale)))
+        img_draw = ImageDraw.Draw(img)
+        #Add text box
+        img_draw.rectangle((0, 580, 600, 600), outline=None, fill=status_color)
+        img_draw.text((20, 590), text_val, align='center', fill='black')
+        
     bio = io.BytesIO()
     img.save(bio, format="PNG")
     return base64.b64encode(bio.getvalue())
+
+# def test_resize_image():
+#     image_path = '/fast/tmp_QA/BIDS_stringaris/derivatives/ENIGMA_MEG_QA/sub-24208/meg/sub-24208_run-1_desc-QAfsrecon_lh.png'
+#     resize=(200,200)
+#     status=None
+#     PIL.ImageDraw.Draw.rectangle()
+#     subjid = 'TEST_SUBJ'
+#     status = 'red'    
+#     # from PIL import Image, ImageDraw
+
+#     canvas = Image.new('RGB', resize, 'white')
+#     img_draw = ImageDraw.Draw(canvas)
+#     img_draw.rectangle((0, 580, 600, 600), outline=None, fill=status)
+#     img_draw.text((20, 590), subjid, align='center', fill='black', spacing=10)
+#     canvas.show()
+    
+    
+
 
 # Create a list of objects unique to the subjects
 class sub_qa_info():
@@ -124,13 +160,14 @@ class sub_qa_info():
         self.qa_type=qa_type
         self.status = self.check_status()  
         self.subject = self.get_subjid()
-        self.image_r = resize_image(self.fname, resize=resize_xy)
+        self.image_r = resize_image(self.fname, resize=resize_xy, 
+                                    status=self.status, text_val=self.subject)
     
     ############## VERIFY #####################
     def set_status(self):
         '''Set up toggle for GOOD/BAD'''
         if self.status=='Unchecked':
-            self.status = 'BAD'
+            self.status = 'GOOD'
         elif self.status=='GOOD':
             self.status = 'BAD'
         elif self.status=='BAD':
@@ -195,11 +232,16 @@ def create_window_layout(sub_obj_list=None, qa_type=None,
         row = []
         for j in range(grid_size[1]):
             if current_idx >= len(sub_obj_list):
-                image_ = resize_image(NULL_IMAGE, resize=resize_xy)
+                image_ = resize_image(NULL_IMAGE, resize=resize_xy, 
+                                      status='Unchecked', text_val='')
                 row.append(sg.Button(image_data=image_, border_width=5, key=None, 
                                  image_size=resize_xy, expand_x=True, expand_y=True))
             else:
-                image_ = sub_obj_list[current_idx].image_r
+                image_ = resize_image(sub_obj_list[current_idx].image_r,
+                                      resize=resize_xy, 
+                                      status=sub_obj_list[current_idx].status,
+                                      text_val=sub_obj_list[current_idx].subject
+                                      )
                 button_name = sub_obj_list[current_idx].subject
                 row.append(sg.Button(image_data=image_, border_width=5, 
                                      key=sub_obj_list[current_idx],
@@ -248,6 +290,12 @@ while True:             # Event Loop
         write_logfile(sub_obj_list)
     if type(event) is sub_qa_info:
         event.set_status()
+        image_ = resize_image(event.image_r,
+                      resize=(600,600) ,  #!!!FIX - should be a variable
+                      status=event.status,
+                      text_val=event.subject
+                      )
+        window[event].update(image_data=image_) 
     if modify_frame == True:
         window.close()
         window=create_window_layout(sub_obj_list,
