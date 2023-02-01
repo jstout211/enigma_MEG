@@ -30,7 +30,11 @@ status_color_dict = {'Unchecked':'grey',
                    'BAD':'red'
                    }
 GRID_SIZE=(3,6)
-
+PROJECT = 'ENIGMA_MEG_QA'
+SEARCH_DICT = {'FSrecon': f'{PROJECT}/sub-*/meg/*QAfsrecon*.png'}
+# =============================================================================
+# Commandline Interface
+# =============================================================================
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
@@ -43,31 +47,23 @@ if __name__ == '__main__':
 deriv_root = op.join(bids_root, 'derivatives')                       
                         
 
-# image = '/home/jstout/Desktop/Plot1.png'
-# subject = '23520'
-# session = '1'
-# run = '01'
-# GRID_SIZE=(2,2)
-
-
-
-# =============================================================================
-# Create dictionary of dictionaries to access the different QA 
-# =============================================================================
 # Set up logging
-# log = op.join(deriv_root, 'enigma_QA_logfile.txt')
-# logging.basicConfig(filename=log, encoding='utf-8', level=logging.DEBUG, 
-#                     format='%(levelname)s:%(message)s')
-# format='%(levelname)s:%(message)s'
-# logging.IFNO
-# bids_root = '/fast/tmp_QA/BIDS_stringaris'
+logfile = op.join(deriv_root, PROJECT, 'enigma_QA_logfile.txt')
+if op.exists(logfile):
+    with open(logfile) as f:
+        history_log = f.readlines()
+logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.INFO, 
+                    format='%(asctime)s:%(levelname)s:%(message)s')
+logging.info("REVIEW_START")
 
+# =============================================================================
+# Generate QA images 
+# =============================================================================
 def generate_QA_images(bids_root, subject=None, session=None, 
                        run='1'):
     deriv_root = op.join(bids_root, 'derivatives', 'ENIGMA_MEG')
     deriv_root_qa = op.join(bids_root, 'derivatives', 'ENIGMA_MEG_QA')
     subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')
-
     deriv_path = BIDSPath(root=deriv_root, 
                           check=False,
                           subject=subject,
@@ -95,7 +91,6 @@ def save_brain_images(deriv_path, hemi=None, out_fname=None):
         brain.close()
     return out_fname
 
-
 for subj in glob.glob(op.join(bids_root, 'sub-*')):
     subj = op.basename(subj)[4:]
     generate_QA_images(bids_root, subject=subj, session=None, 
@@ -108,6 +103,8 @@ def resize_image(image_path, resize=(200,200), status=None,
                  text_val=None): 
     '''
     Configure images to be used as PySimpleGUI buttons
+    Add a color bar at the bottom of the image designating the status
+    Write the Subject ID into colorbar
 
     Parameters
     ----------
@@ -115,12 +112,16 @@ def resize_image(image_path, resize=(200,200), status=None,
         Path to input image
     resize : Tuple, optional
         Pixel X Pixel Dimension. The default is (200,200).
+    status : str
+        Used in the STATUS_COLOR_DICT to extract a background color
+        Must be one of the following Unchecked / GOOD / BAD 
+    text_val : str
+        Written in colorbar - typically the subject ID
 
     Returns
     -------
     Base64 encoded string
         Base64 string for use as button image.
-
     '''
     if isinstance(image_path, str):
         img = PIL.Image.open(image_path)
@@ -145,8 +146,6 @@ def resize_image(image_path, resize=(200,200), status=None,
     img.save(bio, format="PNG")
     return base64.b64encode(bio.getvalue())
 
-
-# Create a list of objects unique to the subjects
 class sub_qa_info():
     '''Store info on the status of subject QA results'''
     def __init__(self, idx=None, fname=None, qa_type='FSrecon', log=None, 
@@ -188,7 +187,7 @@ class sub_qa_info():
         except:
             return None
     
-def load_logfile():
+def load_logfile(logfile):
     '''
     Load the file and check for subject entries.  Make a dictionary that can 
     be queried during qa_info creation to load the status
@@ -198,7 +197,25 @@ def load_logfile():
     None.
 
     '''
-    return 
+    with open(logfile) as f:
+        history = f.readlines()
+    return history
+
+# def parse_history(history):
+#     '''
+    
+
+#     Parameters
+#     ----------
+#     history : TYPE
+#         DESCRIPTION.
+
+#     Returns
+#     -------
+#     None.
+
+#    '''
+    
 
 def write_logfile(obj_list):
     '''
@@ -215,8 +232,8 @@ def write_logfile(obj_list):
     None.
 
     '''
-    return    
-
+    for obj in obj_list:
+        logging.info(f"SUBJECT:{obj.subject}:STATUS:{obj.status}")
 
 def create_window_layout(sub_obj_list=None, qa_type=None, 
                          grid_size=GRID_SIZE, frame_start_idx=0, 
@@ -254,14 +271,13 @@ def create_window_layout(sub_obj_list=None, qa_type=None,
 # =============================================================================
 # GUI component
 # =============================================================================
-image_list = glob.glob(op.join(deriv_root, 'ENIGMA_MEG_QA/sub-*/meg/*QAfsrecon*.png'))
+image_list = glob.glob(op.join(deriv_root, SEARCH_DICT['FSrecon']))
 sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
 
 idx=0
 window = create_window_layout(sub_obj_list, qa_type=QA_type, 
                               grid_size=GRID_SIZE,
                               frame_start_idx=idx)
-
 modify_frame=False
 while True:             # Event Loop
     # print(idx)
@@ -297,10 +313,9 @@ while True:             # Event Loop
                                         qa_type=QA_type, grid_size=GRID_SIZE,
                                         frame_start_idx=idx)
         modify_frame = False
-for subj_qa in sub_obj_list:
-    print(f'{subj_qa.subject}:{subj_qa.fname}:{subj_qa.status}')
-window.close()
 
+window.close()
+logging.info("REVIEW_FINISH")
 
 #%%
 # def test_resize_image():
@@ -329,6 +344,12 @@ window.close()
 
 # tmp = test_sub_qa_info()
 
-
-
+# =============================================================================
+# Test extra
+# =============================================================================
+# image = '/home/jstout/Desktop/Plot1.png'
+# subject = '23520'
+# session = '1'
+# run = '01'
+# GRID_SIZE=(2,2)
 
