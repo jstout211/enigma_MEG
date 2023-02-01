@@ -30,6 +30,11 @@ session = '1'
 run = '01'
 GRID_SIZE=(2,2)
 
+status_color_dict = {'Unchecked':'grey',
+                   'GOOD':'green',
+                   'BAD':'red'
+                   }
+
 # =============================================================================
 # Create dictionary of dictionaries to access the different QA 
 # =============================================================================
@@ -79,18 +84,9 @@ for subj in glob.glob(op.join(bids_root, 'sub-*')):
     generate_QA_images(bids_root, subject=subj, session=None, 
                        run='1')
     
-
-# def build_textbox(resize):
-#     canvas = Image.new('RGB', resize, 'white')
-#     img_draw = ImageDraw.Draw(canvas)
-#     img_draw.rectangle((0, 180, 200, 200), outline=None, fill=status)
-#     img_draw.text((20, 190), subjid, align='center', fill='black', spacing=10)
-#     canvas.show()
-
-status_color_dict = {'Unchecked':'grey',
-                   'GOOD':'green',
-                   'BAD':'red'
-                   }
+# =============================================================================
+# Functions to Process images and set current status
+# =============================================================================
 def resize_image(image_path, resize=(200,200), status=None, 
                  text_val=None): 
     '''
@@ -132,23 +128,6 @@ def resize_image(image_path, resize=(200,200), status=None,
     img.save(bio, format="PNG")
     return base64.b64encode(bio.getvalue())
 
-# def test_resize_image():
-#     image_path = '/fast/tmp_QA/BIDS_stringaris/derivatives/ENIGMA_MEG_QA/sub-24208/meg/sub-24208_run-1_desc-QAfsrecon_lh.png'
-#     resize=(200,200)
-#     status=None
-#     PIL.ImageDraw.Draw.rectangle()
-#     subjid = 'TEST_SUBJ'
-#     status = 'red'    
-#     # from PIL import Image, ImageDraw
-
-#     canvas = Image.new('RGB', resize, 'white')
-#     img_draw = ImageDraw.Draw(canvas)
-#     img_draw.rectangle((0, 580, 600, 600), outline=None, fill=status)
-#     img_draw.text((20, 590), subjid, align='center', fill='black', spacing=10)
-#     canvas.show()
-    
-    
-
 
 # Create a list of objects unique to the subjects
 class sub_qa_info():
@@ -171,7 +150,7 @@ class sub_qa_info():
         elif self.status=='GOOD':
             self.status = 'BAD'
         elif self.status=='BAD':
-            self.status = 'GOOD'
+            self.status = 'Unchecked'
     
     def log_status(self):
         '''Check if this has been previously set in the log'''
@@ -308,6 +287,22 @@ window.close()
 
 
 #%%
+# def test_resize_image():
+#     image_path = '/fast/tmp_QA/BIDS_stringaris/derivatives/ENIGMA_MEG_QA/sub-24208/meg/sub-24208_run-1_desc-QAfsrecon_lh.png'
+#     resize=(200,200)
+#     status=None
+#     PIL.ImageDraw.Draw.rectangle()
+#     subjid = 'TEST_SUBJ'
+#     status = 'red'    
+#     # from PIL import Image, ImageDraw
+
+#     canvas = Image.new('RGB', resize, 'white')
+#     img_draw = ImageDraw.Draw(canvas)
+#     img_draw.rectangle((0, 580, 600, 600), outline=None, fill=status)
+#     img_draw.text((20, 590), subjid, align='center', fill='black', spacing=10)
+#     canvas.show()
+  
+
 # =============================================================================
 # TESTs currently (need to move to subdirectory)
 # =============================================================================
@@ -319,63 +314,5 @@ window.close()
 # tmp = test_sub_qa_info()
 
 
-#%%
-#import pandas as pd
 
-# class QA_layout():
-#     def __init__(self, image_list=None, qa_type=None, grid_size=GRID_SIZE):
-#         self.idx=0
-#         self.QA_type = qa_type
-#         self.grid_size=grid_size
-#         self.resize_xy = (600,600)
-#         self.image_list=image_list
-#         self.layout = self.create_layout()
-#         self.update_ignore=(len(self.layout),)
-#         # self.update_layout()
-#         self.ratings=pd.DataFrame(image_list, columns=['fname'])
-#         self.ratings['rating']=None
-
-#     def encode_image(self,fname):
-#         with open(fname, "rb") as image_file:
-#             encoded_string = base64.b64encode(image_file.read())
-#         return encoded_string 
-    
-#     def create_layout(self):
-#         layout = [  [sg.Text(f'QA: {self.QA_type}')]]
-#         self.idx=0
-#         for i in range(self.grid_size[0]):
-#             row = []
-#             for j in range(self.grid_size[1]):
-#                 # image_ = self.encode_image(self.image_list[self.idx])
-#                 image_ = resize_image(self.image_list[self.idx], resize=self.resize_xy) #image_)
-#                 button_name = self.image_list[self.idx]
-#                 row.append(sg.Button(image_data=image_, border_width=5, key=f'-{str(self.idx)}-', 
-#                                      image_size=self.resize_xy, expand_x=True, expand_y=True))
-#                 self.idx+=1
-#             layout.append(row)
-#         layout.append([sg.Button('PREV'), sg.Button('NEXT'), sg.Button('EXIT')])
-#         return layout
-        
-#     def update_layout(self): #layout=None, imagelist=None, idx=None):
-#         '''After prev/next button press - update with new images'''
-#         for row_idx, row in enumerate(self.layout):
-#             # Bottom buttons should be ignored
-#             if row_idx in self.update_ignore:
-#                 continue
-#             for button in row:
-#                 if self.idx<len(self.image_list):
-#                     tmp_ = resize_image(self.image_list[self.idx], resize=self.resize_xy)
-#                     button.update(image_data=tmp_)
-#                 else:
-#                     continue
-#                     # button.update(image_data=None)
-                          
-    
-
-# image_list = glob.glob('/home/jstout/Pictures/*.png')
-
-
-# QA_type = 'Freesurfer Recon'
-# # layout=create_layout(QA_type, grid_size=GRID_SIZE)
-# QA = QA_layout(image_list, qa_type=QA_type, grid_size=(2,2))
 
