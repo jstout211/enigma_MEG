@@ -49,7 +49,7 @@ if __name__ == '__main__':
     QA_type=args.qa_type
     
 deriv_root = op.join(bids_root, 'derivatives')                       
-                        
+subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')                        
 
 # Set up logging
 logfile = op.join(deriv_root, PROJECT, 'enigma_QA_logfile.txt')
