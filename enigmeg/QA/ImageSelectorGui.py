@@ -17,7 +17,7 @@ import base64
 import copy
 import enigmeg
 import logging
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 # =============================================================================
 # Defaults
@@ -137,15 +137,19 @@ def resize_image(image_path, resize=(200,200), status=None,
             img = PIL.Image.open(data_bytes_io)
     cur_width, cur_height = img.size
     status_color = status_color_dict[status]
-    if resize:
-        new_width, new_height = resize
-        scale = min(new_height/cur_height, new_width/cur_width)
-        img = img.resize((int(cur_width*scale), int(cur_height*scale)))
-        img_draw = ImageDraw.Draw(img)
-        #Add text box
-        img_draw.rectangle((0, 580, 600, 600), outline=None, fill=status_color)
-        img_draw.text((20, 590), text_val, align='center', fill='black')
-        
+    new_width, new_height = resize
+    scale = min(new_height/cur_height, new_width/cur_width)
+    img = img.resize((int(cur_width*scale), int(cur_height*scale)))
+    img_draw = ImageDraw.Draw(img)
+    #Add text box
+    img_draw.rectangle((0, 580, 600, 600), outline=None, fill=status_color)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", size=20)
+        img_draw.text((20, 580), text_val, font=font, align='center', fill='black')
+    except:
+        #Fallback if DejaVuSans not available - but should be installed 
+        #with matplotlib
+        img_draw.text((20, 580), text_val, align='center', fill='black')
     bio = io.BytesIO()
     img.save(bio, format="PNG")
     return base64.b64encode(bio.getvalue())
