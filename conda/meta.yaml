@@ -1,0 +1,45 @@
+{% set name = "enigmeg" %}
+{% set version = "0.2" %}
+
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  git_rev: v0.2 
+  git_url: https://github.com/jstout211/enigma_MEG.git
+
+requirements:
+  build:
+    - git
+  host:
+    - python
+    - pip
+  run:
+    - python >=3.8
+    - mne >=1.1
+    - numpy 
+    - scipy 
+    - neurodsp 
+    - fooof
+    - munch 
+    - pysimplegui
+    - statsmodels
+    - nibabel 
+    - seaborn 
+    - mne-bids >=0.10
+
+build:
+  noarch: python
+  number: 0
+  script:  "{{ PYTHON }} -m pip install --no-deps . --ignore-installed -vv "
+
+test:
+  imports:
+    - enigmeg
+
+about:
+  home: https://github.com/jstout211/enigma_MEG.git
+  license: CC0
+
