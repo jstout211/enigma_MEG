@@ -8,5 +8,5 @@ Add the tarball to the conda env <br>
 `cp conda-bld.tar   ~/miniconda3/envs/enigma_meg/` <br>
 `cd  ~/miniconda3/envs/enigma_meg/`<br>
 `tar -xvf ----.tar`   #will result in conda-bld folder <br>
-`cd ~`
+`cd ~`<br>
 `mamba install --use-local -c conda-forge` <br>
