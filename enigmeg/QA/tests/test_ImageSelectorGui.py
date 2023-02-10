@@ -7,18 +7,16 @@ Created on Fri Feb 10 14:07:24 2023
 """
 from enigmeg.QA.ImageSelectorGui import get_last_review, get_subject_status, build_status_dict
 import os.path as op
-logfile = op.join(__file__ , 'enigma_QA_logfile.txt')
+logfile = op.join(op.dirname(__file__) , 'enigma_QA_logfile.txt')
 
-if op.exists(logfile):
-    with open(logfile) as f:
-        history_log = f.readlines()
-    #Strip newlines        
-    history_log=[i[:-1] for i in history_log if i[-1:]=='\n']
-
+with open(logfile) as f:
+    history_log = f.readlines()
+#Strip newlines        
+history_log=[i[:-1] for i in history_log if i[-1:]=='\n']
 
 last_review = get_last_review(history_log) 
 
-def test_get_last_review(): 
+def test_get_last_review():
     last_review = get_last_review(history_log)
     assert len(last_review)==49  
 

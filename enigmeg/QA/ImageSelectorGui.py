@@ -32,38 +32,7 @@ GRID_SIZE=(3,6)
 PROJECT = 'ENIGMA_MEG_QA'
 SEARCH_DICT = {'FSrecon': f'{PROJECT}/sub-*/meg/*QAfsrecon*.png'}
 qa_types = SEARCH_DICT.keys()
-# =============================================================================
-# Commandline Interface
-# =============================================================================
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-bids_root',
-                        help='''Location of bids directory used for enigma
-                        processing''')
-    parser.add_argument('-qa_type',
-                        help='''Type of image to lookup''',
-                        default='FSrecon')
-    args = parser.parse_args()
-    bids_root=args.bids_root
-    QA_type=args.qa_type
 
-#!!! FIX - can not import for test functions - need to functionalize all code
-    
-deriv_root = op.join(bids_root, 'derivatives')                       
-subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')                        
-
-# Set up logging
-logfile = op.join(deriv_root, PROJECT, 'enigma_QA_logfile.txt')
-if op.exists(logfile):
-    with open(logfile) as f:
-        history_log = f.readlines()
-    #Strip newlines        
-    history_log=[i[:-1] for i in history_log if i[-1:]=='\n']
-
-logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.INFO, 
-                    format='%(asctime)s:%(levelname)s:%(message)s')
-logging.info("REVIEW_START")
 
 # =============================================================================
 # Logfile parsing
@@ -125,10 +94,6 @@ def generate_QA_images(bids_root, subject=None, session=None,
     lh_brain_fname = save_brain_images(deriv_path, hemi='lh', out_fname=qa_path)
 
 def save_brain_images(deriv_path, hemi=None, out_fname=None):
-    # out_path = deriv_path.directory / qa_subdir
-    # out_fname = deriv_path.copy().update(description=f'QAfsrecon',
-    #                                       suffix=hemi,
-    #                                       extension='.png').fpath
     os.makedirs(op.dirname(out_fname), exist_ok=True)
     if not op.exists(out_fname):
         brain = Brain(subject='sub-'+deriv_path.subject,
@@ -140,10 +105,11 @@ def save_brain_images(deriv_path, hemi=None, out_fname=None):
         brain.close()
     return out_fname
 
-for subj in glob.glob(op.join(bids_root, 'sub-*')):
-    subj = op.basename(subj)[4:]
-    generate_QA_images(bids_root, subject=subj, session=None, 
-                       run='1')
+def process_freesurferQA_images(bids_root):
+    for subj in glob.glob(op.join(bids_root, 'sub-*')):
+        subj = op.basename(subj)[4:]
+        generate_QA_images(bids_root, subject=subj, session=None, 
+                           run='1')
     
 # =============================================================================
 # Functions to Process images and set current status
@@ -230,21 +196,6 @@ class sub_qa_info():
     def set_status(self, status):
         self.status=status
     
-# def load_logfile(logfile):
-#     '''
-#     Load the file and check for subject entries.  Make a dictionary that can 
-#     be queried during qa_info creation to load the status
-
-#     Returns
-#     -------
-#     None.
-
-#     '''
-#     with open(logfile) as f:
-#         history = f.readlines()
-#     return history
-
-
 def write_logfile(obj_list):
     '''
     Loop over all subjects in list and write the status to the logfile
@@ -296,64 +247,123 @@ def create_window_layout(sub_obj_list=None, qa_type=None,
                    scaling=True)
     return window
 
+                         
+def initialize(bids_root):
+    '''
+    Set up QA project folder and create logging file
+
+    Parameters
+    ----------
+    bids_root : path
+        
+    Returns
+    -------
+    history_log : list of historical log entries
+
+    '''
+    deriv_root = op.join(bids_root, 'derivatives') 
+    if not op.exists(op.join(deriv_root, PROJECT)):
+        os.mkdir(op.join(deriv_root, PROJECT))
+    
+    # Set up logging
+    logfile = op.join(deriv_root, PROJECT, 'enigma_QA_logfile.txt')
+    return_log=False
+    if op.exists(logfile):
+        with open(logfile) as f:
+            history_log = f.readlines()
+        #Strip newlines        
+        history_log=[i[:-1] for i in history_log if i[-1:]=='\n']
+        return_log=True
+    logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.INFO, 
+                        format='%(asctime)s:%(levelname)s:%(message)s')
+    logging.info("REVIEW_START")
+    if return_log==True:
+        return history_log
+    else:
+        return None
+
 # =============================================================================
 # GUI component
 # =============================================================================
-#Build list to display and initialize all subject data
-image_list = glob.glob(op.join(deriv_root, SEARCH_DICT['FSrecon']))
-sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
+def main(bids_root):
+    history_log = initialize(bids_root)    
+    deriv_root = op.join(bids_root, 'derivatives')                       
+    subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')   
+    
+    #Build list to display and initialize all subject data
+    image_list = glob.glob(op.join(deriv_root, SEARCH_DICT['FSrecon']))
+    sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
+    
+    #Update status based on previous log
+    if history_log is not None:
+        last_review = get_last_review(history_log) 
+        stat_dict = build_status_dict(last_review)
+        for sub_qa in sub_obj_list:
+            if sub_qa.subject in stat_dict.keys():
+                sub_qa.set_status(stat_dict[sub_qa.subject])
+    run_gui(sub_obj_list)
 
-#Update status based on previous log
-last_review = get_last_review(history_log) 
-stat_dict = build_status_dict(last_review)
-for sub_qa in sub_obj_list:
-    if sub_qa.subject in stat_dict.keys():
-        sub_qa.set_status(stat_dict[sub_qa.subject])
 
-
-
-idx=0
-window = create_window_layout(sub_obj_list, qa_type=QA_type, 
-                              grid_size=GRID_SIZE,
-                              frame_start_idx=idx)
-modify_frame=False
-while True:             # Event Loop
-    # print(idx)
-    event, values = window.read()
-    # print(event, values)
-    if event in (sg.WIN_CLOSED, 'EXIT'):
-        break
-    if event=='NEXT':
-        if idx+GRID_SIZE[0]*GRID_SIZE[1] < len(sub_obj_list):
-            idx+= GRID_SIZE[0]*GRID_SIZE[1]
-            modify_frame = True
-        else:
-            print('End of Frame')
-    if event=='PREV':
-        if idx-(GRID_SIZE[0]*GRID_SIZE[1]) < 0:
-            idx=0
-        else:
-            idx-=(GRID_SIZE[0]*GRID_SIZE[1])
-            modify_frame = True
-    if event=='SAVE':
-        write_logfile(sub_obj_list)
-    if type(event) is sub_qa_info:
-        event.button_set_status()
-        image_ = resize_image(event.image_r,
-                      resize=(600,600) ,  #!!!FIX - should be a variable
-                      status=event.status,
-                      text_val=event.subject
-                      )
-        window[event].update(image_data=image_) 
-    if modify_frame == True:
-        window.close()
-        window=create_window_layout(sub_obj_list,
-                                        qa_type=QA_type, grid_size=GRID_SIZE,
-                                        frame_start_idx=idx)
-        modify_frame = False
-
-window.close()
-logging.info("REVIEW_FINISH")
+def run_gui(sub_obj_list):
+    idx=0
+    window = create_window_layout(sub_obj_list, qa_type=QA_type, 
+                                  grid_size=GRID_SIZE,
+                                  frame_start_idx=idx)
+    modify_frame=False
+    while True:             # Event Loop
+        # print(idx)
+        event, values = window.read()
+        # print(event, values)
+        if event in (sg.WIN_CLOSED, 'EXIT'):
+            break
+        if event=='NEXT':
+            if idx+GRID_SIZE[0]*GRID_SIZE[1] < len(sub_obj_list):
+                idx+= GRID_SIZE[0]*GRID_SIZE[1]
+                modify_frame = True
+            else:
+                print('End of Frame')
+        if event=='PREV':
+            if idx-(GRID_SIZE[0]*GRID_SIZE[1]) < 0:
+                idx=0
+            else:
+                idx-=(GRID_SIZE[0]*GRID_SIZE[1])
+                modify_frame = True
+        if event=='SAVE':
+            write_logfile(sub_obj_list)
+        if type(event) is sub_qa_info:
+            event.button_set_status()
+            image_ = resize_image(event.image_r,
+                          resize=(600,600) ,  #!!!FIX - should be a variable
+                          status=event.status,
+                          text_val=event.subject
+                          )
+            window[event].update(image_data=image_) 
+        if modify_frame == True:
+            window.close()
+            window=create_window_layout(sub_obj_list,
+                                            qa_type=QA_type, grid_size=GRID_SIZE,
+                                            frame_start_idx=idx)
+            modify_frame = False
+    
+    window.close()
+    logging.info("REVIEW_FINISH")
+    
+# =============================================================================
+# Commandline Interface
+# =============================================================================
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-bids_root',
+                        help='''Location of bids directory used for enigma
+                        processing''')
+    parser.add_argument('-qa_type',
+                        help='''Type of image to lookup''',
+                        default='FSrecon')
+    args = parser.parse_args()
+    bids_root=args.bids_root
+    QA_type=args.qa_type
+    main(bids_root)
 
 #%%
 # def test_resize_image():
