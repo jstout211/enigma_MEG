@@ -47,6 +47,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     bids_root=args.bids_root
     QA_type=args.qa_type
+
+#!!! FIX - can not import for test functions - need to functionalize all code
     
 deriv_root = op.join(bids_root, 'derivatives')                       
 subjects_dir = op.join(bids_root, 'derivatives','freesurfer', 'subjects')                        
@@ -56,10 +58,53 @@ logfile = op.join(deriv_root, PROJECT, 'enigma_QA_logfile.txt')
 if op.exists(logfile):
     with open(logfile) as f:
         history_log = f.readlines()
+    #Strip newlines        
+    history_log=[i[:-1] for i in history_log if i[-1:]=='\n']
+
 logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.INFO, 
                     format='%(asctime)s:%(levelname)s:%(message)s')
 logging.info("REVIEW_START")
 
+# =============================================================================
+# Logfile parsing
+# =============================================================================
+## Get the last review period
+def get_last_review(history_log):
+    '''Extract the start and stop of the last review
+    Return the log lines from the last review'''
+    rev_start_idx=0
+    rev_end_idx=0
+    for idx, line in enumerate(history_log):
+        cond=line.split('INFO:')[-1]
+        if cond=='REVIEW_START':
+            rev_start_idx=idx
+        elif cond=='REVIEW_FINISH':
+            rev_end_idx=idx
+    last_review=history_log[rev_start_idx+1:rev_end_idx]
+    return last_review
+        
+def get_subject_status(logline_input):
+    tmp=logline_input.split(':')
+    datetimeval=':'.join(tmp[0:3])
+    subject, status = None, None #Preinitialize
+    if 'SUBJECT' in tmp:
+        sub_idx = tmp.index('SUBJECT')
+        subject = tmp[sub_idx+1]
+    if 'STATUS' in tmp:
+        stat_idx = tmp.index('STATUS')
+        status = tmp[stat_idx+1]
+    return subject, status
+
+def build_status_dict(review_log):
+    '''Loop over lines in review log and extract a dictionary of 
+    subject status.'''
+    subject_status_dict={}
+    for line in review_log:
+        subject,status = get_subject_status(line)
+        if subject==None:
+            continue
+        subject_status_dict[subject]=status
+    return subject_status_dict
 # =============================================================================
 # Generate QA images 
 # =============================================================================
@@ -157,17 +202,16 @@ def resize_image(image_path, resize=(200,200), status=None,
 class sub_qa_info():
     '''Store info on the status of subject QA results'''
     def __init__(self, idx=None, fname=None, qa_type='FSrecon', log=None, 
-                 resize_xy=(600,600)):
+                 resize_xy=(600,600), init_status='Unchecked'):
         self.idx=idx
         self.fname = fname
         self.qa_type=qa_type
-        self.status = self.check_status()  
+        self.status = init_status  
         self.subject = self.get_subjid()
         self.image_r = resize_image(self.fname, resize=resize_xy, 
                                     status=self.status, text_val=self.subject)
     
-    ############## VERIFY #####################
-    def set_status(self):
+    def button_set_status(self):
         '''Set up toggle for Unchecked/GOOD/BAD'''
         if self.status=='Unchecked':
             self.status = 'GOOD'
@@ -176,56 +220,29 @@ class sub_qa_info():
         elif self.status=='BAD':
             self.status = 'Unchecked'
     
-    def log_status(self):
-        '''Check if this has been previously set in the log'''
-        return 
-        
-    #!!! FIX Need to make a QA list that is queried to determine good/bad/unchecked
-    def check_status(self):
-        if not hasattr(self, 'status'):
-            return 'Unchecked'
-        else:
-            return self.status
-    ###########################################
-    
     def get_subjid(self):
         base = op.basename(self.fname)
         try:
             return base.split('_')[0][4:]
         except:
             return None
+        
+    def set_status(self, status):
+        self.status=status
     
-def load_logfile(logfile):
-    '''
-    Load the file and check for subject entries.  Make a dictionary that can 
-    be queried during qa_info creation to load the status
+# def load_logfile(logfile):
+#     '''
+#     Load the file and check for subject entries.  Make a dictionary that can 
+#     be queried during qa_info creation to load the status
 
-    Returns
-    -------
-    None.
+#     Returns
+#     -------
+#     None.
 
-    '''
-    with open(logfile) as f:
-        history = f.readlines()
-    return history
-
-def parse_history(history):  #!!!FIX Empty function
-    '''
-    Identify the last time the log was initiated
-    Generate a dictionary with subject ids to readout the status
-    
-
-    Parameters
-    ----------
-    history : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
-    '''
-    return 
+#     '''
+#     with open(logfile) as f:
+#         history = f.readlines()
+#     return history
 
 
 def write_logfile(obj_list):
@@ -282,8 +299,18 @@ def create_window_layout(sub_obj_list=None, qa_type=None,
 # =============================================================================
 # GUI component
 # =============================================================================
+#Build list to display and initialize all subject data
 image_list = glob.glob(op.join(deriv_root, SEARCH_DICT['FSrecon']))
 sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
+
+#Update status based on previous log
+last_review = get_last_review(history_log) 
+stat_dict = build_status_dict(last_review)
+for sub_qa in sub_obj_list:
+    if sub_qa.subject in stat_dict.keys():
+        sub_qa.set_status(stat_dict[sub_qa.subject])
+
+
 
 idx=0
 window = create_window_layout(sub_obj_list, qa_type=QA_type, 
@@ -311,7 +338,7 @@ while True:             # Event Loop
     if event=='SAVE':
         write_logfile(sub_obj_list)
     if type(event) is sub_qa_info:
-        event.set_status()
+        event.button_set_status()
         image_ = resize_image(event.image_r,
                       resize=(600,600) ,  #!!!FIX - should be a variable
                       status=event.status,
