@@ -1,4 +1,4 @@
-# The below will be changed soon 
+# The below is currently under construction and will be changing 
 
 
 ______________________
@@ -6,7 +6,8 @@ ______________________
 # Installation
 ## Setup Conda Environment
 ```#Setup Conda environment
-conda create -n enigma_meg python pip
+conda install --channel=conda-forge --name=base mamba
+mamba create --override-channels --channel=conda-forge --name=enigma_meg mne pip 
 conda activate enigma_meg
 ```
 ## Install python package
