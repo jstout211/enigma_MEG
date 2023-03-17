@@ -9,11 +9,7 @@ ______________________
 conda install --channel=conda-forge --name=base mamba
 mamba create --override-channels --channel=conda-forge --name=enigma_meg mne pip 
 conda activate enigma_meg
-```
-## Install python package
-```#Install enigma meg and dependencies
-git clone https://github.com/jstout211/enigma_MEG
-pip install ./enigma_MEG
+pip install git+https://github.com/jstout211/enigma_MEG.git
 ```
 
 # Parameter Heirarchy
