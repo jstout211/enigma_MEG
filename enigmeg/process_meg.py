@@ -69,6 +69,8 @@ class process():
                 'freesurfer',
                 'subjects'
                 )
+        else:
+            self.subjects_dir = subjects_dir
         self.proc_vars=munch.Munch()
         self.proc_vars['fmin'] = 1
         self.proc_vars['fmax'] = 45
