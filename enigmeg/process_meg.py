@@ -8,6 +8,7 @@ Created on Fri Apr  3 16:08:12 2020
 """
 import os
 import os.path as op
+import glob
 import mne
 from mne import Report
 import numpy as np
@@ -766,145 +767,45 @@ def make_report(subject, subjects_dir, meg_filename, output_dir):
     report.parse_folder(output_dir, on_error='ignore', mri_decim=10)
     report_filename = op.join(output_dir, 'QA_report.html')
     report.save(report_filename)
-        
 
+def list_all_bids_subjects(bids_path):
+    '''
+    Return all subjects in the bids folder
 
-# def main(filename=None, subjid=None, trans=None, info=None, line_freq=None, 
-#          emptyroom_filename=None, subjects_dir=None):
-    
-#     ## Load and prefilter continuous data
-#     raw=load_data(filename)
-#     eraw=load_data(emptyroom_filename)
-    
-#     if type(raw)==mne.io.ctf.ctf.RawCTF:
-#         raw.apply_gradient_compensation(3)
-    
-#     ## Test SSS bad channel detection for non-Elekta data
-#     # !!!!!!!!!!!  Currently no finecal or crosstalk used  !!!!!!!!!!!!!!!
-#     if filename[-3:]=='fif':
-#         raw_bads_dict = assess_bads(filename)
-#         eraw_bads_dict = assess_bads(emptyroom_filename, is_eroom=True)
-        
-#         raw.info['bads']=raw_bads_dict['noisy'] + raw_bads_dict['flat']
-#         eraw.info['bads']=eraw_bads_dict['noisy'] + eraw_bads_dict['flat']
-    
-#     resample_freq=300
-    
-#     raw.resample(resample_freq)
-#     eraw.resample(resample_freq)
-    
-#     raw.filter(0.5, 140)
-#     eraw.filter(0.5, 140)
-    
-#     if line_freq==None:
-#         try:
-#             line_freq = raw.info['line_freq']  # this isn't present in all files
-#         except:
-#             raise(ValueError('Could not determine line_frequency'))
-#     notch_freqs = np.arange(line_freq, 
-#                             resample_freq/2, 
-#                             line_freq)
-#     raw.notch_filter(notch_freqs)
-    
-    
-#     ## Create Epochs and covariance 
-#     epochs = mne.make_fixed_length_epochs(raw, duration=4.0, preload=True)
-#     epochs.apply_baseline(baseline=(0,None))
-#     cov = mne.compute_covariance(epochs)
-    
-#     er_epochs=mne.make_fixed_length_epochs(eraw, duration=4.0, preload=True)
-#     er_epochs.apply_baseline(baseline=(0,None))
-#     er_cov = mne.compute_covariance(er_epochs)
-    
-#     os.environ['SUBJECTS_DIR']=subjects_dir
-#     src = mne.read_source_spaces(info.src_filename)
-#     bem = mne.read_bem_solution(info.bem_sol_filename)
-#     fwd = mne.make_forward_solution(epochs.info, trans, src, bem)
-    
-#     data_info = epochs.info
-    
-#     from mne.beamformer import make_lcmv, apply_lcmv_epochs
-#     filters = make_lcmv(epochs.info, fwd, cov, reg=0.01,
-#                         noise_cov=er_cov, pick_ori='max-power',
-#                         weight_norm='unit-noise-gain', rank=None)
-    
-#     labels_lh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
-#                                         subjects_dir=subjects_dir, hemi='lh') 
-#     labels_rh=mne.read_labels_from_annot(subjid, parc='aparc_sub',
-#                                         subjects_dir=subjects_dir, hemi='rh') 
-#     labels=labels_lh + labels_rh 
-    
-#     results_stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)#, max_ori_out='max_power')
-    
-#     #Monkey patch of mne.source_estimate to perform 15 component SVD
-#     label_ts = mod_source_estimate.extract_label_time_course(results_stcs, 
-#                                                              labels, 
-#                                                              fwd['src'],
-#                                                              mode='pca15_multitaper')
-    
-#     #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
-#     label_stack = np.stack(label_ts)
+    Parameters
+    ----------
+    bids_path : path or mne_bids.BIDSPath
+        Either str or BIDSPath that contains bids root.
 
-#     #HACK HARDCODED FREQ BINS
-#     freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+    Returns
+    -------
+    subjects : list of str
+        Subjects list.
 
-#     #Initialize 
-#     label_power = np.zeros([len(labels), len(freq_bins)])  
-#     alpha_peak = np.zeros(len(labels))
-    
-#     #Create PSD for each label
-#     for label_idx in range(len(labels)):
-#         print(str(label_idx))
-#         current_psd = label_stack[:,label_idx, :].mean(axis=0) 
-#         label_power[label_idx,:] = current_psd
-        
-#         spectral_image_path = os.path.join(info.outfolder, 'Spectra_'+
-#                                             labels[label_idx].name + '.png')
+    '''
+    if type(bids_path) is mne_bids.BIDSPath:
+        bids_path=str(bids_path.root)
+    subjects = glob.glob(op.join(bids_path, 'sub-*'))
+    subjects = [op.basename(i) for i in subjects] #Strip off the leading path
+    subjects = [str(i[4:]) if str(i)[0:4]=='sub-' else str(i) for i in subjects]
+    return subjects 
 
-#         try:
-#             tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
-#                             out_image_path=spectral_image_path)
-            
-#             #FIX FOR MULTIPLE ALPHA PEAKS
-#             potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
-#                                     (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
-#             if len(potential_alpha_idx) != 1:
-#                 alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
-#             else:
-#                 alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
-#         except:
-#             alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<    
-        
-#     #Save the label spectrum to assemble the relative power
-#     freq_bin_names=[str(binval) for binval in freq_bins]
-#     label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
-#     label_spectra_dframe.to_csv( os.path.join(info.outfolder, 'label_spectra.csv') , index=False)
-#     # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
-#     #     np.save(f, label_power)
-    
-#     relative_power = label_power / label_power.sum(axis=1, keepdims=True)
+def process_subject(subject, args):
+    proc = process(subject=subject, 
+            bids_root=args.bids_root, 
+            deriv_root=None,
+            subjects_dir=None,
+            rest_tagname=args.rest_tag,
+            emptyroom_tagname=args.emptyroom_tag, 
+            session=args.session, 
+            mains=float(args.mains),
+            run=args.run,
+            t1_override=None,
+            fs_ave_fids=args.fs_ave_fids
+            )
+    proc.load_data()
+    proc.do_proc_allsteps()
 
-#     #Define bands
-#     bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
-#     band_idxs = get_freq_idx(bands, freq_bins)
-
-#     #initialize output
-#     band_means = np.zeros([len(labels), len(bands)]) 
-#     #Loop over all bands, select the indexes assocaited with the band and average    
-#     for mean_band, band_idx in enumerate(band_idxs):
-#         band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
-    
-#     output_filename = os.path.join(info.outfolder, 'Band_rel_power.csv')
-    
-
-#     bands_str = [str(i) for i in bands]
-#     label_names = [i.name for i in labels]
-    
-#     output_dframe = pd.DataFrame(band_means, columns=bands_str, 
-#                                  index=label_names)
-#     output_dframe['AlphaPeak'] = alpha_peak
-#     output_dframe.to_csv(output_filename, sep='\t')    
-        
     
 if __name__=='__main__':
     import argparse
@@ -912,9 +813,9 @@ if __name__=='__main__':
     parser.add_argument('-bids_root',
                         help='''Top level directory of the bids data'''
                         )
-    parser.add_argument('-config', 
-                        help='''Config file for processing data'''
-                        )
+    # parser.add_argument('-config', 
+    #                     help='''Config file for processing data'''
+    #                     )
     parser.add_argument('-subject',
                         help='''Subject to process'''
                         )
@@ -947,27 +848,30 @@ if __name__=='__main__':
                         action='store_true',
                         default=False
                         )
+    parser.add_argument('-proc_all_subjects',
+                        help='''Loop over all subjects in the bids_root
+                        and process.  Currently subject data needs to be configured 
+                        homogeneously according to the tags above'''
+                        action='store_true',
+                        default=False
+                        )
                             
         
     args = parser.parse_args()
     if args.run.lower()=='none': args.run=None
     if args.session.lower()=='none': args.session=None
     if args.emptyroom_tag.lower()=='none': args.emptyroom_tag=None
+    
+    if args.proc_all_subjects:
+        subjects = list_all_bids_subjects(arg.bids_root)
+    else if args.subject:
+        subjects = [args.subject]
+    
+    for subject in subjects:
+        process_subject(subject, args)
+        
      
-    proc = process(subject=args.subject, 
-                bids_root=args.bids_root, 
-                deriv_root=None,
-                subjects_dir=None,
-                rest_tagname=args.rest_tag,
-                emptyroom_tagname=args.emptyroom_tag, 
-                session=args.session, 
-                mains=float(args.mains),
-                run=args.run,
-                t1_override=None,
-                fs_ave_fids=args.fs_ave_fids
-                )
-    proc.load_data()
-    proc.do_proc_allsteps()
+
     
 
     
