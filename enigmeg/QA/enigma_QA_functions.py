@@ -3,27 +3,15 @@
 """
 Created on Tue Mar 21 11:36:28 2023
 
-@author: nugenta
+@author: Allison Nugent and chatGPT
 """
 
 import mne
-import PySimpleGUI as sg
-import os, os.path as op
+import os.path as op
 from mne_bids import BIDSPath
 from mne.viz import Brain
-import glob
-import PIL.Image
-import io
-import base64
-import copy
-import logging
 import matplotlib.pyplot as plt
-from matplotlib import font_manager
-from PIL import Image, ImageDraw, ImageFont
-import argparse
-from mne_bids import BIDSPath
-from enigmeg.process_meg import process, load_data
-
+from enigmeg.process_meg import load_data
 
 def gen_coreg_pngs(subjstruct):
     
@@ -203,7 +191,7 @@ def gen_epo_pngs(subjstruct):
     subjid = subjstruct.subject
     
     png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
-    figname_epo_psd = op.join(png_path, 'sub-' + subjid + '_epo_psd.png')
+    figname_epo_psd = op.join(png_path, 'sub-' + subjid + '_spectra.png')
     
     epo_path = subjstruct.rest_derivpath.copy().update(suffix='epo', extension='.fif')
     epochs = mne.read_epochs(epo_path)
@@ -286,7 +274,7 @@ def gen_fooof_pngs(subjstruct):
     brain.close()
     
     png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
-    figname_alpha = op.join(png_path, 'sub-' + subjid + '_alpha.png')
+    figname_alpha = op.join(png_path, 'sub-' + subjid + '_beamformer.png')
     
     fig, ax = plt.subplots(2,2)
     ax[0][0].imshow(img1)

@@ -23,5 +23,6 @@ setuptools.setup(
                       'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids'], #'pyvista', 'pyqt5','pyvistaqt',
     scripts=['enigmeg/process_meg.py', 
              'enigmeg/process_anatomical.py',
-             'enigmeg/QA/prepare_QA.py'],
-)
+             'enigmeg/QA/enigma_prep_QA.py',
+	     'enigmeg/QA/Run_enigma_QA_GUI.py'],
+    include_package_data=True,)

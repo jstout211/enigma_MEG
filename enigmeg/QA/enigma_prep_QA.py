@@ -3,16 +3,14 @@
 """
 Created on Mon Mar 20 14:39:25 2023
 
-@author: nugenta
+@author: Allison Nugent and Jeff Stout
 """
 
-import mne
 import os, os.path as op
-from mne_bids import BIDSPath
 import argparse
-from enigmeg.process_meg import process, load_data
-from enigmeg.QA.QA_functions import gen_coreg_pngs, gen_bem_pngs, gen_src_pngs, gen_surf_pngs
-from enigmeg.QA.QA_functions import gen_epo_pngs, gen_fooof_pngs
+from enigmeg.process_meg import process
+from enigmeg.QA.enigma_QA_functions import gen_coreg_pngs, gen_bem_pngs, gen_src_pngs, gen_surf_pngs
+from enigmeg.QA.enigma_QA_functions import gen_epo_pngs, gen_fooof_pngs
 import sys
 
 def _prepare_QA(subjstruct):
