@@ -25,4 +25,4 @@ setuptools.setup(
              'enigmeg/process_anatomical.py',
              'enigmeg/QA/enigma_prep_QA.py',
 	     'enigmeg/QA/Run_enigma_QA_GUI.py'],
-    include_package_data=True,)
+    )
