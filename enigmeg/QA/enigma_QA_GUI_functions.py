@@ -168,7 +168,7 @@ def initialize(bids_root, QAtype):
         history_log=[i[:-1] for i in history_log if i[-1:]=='\n']
         return_log=True
     logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.INFO, 
-                        format='%(asctime)s:%(levelname)s:%(message)s')
+                        format='%(asctime)s::%(levelname)s::%(message)s')
     logging.info("REVIEW_START")
     if return_log==True:
         return history_log
@@ -249,6 +249,7 @@ def run_gui(sub_obj_list,rows=3,columns=2,imgsize=200, QAtype=None):
     while True:             # Event Loop
         event, values = window.read()
         if event in (sg.WIN_CLOSED, 'EXIT'):
+            write_logfile(sub_obj_list)
             break
         if event=='NEXT':
             if idx+GRID_SIZE[0]*GRID_SIZE[1] < len(sub_obj_list):
