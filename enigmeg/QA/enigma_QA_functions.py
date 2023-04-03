@@ -3,7 +3,7 @@
 """
 Created on Tue Mar 21 11:36:28 2023
 
-@author: Allison Nugent and chatGPT
+@author: Allison Nugent
 """
 
 import mne

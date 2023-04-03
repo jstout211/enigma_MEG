@@ -18,9 +18,11 @@ from enigmeg.mod_label_extract import mod_source_estimate
 import logging
 import munch 
 from collections import OrderedDict
+import subprocess
 import mne_bids
 from mne_bids import get_head_mri_trans
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
+import scipy as sp
 
 logger=logging.basicConfig()
 n_jobs = 5  #extract this from the configuration file
@@ -49,6 +51,7 @@ class process():
 # =============================================================================
 #         #Initialize variables
 # =============================================================================
+
         self.subject=subject.replace('sub-','')  #Strip header if present
         self.bids_root=bids_root
         if deriv_root is None:
@@ -84,15 +87,15 @@ class process():
             self._use_fsave_coreg=True
         else:
             self._use_fsave_coreg=False
-        
-        
-        
-        
-        
+            
+        self.anat_vars=munch.Munch()
+        self.anat_vars.fsdict = get_fs_filedict(self.subject,self.bids_root)
+        self.anat_vars.process_list = compile_fs_process_list(self)
             
 # =============================================================================
 #             Configure bids paths
 # =============================================================================
+
         self.bids_path = BIDSPath(
             root=bids_root, 
             subject=subject, 
@@ -152,6 +155,10 @@ class process():
         ## Setup bids paths for all 
         # Conversion to actual paths at end
         
+        _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii')
+        if not os.path.exists(_tmp['anat'].fpath):
+            _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii.gz')
+
         _tmp['raw_rest']=self.meg_rest_raw
         if emptyroom_tagname!=None:
             _tmp['raw_eroom']=self.meg_er_raw
@@ -192,10 +199,10 @@ class process():
                                f'sub-{self.subject}-fsaverage-morph.fif') 
         return munch.Munch(path_dict)
         
-        
 # =============================================================================
 #       Load data
 # =============================================================================
+
     def load_data(self):
         if not hasattr(self, 'raw_rest'):
             self.raw_rest = load_data(self.meg_rest_raw.fpath) 
@@ -203,22 +210,25 @@ class process():
         if (not hasattr(self, 'raw_eroom')) and (self.meg_er_raw != None):
             self.raw_eroom = load_data(self.meg_er_raw.fpath) 
             self.raw_eroom.pick_types(meg=True, eeg=False)
-        
+        # figure out the MEG system vendor, note that this may be different from 
+        # datatype if the datatype is .fif
+        self.vendor = mne.channels.channels._get_meg_system(self.raw_rest.info)
     
     def check_paths(self):
         '''Verify that the raw data is present and can be found'''
         try:
             self.meg_rest_raw.fpath  #Errors if not present
-            self.vendor, self.extra_params = check_datatype(str(self.meg_rest_raw.fpath))
+            self.datatype = check_datatype(str(self.meg_rest_raw.fpath))
+            
         except:
-            logging.exception(f'Could not find rest dataset:\n')
+            logging.exception(f'Could not find rest dataset:{self.meg_rest_raw.fpath}\n')
             
         if hasattr(self, 'meg_er_raw'): 
             if self.meg_er_raw != None:
                 try:
                     self.meg_er_raw.fpath
                 except:
-                    logging.exception(f'Could not find emptyroom dataset:\n')
+                    logging.exception(f'Could not find emptyroom dataset:{self.meg_er_raw.fpath}\n')
             else:
                 self.raw_eroom = None
         else:
@@ -230,40 +240,50 @@ class process():
             errtxt = f'There is no freesurfer folder for {self.subject}:\
                               \n{subj_fsdir}'.replace('  ',' ')
             logging.exception(errtxt)
-                         
-                         
 
 # =============================================================================
 #       Vendor specific prep
 # =============================================================================
+
     def vendor_prep(self):
         '''Different vendor types require special cleaning / initialization'''
         ## Elekta/MEGIN
-        if self.vendor == 'fif':
-            rest_bads_ = assess_bads(self.meg_rest_raw.fpath)
-            er_bads_ = assess_bads(self.meg_er_raw.fpath,
-                                   is_errom=True)
+        if self.vendor[0] == '306m' or self.vendor[0] == '122m':
+            rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor)
+            er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor, is_eroom=True)
+            all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
+                rest_bad + rest_flat + er_bad + er_flat
+            # remove duplicates
+            all_bad = list(set(all_bad))
             
-            self.raw_rest.info['bads'] = rest_bads_['noisy'] + rest_bads_['flat']
-            self.raw_eroom.info['bads'] = er_bads_['noisy'] + er_bads_['flat']
+            self.raw_rest.info['bads'] = all_bad
+            self.raw_eroom.info['bads'] = all_bad
         
-        ## CTF
-        if self.vendor == 'ctf':
+        ## everybody else
+        else:
             if self.raw_rest.compensation_grade != 3:
-                logging.info(f'Applying 3rd order gradient to rest data')
+                logging.info('Applying 3rd order gradient to rest data')
                 self.apply_gradient_compensation(3)
             if self.raw_eroom.compensation_grade != 3:
-                logging.info(f'Applying 3rd order gradient to emptyroom data')
+                logging.info('Applying 3rd order gradient to emptyroom data')
                 self.apply_gradient_compensation(3)
-        
-        ## 4D
-        
-        ## KIT 
-        
-            
+            rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor)
+            er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor, is_eroom=True)
+            all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
+                    rest_bad + rest_flat + er_bad + er_flat
+            # remove duplicates
+            all_bad = list(set(all_bad))
+                
+            self.raw_rest.info['bads'] = all_bad
+            self.raw_eroom.info['bads'] = all_bad    
+        print('bad or flat channels')
+        print(all_bad)           
+    
+                   
 # =============================================================================
 #       Preprocessing
 # =============================================================================
+
     def _preproc(self,
                 raw_inst=None,
                 deriv_path=None):
@@ -301,6 +321,7 @@ class process():
                               deriv_path=self.eroom_derivpath)
         
     def proc_mri(self, t1_override=None,redo_all=False):
+        
         if t1_override is not None:
             entities=mne_bids.get_entities_from_fname(t1_override)
             t1_bids_path = BIDSPath(**entities)
@@ -311,11 +332,26 @@ class process():
         # Configure filepaths
         os.environ['SUBJECTS_DIR']=self.subjects_dir
         deriv_path = self.rest_derivpath.copy()
+        
+        fs_subject = 'sub-' + self.subject
+        
+        fs_subject_dir = os.path.join(self.subjects_dir,fs_subject)
+        
+        if 'IsRunning.lh+rh' in os.listdir(os.path.join(fs_subject_dir, 'scripts')):
+            del_run_file=input('''The IsRunning.lh+rh file is present.  Could be from a broken process \
+                  or the process is currently running.  Do you want to delete to continue?(y/n)''')
+            if del_run_file.lower()=='y':
+                os.remove(os.path.join(fs_subject_dir, 'scripts','IsRunning.lh+rh'))
+                
+        for proc in self.anat_vars.process_list:
+            subcommand(proc)
+        
         # Update path so src/bem are not saved as task/run specific
         src_fname = deriv_path.copy().update(suffix='src', extension='.fif',
                                              task=None, run=None)
         bem_fname = deriv_path.copy().update(suffix='bem', extension='.fif',
                                              task=None, run=None)
+        
         # Specific to task = rest / run = run#
         fwd_fname = deriv_path.copy().update(suffix='fwd', extension='.fif')
         trans_fname = deriv_path.copy().update(suffix='trans',extension='.fif')
@@ -356,10 +392,18 @@ class process():
             if self._use_fsave_coreg==True:
                 trans = self.do_auto_coreg()
             else:
-                trans = get_head_mri_trans(self.meg_rest_raw,
+                if(self.datatype == 'fif'):
+                    trans = get_head_mri_trans(self.meg_rest_raw, {'allow_maxshield' : True},
                                            t1_bids_path=t1_bids_path,
-                                           fs_subject='sub-'+self.bids_path.subject,
-                                           extra_params=self.extra_params) 
+                                           fs_subject='sub-'+self.bids_path.subject) 
+                elif(self.datatype == 'ctf'):
+                    trans = get_head_mri_trans(self.meg_rest_raw, {'system_clock' : 'ignore'},
+                                           t1_bids_path=t1_bids_path,
+                                           fs_subject='sub-'+self.bids_path.subject)
+                else:
+                    trans = get_head_mri_trans(self.meg_rest_raw,
+                                           t1_bids_path=t1_bids_path,
+                                           fs_subject='sub-'+self.bids_path.subject)
             mne.write_trans(trans_fname.fpath, trans, overwrite=True)
         else:
             trans = mne.read_trans(trans_fname.fpath)
@@ -384,7 +428,7 @@ class process():
     def do_make_aparc_sub(self):
         write_aparc_sub(subjid=f'sub-{self.subject}', 
                         subjects_dir=self.subjects_dir)
-        
+         
     def do_beamformer(self):
         dat_cov = mne.read_cov(self.fnames.rest_cov)
         forward = mne.read_forward_solution(self.fnames.rest_fwd)
@@ -437,7 +481,7 @@ class process():
         #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
         self.label_ts = np.stack(label_ts)
         
-    def do_spectral_paramerization(self):
+    def do_spectral_parameterization(self):
         '''
         Passes spectra to fooof alg for peak and 1/f analysis
 
@@ -466,8 +510,9 @@ class process():
             current_psd = label_stack[:,label_idx, :].mean(axis=0) 
             label_power[label_idx,:] = current_psd
             
-            spectral_image_path = os.path.join(outfolder, 'Spectra_'+
-                                                labels[label_idx].name + '.png')   
+            #spectral_image_path = os.path.join(outfolder, 'Spectra_'+
+            #                                    labels[label_idx].name + '.png')   
+            spectral_image_path = None  ## supress output of spectra .png files for every region
     
             try:
                 tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
@@ -511,11 +556,11 @@ class process():
         output_dframe = pd.DataFrame(band_means, columns=bands_str, 
                                      index=label_names)
         output_dframe['AlphaPeak'] = alpha_peak
-        output_dframe.to_csv(output_filename, sep='\t')    
+        output_dframe.to_csv(output_filename, sep='\t')  
 
+        # output some freesurfer QA metrics
 
-
-        
+        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/{self.subject}_fsstats.tsv')          
         
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
@@ -528,13 +573,14 @@ class process():
         
     def do_proc_allsteps(self):
         self.load_data()
+        self.vendor_prep()
         self.do_preproc()
         self.do_proc_epochs()
         self.proc_mri(t1_override=self._t1_override)
         self.do_beamformer()
         self.do_make_aparc_sub()
         self.do_label_psds()
-        self.do_spectral_paramerization()
+        self.do_spectral_parameterization()
         
     
     def check_alignment(self):
@@ -546,21 +592,63 @@ class process():
                                     subjects_dir=self.subjects_dir,
                                     dig=True)
         
+def subcommand(function_str):
+    from subprocess import check_call
+    check_call(function_str.split(' '))
         
-      
+def compile_fs_process_list(process):
+    process_steps=[]
+    fs_subject = 'sub-'+process.subject
+    if not(process.anat_vars.fsdict['001mgz']):
+        process_steps.append('recon-all -i {} -s {}'.format(process.fnames['anat'], fs_subject))
+    if not(process.anat_vars.fsdict['brainmask']):
+        process_steps.append('recon-all -autorecon1 -s {}'.format(fs_subject))
+    if not(process.anat_vars.fsdict['lh_pial']):
+        process_steps.append('recon-all -autorecon2 -careg -s {}'.format(fs_subject))
+    if not(process.anat_vars.fsdict['lh_dkaparc']):
+        process_steps.append('recon-all -autorecon3 -s {}'.format(fs_subject))
+    return process_steps   
+        
 
+def get_fs_filedict(subject, bids_root):
+    subjects_dir = op.join(bids_root, 'derivatives', 'freesurfer', 'subjects')
+    
+    fs_dict = {}
+    # FS default files
+    fs_dict['001mgz'] = f'sub-{subject}/mri/orig/001.mgz'
+    fs_dict['brainmask'] = f'sub-{subject}/mri/brainmask.mgz'
+    fs_dict['lh_pial'] = f'sub-{subject}/surf/lh.pial'
+    fs_dict['rh_pial'] = f'sub-{subject}/surf/rh.pial'
+    fs_dict['lh_dkaparc'] = f'sub-{subject}/label/lh.aparc.DKTatlas.annot'
+    fs_dict['rh_dkaparc'] = f'sub-{subject}/label/rh.aparc.DKTatlas.annot'
+    
+    # FS - post process files
+    fs_dict['in_skull'] = f'sub-{subject}/bem/inner_skull.surf'
+    fs_dict['head'] = f'sub-{subject}/bem/sub-{subject}-head.fif'
+    fs_dict['head_dense'] = f'sub-{subject}/bem/sub-{subject}-head-dense.fif'
+    
+    # Morph maps for sub-aparc
+    fs_dict['morph'] = f'morph-maps/fsaverage-sub-{subject}-morph.fif'
+    
+    # Prepend subjects_dir
+    for key, value in fs_dict.items():
+        fs_dict[key] = op.join(subjects_dir,value)
+        if not op.exists(fs_dict[key]):
+            fs_dict[key]=False
+    return fs_dict
+ 
 def check_datatype(filename):
-    '''Check datatype based on the vendor naming convention'''
+    '''Check datatype based on the vendor naming convention to choose best loader'''
     if os.path.splitext(filename)[-1] == '.ds':
-        return 'ctf', dict(system_clock='ignore')
+        return 'ctf'
     elif os.path.splitext(filename)[-1] == '.fif':
-        return 'elekta', dict(allow_maxshield=True)
+        return 'fif'
     elif os.path.splitext(filename)[-1] == '.4d':
-        return '4d', None
+        return '4d'
     elif os.path.splitext(filename)[-1] == '.sqd':
-        return 'kit', None
+        return 'kit'
     elif os.path.splitext(filename)[-1] == 'con':
-        return 'kit', None
+        return 'kit'
     else:
         raise ValueError('Could not detect datatype')
         
@@ -568,39 +656,95 @@ def return_dataloader(datatype):
     '''Return the dataset loader for this dataset'''
     if datatype == 'ctf':
         return functools.partial(mne.io.read_raw_ctf, system_clock='ignore')
-    if datatype == 'elekta':
-        return mne.io.read_raw_fif
+    if datatype == 'fif':
+        return functools.partial(mne.io.read_raw_fif, allow_maxshield=True)
     if datatype == '4d':
         return mne.io.read_raw_bti
     if datatype == 'kit':
         return mne.io.read_raw_kit
 
 def load_data(filename):
-    datatype, _ = check_datatype(filename)
+    datatype = check_datatype(filename)
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
     return raw
 
-def assess_bads(raw_fname, is_eroom=False):
+def assess_bads(raw_fname, vendor, is_eroom=False):
     '''Code sampled from MNE python website
     https://mne.tools/dev/auto_tutorials/preprocessing/\
         plot_60_maxwell_filtering_sss.html'''
     from mne.preprocessing import find_bad_channels_maxwell
-    raw = mne.io.read_raw_fif(raw_fname)
+    # load data with load_data to ensure correct function is chosen
+    raw = load_data(raw_fname)    
     if raw.times[-1] > 60.0:
         raw.crop(tmax=60)    
     raw.info['bads'] = []
     raw_check = raw.copy()
-    if is_eroom==False:
-        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
-            raw_check, cross_talk=None, calibration=None,
-            return_scores=True, verbose=True)
-    else:
-        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
-            raw_check, cross_talk=None, calibration=None,
-            return_scores=True, verbose=True, coord_frame="meg")        
     
-    return {'noisy':auto_noisy_chs, 'flat':auto_flat_chs}            
+    if vendor == '306m' or vendor == '122m':
+        
+        if is_eroom==False:
+            auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+                raw_check, cross_talk=None, calibration=None,
+                return_scores=True, verbose=True)
+        else:
+            auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+                raw_check, cross_talk=None, calibration=None,
+                return_scores=True, verbose=True, coord_frame="meg")
+            
+        # find_bad_channels_maxwell is actually pretty bad at finding flat channels - 
+        # it uses a much too stringent threshold. So, we need some supplementary code
+        # This is extra complicated for Elekta/MEGIN, because there are both mags and 
+        # grads, which will be on a different scale
+            
+        mags = mne.pick_types(raw_check.info, meg='mag')
+        grads = mne.pick_types(raw_check.info, meg='grad')
+        # get the standard deviation for each channel, and the trimmed mean of the stds
+        # have to do this separately for mags and grads
+        stdraw_mags = np.std(raw_check._data[mags,:],axis=1)
+        stdraw_grads = np.std(raw_check._data[grads,:],axis=1)    
+        stdraw_trimmedmean_mags = sp.stats.trim_mean(stdraw_mags,0.1)
+        stdraw_trimmedmean_grads = sp.stats.trim_mean(stdraw_grads,0.1)
+        # we can't use the same threshold here, because grads have a much greater 
+        # variance in the variances 
+        flat_mags = np.where(stdraw_mags < stdraw_trimmedmean_mags/100)[0]
+        flat_grads = np.where(stdraw_grads < stdraw_trimmedmean_grads/1000)[0]
+        # need to use list comprehensions
+        flat_idx_mags = [flat_mags[i] for i in flat_mags.tolist()]
+        flat_idx_grads = [flat_grads[i] for i in flat_grads.tolist()]
+        flats = []
+        for flat in flat_idx_mags:
+            flats.append(raw_check.info['ch_names'][mags[flat_idx_mags]])
+        for flat in flat_idx_grads:
+            flats.append(raw_check.info['ch_names'][grads[flat_idx_grads]])
+        
+    # ignore references and use 'meg' coordinate frame for CTF and KIT
+    
+    else: 
+        
+        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+            raw_check, cross_talk=None, calibration=None, coord_frame='meg',
+            return_scores=True, verbose=True, ignore_ref=True)
+    
+    # again, finding flat/bad channels is not great, so we add another algorithm
+    # since other vendors don't mix grads and mags, we only need to do this for
+    # a single channel type
+    
+        megs = mne.pick_types(raw_check.info, meg=True)
+        # get the standard deviation for each channel, and the trimmed mean of the stds
+        stdraw_megs = np.std(raw_check._data[megs,:],axis=1)
+        stdraw_trimmedmean_megs = sp.stats.trim_mean(stdraw_megs,0.1)
+        flat_megs = np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]
+        # need to use list comprehensions
+        flat_idx_megs = [flat_megs[i] for i in flat_megs.tolist()]
+        flats = []
+        for flat in flat_idx_megs:
+            flats.append(raw_check.info['ch_names'][megs[flat_idx_mags]])    
+    
+    auto_flat_chs = auto_flat_chs + flats
+    auto_flat_chs = list(set(auto_flat_chs))
+            
+    return auto_noisy_chs, auto_flat_chs            
 
 def write_aparc_sub(subjid=None, subjects_dir=None):
     '''Check for fsaverage and aparc_sub and download
@@ -622,10 +766,6 @@ def write_aparc_sub(subjid=None, subjects_dir=None):
     mne.write_labels_to_annot(subject_labels, subject=subjid, 
                               parc='aparc_sub', subjects_dir=subjects_dir, 
                               overwrite=True)
-
-
-
-
 
 def load_test_data(**kwargs):
     proc = process(subject='ON02747',
@@ -653,8 +793,6 @@ def load_test_data_noer(**kwargs):
 # # For Testing run this cell
 # if __name__!='__main__':
 # proc = load_test_data(run='01')
-
-
 
 # !!! Fix hardcoded variables   
 def label_psd(epoch_vector, fs=None):
@@ -687,53 +825,53 @@ def get_freq_idx(bands, freq_bins):
     return output
 
 
-#%%
-def parse_proc_inputs(proc_file):
+#
+#def parse_proc_inputs(proc_file):
     # Load csv processing tab separated file
-    proc_dframe = pd.read_csv(proc_file, sep='\t')    
+#    proc_dframe = pd.read_csv(proc_file, sep='\t')    
     
     # Reject subjects with ignore flags
-    keep_idx = proc_dframe.ignore.isna()   #May want to make a list of possible ignores
-    proc_dframe = proc_dframe[keep_idx]
+#    keep_idx = proc_dframe.ignore.isna()   #May want to make a list of possible ignores
+#    proc_dframe = proc_dframe[keep_idx]
     
-    for idx, dseries in proc_dframe.iterrows():
-        print(dseries)
+#    for idx, dseries in proc_dframe.iterrows():
+#        print(dseries)
         
-        dseries['output_dir']=op.expanduser(dseries['output_dir'])
+#        dseries['output_dir']=op.expanduser(dseries['output_dir'])
         
-        from types import SimpleNamespace
-        info = SimpleNamespace()
-        info.SUBJECTS_DIR = dseries['fs_subjects_dir']
+#        from types import SimpleNamespace
+#        info = SimpleNamespace()
+#        info.SUBJECTS_DIR = dseries['fs_subjects_dir']
         
-        info.outfolder = op.join(dseries['output_dir'], dseries['subject'])
-        info.bem_sol_filename = op.join(info.outfolder, 'bem_sol-sol.fif') 
-        info.src_filename = op.join(info.outfolder, 'source_space-src.fif')
+#        info.outfolder = op.join(dseries['output_dir'], dseries['subject'])
+#       info.bem_sol_filename = op.join(info.outfolder, 'bem_sol-sol.fif') 
+#       info.src_filename = op.join(info.outfolder, 'source_space-src.fif')
         
-        os.environ['SUBJECTS_DIR']=dseries['fs_subjects_dir']
+#        os.environ['SUBJECTS_DIR']=dseries['fs_subjects_dir']
         
         #Determine if meg_file_path is a full path or relative path
-        if not op.isabs(dseries['meg_file_path']):
-            if op.isabs(dseries['meg_top_dir']):
-                dseries['meg_file_path'] = op.join(dseries['meg_top_dir'], 
-                                                   dseries['meg_file_path'])
-            else:
-                raise ValueError('This is not a valid path')
+#        if not op.isabs(dseries['meg_file_path']):
+#            if op.isabs(dseries['meg_top_dir']):
+#                dseries['meg_file_path'] = op.join(dseries['meg_top_dir'], 
+#                                                   dseries['meg_file_path'])
+#            else:
+#                raise ValueError('This is not a valid path')
         
         #Perform the same check on the emptyroom data
-        if not op.isabs(dseries['eroom_file_path']):
-            if op.isabs(dseries['meg_top_dir']):
-                dseries['eroom_file_path'] = op.join(dseries['meg_top_dir'], 
-                                                   dseries['eroom_file_path'])
-            else:
-                raise ValueError('This is not a valid path')        
+#       if not op.isabs(dseries['eroom_file_path']):
+#           if op.isabs(dseries['meg_top_dir']):
+#               dseries['eroom_file_path'] = op.join(dseries['meg_top_dir'], 
+#                                                  dseries['eroom_file_path'])
+#            else:
+#                raise ValueError('This is not a valid path')        
             
-        inputs = {'filename' : dseries['meg_file_path'],
-                  'subjid' : dseries['subject'],
-                  'trans' : dseries['trans_file'],
-                  'info' : info ,
-                  'line_freq' : dseries['line_freq'],
-                  'emptyroom_filename' : dseries['eroom_file_path']}
-        main(**inputs)
+#        inputs = {'filename' : dseries['meg_file_path'],
+#                  'subjid' : dseries['subject'],
+#                  'trans' : dseries['trans_file'],
+#                  'info' : info ,
+#                  'line_freq' : dseries['line_freq'],
+#                  'emptyroom_filename' : dseries['eroom_file_path']}
+#        main(**inputs)
 
 def plot_QA_head_sensor_align(info, raw, trans):
     '''Plot and save the head and sensor alignment and save to the output folder'''
@@ -766,29 +904,7 @@ def make_report(subject, subjects_dir, meg_filename, output_dir):
     
     report.parse_folder(output_dir, on_error='ignore', mri_decim=10)
     report_filename = op.join(output_dir, 'QA_report.html')
-    report.save(report_filename)
-
-def list_all_bids_subjects(bids_path):
-    '''
-    Return all subjects in the bids folder
-
-    Parameters
-    ----------
-    bids_path : path or mne_bids.BIDSPath
-        Either str or BIDSPath that contains bids root.
-
-    Returns
-    -------
-    subjects : list of str
-        Subjects list.
-
-    '''
-    if type(bids_path) is mne_bids.BIDSPath:
-        bids_path=str(bids_path.root)
-    subjects = glob.glob(op.join(bids_path, 'sub-*'))
-    subjects = [op.basename(i) for i in subjects] #Strip off the leading path
-    subjects = [str(i[4:]) if str(i)[0:4]=='sub-' else str(i) for i in subjects]
-    return subjects 
+    report.save(report_filename) 
 
 def process_subject(subject, args):
     proc = process(subject=subject, 
@@ -809,6 +925,7 @@ def process_subject(subject, args):
     
 if __name__=='__main__':
     import argparse
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('-bids_root',
                         help='''Top level directory of the bids data'''
@@ -817,7 +934,14 @@ if __name__=='__main__':
     #                     help='''Config file for processing data'''
     #                     )
     parser.add_argument('-subject',
-                        help='''Subject to process'''
+                        help='''BIDS ID of subject to process'''
+                        )
+    parser.add_argument('-subjects_dir',
+                        help='''Freesurfer subjects directory, only specify if not \
+                        bids_root/derivatives/freesurfer/subjects'''
+                        )
+    parser.add_argument('-fs_subject',
+                        help='''Freefurfer subject ID if different from BIDS ID'''
                         )
     parser.add_argument('-run',
                         help='''Run number.  \nNOTE: 01 is different from 1''',
@@ -850,25 +974,92 @@ if __name__=='__main__':
                         )
     parser.add_argument('-proc_all_subjects',
                         help='''Loop over all subjects in the bids_root
-                        and process.  Currently subject data needs to be configured 
-                        homogeneously according to the tags above'''
-                        action='store_true',
-                        default=False
+                        and process. Requires CSV file with processing manifest''',
+                        default=None
                         )
                             
         
     args = parser.parse_args()
+    
+    # set some defaults
+    
     if args.run.lower()=='none': args.run=None
     if args.session.lower()=='none': args.session=None
     if args.emptyroom_tag.lower()=='none': args.emptyroom_tag=None
     
-    if args.proc_all_subjects:
-        subjects = list_all_bids_subjects(arg.bids_root)
-    else if args.subject:
-        subjects = [args.subject]
+    if not args.bids_root:
+        bids_root = op.join(os.getcwd(), 'bids_out')
+    else:
+        bids_root=args.bids_root
+        
+    if not op.exists(bids_root):    # throw an error if the BIDS root directory doesn't exist
+        parser.print_help()
+        raise ValueError('Please specify a correct -bids_root')       
+        
+    # Users can use a separate freesurfer directory if they have already done freesurfer processing.
+    # If the $bids_root/derivatives/freesurfer/subjects doesn't already exist, create it
     
-    for subject in subjects:
-        process_subject(subject, args)
+    if not os.path.isdir(os.path.join(bids_root,'derivatives')):
+        os.makedirs(os.path.join(bids_root,'derivatives'))
+    if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer')):
+        os.makedirs(os.path.join(bids_root,'derivatives/freesurfer'))
+    if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer/subjects')):
+        os.makedirs(os.path.join(bids_root,'derivatives/freesurfer/subjects'))
+        
+    # We have to find out if there is an fsaverage in the freesurfer directory, and if there is, if 
+    # it is a sym link. If it's a link, it will break later one when we try to get the bem directory
+    
+    if os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer/subjects/fsaverage')):
+        if os.path.islink(os.path.join(bids_root,'derivatives/freesurfer/subjects/fsaverage')):
+            raise ValueError('$SUBJECTS_DIR/fsaverage cannot be a symlink; remove and rerun process_MEG to fetch data')
+            
+    # check and make sure all fsaverage files are present and download if not. 
+    mne.datasets.fetch_fsaverage(op.join(bids_root,'derivatives/freesurfer/subjects/'))
+        
+    # single subject vs. multiple subject processing.     
+    
+    if args.subject:    
+        print('processing a single subject %s' % args.subject)      
+            
+        # now, parse the inputs for freesurfer directory and subject (if not in derivatives)
+        # so freesurfer processing doesn't have to be repeated if it exists elsewhere
+    
+        if args.subjects_dir:
+            
+            dir_entered = os.path.abspath(args.subjects_dir) # get absolute paths to compare
+            default_dir = os.path.abspath(os.path.join(bids_root, '/derivatives/freesurfer/subjects'))
+            
+            if dir_entered == default_dir: # don't user -subjects_dir if using the default subjects_dir                
+                raise ValueError('Specified FS subjects dir same as default, please remove -subjects_dir and try again')
+                
+            if args.fs_subject:
+                if args.fs_subject == args.subject:
+                    raise ValueError('Specified FS subject ID is same as subject ID, please remove -fs_subject and try again')
+                else:
+                    # make a symbolic link from the existing freesurfer directory to the subjects directory 
+                    # in the derivatives folder in the bids tree. Make sure we match the bids name
+                    print('linking freesurfer subject %s to bids subject %s in derivatives folder',
+                                 (args.fs_subject, args.subject))
+                    subprocess.call(['ln','-s',os.path.join(dir_entered, args.fs_subject),
+                                 os.path.join(default_dir, 'sub-'+args.subject.replace('sub-',''))])
+                    
+            else: # case where a different subjects dir was entered, but not a separate fs ID
+                # make sure subjects directory exists with same ID as BIDS ID
+                if os.path.isdir(os.path.join(args.subjects_dir, 'sub-'+args.subject.replace('sub-',''))):
+                        subprocess.call(['ln','-s',os.path.join(args.subjectsdir, 'sub-'+args.subject.replace('sub-','')),
+                            os.path.join(default_dir, 'sub-'+args.subject.replace('sub-',''))])
+                else: 
+                    raise ValueError('No folder for subject in specified subjects_dir, please try again')
+      
+        process_subject(args.subject, args)  # process the single specified subject
+      
+        ## placeholder for multi subject processing. 
+               
+    elif args.proc_all_subjects:
+        print('Option not yet implemented, sorry, we are very tired ')
+        #subject_dframe = pd.read_csv(args.proc_all_subjects)
+        #subject_dframe.apply
+
         
      
 
