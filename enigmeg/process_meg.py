@@ -772,7 +772,7 @@ def check_datatype(filename):   # function to determine the file format of MEG d
         return 'ctf'
     elif os.path.splitext(filename)[-1] == '.fif':
         return 'fif'
-    elif os.path.splitext(filename)[-1] == '.4d':
+    elif os.path.splitext(filename)[-1] == '.4d' or ',' in filename:
         return '4d'
     elif os.path.splitext(filename)[-1] == '.sqd':
         return 'kit'
