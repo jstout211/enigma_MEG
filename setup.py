@@ -24,5 +24,6 @@ setuptools.setup(
     scripts=['enigmeg/process_meg.py', 
              'enigmeg/process_anatomical.py',
              'enigmeg/QA/enigma_prep_QA.py',
-	     'enigmeg/QA/Run_enigma_QA_GUI.py'],
+	     'enigmeg/QA/Run_enigma_QA_GUI.py',
+	     'enigmeg/parse_bids.py'],
     )

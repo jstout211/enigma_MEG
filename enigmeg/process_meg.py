@@ -8,7 +8,7 @@ Created on Fri Apr  3 16:08:12 2020
 """
 import os
 import os.path as op
-import glob
+import sys
 import mne
 from mne import Report
 import numpy as np
@@ -17,7 +17,6 @@ from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.mod_label_extract import mod_source_estimate
 import logging
 import munch 
-from collections import OrderedDict
 import subprocess
 import mne_bids
 from mne_bids import get_head_mri_trans
@@ -30,6 +29,8 @@ os.environ['n_jobs'] = str(n_jobs)
 
 from mne_bids import BIDSPath
 import functools
+
+# define a class that holds all the information about a single subject/session/run dataset for processing
 
 class process():
     def __init__(
@@ -45,14 +46,15 @@ class process():
             run='1',
             t1_override=None,
             fs_ave_fids=False, 
-            check_paths=True
+            check_paths=True,
+            csv_info=None
             ):
         
 # =============================================================================
-#         #Initialize variables
+#         # Initialize variables and directories
 # =============================================================================
 
-        self.subject=subject.replace('sub-','')  #Strip header if present
+        self.subject=subject.replace('sub-','')  # Strip sub- if present
         self.bids_root=bids_root
         if deriv_root is None:
             self.deriv_root = op.join(
@@ -62,12 +64,12 @@ class process():
         else:
             self.deriv_root = deriv_root
             
-        self.enigma_root = op.join(
+        self.enigma_root = op.join( # enigma output directory
             self.deriv_root,
             'ENIGMA_MEG'
             )
         
-        if subjects_dir is None:
+        if subjects_dir is None:    # Freesurfer subjects directory
             self.subjects_dir = op.join(
                 self.deriv_root,
                 'freesurfer',
@@ -82,15 +84,14 @@ class process():
         self.proc_vars['mains'] = mains
         self.proc_vars['epoch_len']=4.0  #seconds
         
-        self._t1_override = t1_override
+        # t1_override is used when you are processing a single subject (so csv_info=None) but the 
+        # name of the anatomical does not follow the same subj/ses/run hierarchy as the meg
+        
+        self._t1_override = t1_override   
         if fs_ave_fids==True:
             self._use_fsave_coreg=True
         else:
             self._use_fsave_coreg=False
-            
-        self.anat_vars=munch.Munch()
-        self.anat_vars.fsdict = get_fs_filedict(self.subject,self.bids_root)
-        self.anat_vars.process_list = compile_fs_process_list(self)
             
 # =============================================================================
 #             Configure bids paths
@@ -117,10 +118,13 @@ class process():
             run=run
             )
         
-        self.eroom_derivpath = self.deriv_path.copy().update(
-            task=emptyroom_tagname,
-            run=run
-            )
+        if emptyroom_tagname == None and not csv_info['eroom']:
+            self.eroom_derivpath = None
+        else:
+            self.eroom_derivpath = self.deriv_path.copy().update(
+                task=emptyroom_tagname,
+                run=run
+                )
         
         self.meg_rest_raw = self.bids_path.copy().update(
             datatype='meg', 
@@ -128,7 +132,7 @@ class process():
             run=run
             )
         
-        if emptyroom_tagname == None:
+        if emptyroom_tagname == None and not csv_info['eroom']:
             self.meg_er_raw = None
         else:
             self.meg_er_raw = self.bids_path.copy().update(
@@ -144,6 +148,119 @@ class process():
         if check_paths==True:
             self.check_paths()
             self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
+        elif csv_info is not None:
+            self.fnames=self.initialize_fromcsv(csv_info)
+            
+        self.anat_vars=munch.Munch()
+        self.anat_vars.fsdict = get_fs_filedict(self.subject,self.bids_root)
+        self.anat_vars.process_list = compile_fs_process_list(self)              
+
+            
+    # This function initializes the bids path structures for the case where the paths have
+    # been defined in a csv file, produced by parsing the BIDS tree. Note that the BidsPath
+    # objects are specified separately for the MEG, eroom, and anat
+            
+    def initialize_fromcsv(self, csv_info):
+        megpath=csv_info['path']            # get the filenames from the submitted csv row
+        mripath=csv_info['mripath']
+        eroompath=csv_info['eroom']
+        datatype=csv_info['type']
+        
+        _tmp=munch.Munch()                  # initialize a temporary variable
+        
+        # extract the entities for the MEG and update the relevant BIDS path objectss
+        entities = mne_bids.get_entities_from_fname(megpath)
+        
+        self.bids_path.update(
+            session=entities['session'])
+        self.deriv_path.update(
+            session=entities['session'],
+            extension=datatype)
+        self.rest_derivpath.update(
+            session=entities['session'],
+            task=entities['task'],
+            run=entities['run'],
+            suffix='meg',
+            extension='.fif')
+        self.meg_rest_raw.update(
+            session=entities['session'],
+            task=entities['task'],
+            run=entities['run'],
+            suffix='meg',
+            extension=datatype)
+        
+        # if there's an emptyroom path provided, extract the entities from the filepath
+        # and update the BIDS path objects
+        if eroompath != None:
+            entities = mne_bids.get_entities_from_fname(eroompath)
+            self.eroom_derivpath.update(
+                session=entities['session'],
+                task=entities['task'],
+                run=entities['run'],
+                suffix='meg',
+                extension='.fif')
+            self.meg_er_raw.update(
+                session=entities['session'],
+                task=entities['task'],
+                run=entities['run'],
+                suffix='meg',
+                extension=datatype)
+            
+        # Finally, extract the entities from the anatomical filename and update the 
+        # BIDS path object
+        
+        entities = mne_bids.get_entities_from_fname(mripath)
+        self.anat_bidspath.update(
+                session=entities['session'],
+                run=entities['run'])
+
+        # check if the anatomical is .nii or .nii.gz
+        
+        _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii')
+        if not os.path.exists(_tmp['anat'].fpath):
+            _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii.gz')
+
+        # populate the temporary dictionary _tmp with all the filenames
+        
+        _tmp['raw_rest']=self.meg_rest_raw
+        if eroompath!=None:
+            _tmp['raw_eroom']=self.meg_er_raw
+        
+        rest_deriv = self.rest_derivpath.copy().update(extension='.fif')
+        if eroompath!=None:
+            eroom_deriv = self.eroom_derivpath.copy().update(extension='.fif')
+  
+        _tmp['rest_filt']=rest_deriv.copy().update(processing='filt')
+        if eroompath!=None:
+            _tmp['eroom_filt']=eroom_deriv.copy().update(processing='filt')
+        
+        _tmp['rest_epo']=rest_deriv.copy().update(suffix='epo')
+        if eroompath!=None:
+            _tmp['eroom_epo']=eroom_deriv.copy().update(suffix='epo')
+        
+        _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
+        if eroompath!=None:
+            _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
+        
+        _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
+        _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
+        _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
+        _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
+        
+        _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', 
+                                                     run=self.meg_rest_raw.run,
+                                                     extension='.h5')
+        
+        # Cast all bids paths to paths and save as dictionary
+        path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
+        
+        # Additional non-bids path files
+        path_dict['parc'] = op.join(self.subjects_dir, 'morph-maps', 
+                               f'sub-{self.subject}-fsaverage-morph.fif') 
+        return munch.Munch(path_dict)
+    
+    # This function initializes all the filenames if a single subject has been requested
+    # rather than a csv from a parsed BIDS tree
     
     def initialize_fnames(self, rest_tagname, emptyroom_tagname):
         '''Use the bids paths to generate output names'''
@@ -198,7 +315,7 @@ class process():
         path_dict['parc'] = op.join(self.subjects_dir, 'morph-maps', 
                                f'sub-{self.subject}-fsaverage-morph.fif') 
         return munch.Munch(path_dict)
-        
+
 # =============================================================================
 #       Load data
 # =============================================================================
@@ -216,8 +333,8 @@ class process():
     
     def check_paths(self):
         '''Verify that the raw data is present and can be found'''
-        try:
-            self.meg_rest_raw.fpath  #Errors if not present
+        try:                            # Errors if MEG is not present
+            self.meg_rest_raw.fpath  
             self.datatype = check_datatype(str(self.meg_rest_raw.fpath))
             
         except:
@@ -225,7 +342,7 @@ class process():
             
         if hasattr(self, 'meg_er_raw'): 
             if self.meg_er_raw != None:
-                try:
+                try:                    # Error if empty room is specified but not present
                     self.meg_er_raw.fpath
                 except:
                     logging.exception(f'Could not find emptyroom dataset:{self.meg_er_raw.fpath}\n')
@@ -235,6 +352,7 @@ class process():
             self.meg_er_raw = None
             self.raw_eroom = None
         
+        # check if freesurfer directory is present for the subject
         subj_fsdir= op.join(f'{self.subjects_dir}', f'sub-{self.subject}')
         if not op.exists(subj_fsdir):
             errtxt = f'There is no freesurfer folder for {self.subject}:\
@@ -246,36 +364,35 @@ class process():
 # =============================================================================
 
     def vendor_prep(self):
-        '''Different vendor types require special cleaning / initialization'''
-        ## Elekta/MEGIN
-        if self.vendor[0] == '306m' or self.vendor[0] == '122m':
-            rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor)
-            er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor, is_eroom=True)
-            all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
-                rest_bad + rest_flat + er_bad + er_flat
-            # remove duplicates
-            all_bad = list(set(all_bad))
-            
-            self.raw_rest.info['bads'] = all_bad
-            self.raw_eroom.info['bads'] = all_bad
         
-        ## everybody else
-        else:
+        '''Different vendor types require special cleaning / initialization'''
+        
+        ## Apply 3rd order gradient for CTF datasets  
+        if self.vendor[0] == 'CTF_275':
             if self.raw_rest.compensation_grade != 3:
                 logging.info('Applying 3rd order gradient to rest data')
                 self.apply_gradient_compensation(3)
-            if self.raw_eroom.compensation_grade != 3:
-                logging.info('Applying 3rd order gradient to emptyroom data')
-                self.apply_gradient_compensation(3)
-            rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor)
-            er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor, is_eroom=True)
-            all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
-                    rest_bad + rest_flat + er_bad + er_flat
-            # remove duplicates
-            all_bad = list(set(all_bad))
-                
-            self.raw_rest.info['bads'] = all_bad
-            self.raw_eroom.info['bads'] = all_bad    
+            if hasattr(self, 'raw_eroom'):
+                if self.raw_eroom.compensation_grade != 3:
+                    logging.info('Applying 3rd order gradient to emptyroom data')
+                    self.apply_gradient_compensation(3)
+         
+            
+        rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
+        if hasattr(self, 'raw_eroom'):
+            er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
+        else:
+            er_bad = []
+            er_flat =[]
+        all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
+                rest_bad + rest_flat + er_bad + er_flat
+        # remove duplicates
+        all_bad = list(set(all_bad))
+            
+        self.raw_rest.info['bads'] = all_bad
+        if hasattr(self, 'raw_eroom'):
+            self.raw_eroom.info['bads'] = all_bad
+        
         print('bad or flat channels')
         print(all_bad)           
     
@@ -284,21 +401,22 @@ class process():
 #       Preprocessing
 # =============================================================================
 
-    def _preproc(self,
+    def _preproc(self,          # resampling, mains notch filtering, bandpass filtering
                 raw_inst=None,
                 deriv_path=None):
         raw_inst.resample(self.proc_vars['sfreq'], n_jobs=n_jobs)
         raw_inst.notch_filter(self.proc_vars['mains'], n_jobs=n_jobs) 
         raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'], n_jobs=n_jobs)
-        raw_inst.save(deriv_path.copy().update(processing='filt'), overwrite=True)
+        raw_inst.save(deriv_path.copy().update(processing='filt', extension='.fif'), 
+                      overwrite=True)
 
-    def do_preproc(self):
+    def do_preproc(self):       # proc both rest and empty room
         '''Preprocess both datasets'''
         self._preproc(raw_inst=self.raw_rest, deriv_path=self.rest_derivpath)
         if self.raw_eroom != None:
             self._preproc(raw_inst=self.raw_eroom, deriv_path=self.eroom_derivpath)
         
-    def _proc_epochs(self,
+    def _proc_epochs(self,      # divide the rest data into epochs
                      raw_inst=None,
                      deriv_path=None):
         '''Create and save epochs
@@ -306,22 +424,27 @@ class process():
         epochs = mne.make_fixed_length_epochs(raw_inst, 
                                               duration=self.proc_vars['epoch_len'], 
                                               preload=True)
-        epochs_fname = deriv_path.copy().update(suffix='epo')
+        epochs_fname = deriv_path.copy().update(suffix='epo', extension='.fif')
         epochs.save(epochs_fname, overwrite=True)
         
+        # compute the covariance for the epoched data
+        
         cov = mne.compute_covariance(epochs)
-        cov_fname = deriv_path.copy().update(suffix='cov')
+        cov_fname = deriv_path.copy().update(suffix='cov', extension='.fif')
         cov.save(cov_fname, overwrite=True)
         
-    def do_proc_epochs(self):
+    def do_proc_epochs(self):   # epoch both the rest and the empty room
         self._proc_epochs(raw_inst=self.raw_rest,
                           deriv_path=self.rest_derivpath)
         if self.raw_eroom != None:
             self._proc_epochs(raw_inst=self.raw_eroom, 
                               deriv_path=self.eroom_derivpath)
-        
+    
+    # Process the anatomical MRI
+    
     def proc_mri(self, t1_override=None,redo_all=False):
         
+        # if not provided with a separate T1 MRI filename, extract it from the BIDSpath objects
         if t1_override is not None:
             entities=mne_bids.get_entities_from_fname(t1_override)
             t1_bids_path = BIDSPath(**entities)
@@ -337,12 +460,14 @@ class process():
         
         fs_subject_dir = os.path.join(self.subjects_dir,fs_subject)
         
+        # check to see if Freesurfer is running (or if it crashed out)
         if 'IsRunning.lh+rh' in os.listdir(os.path.join(fs_subject_dir, 'scripts')):
             del_run_file=input('''The IsRunning.lh+rh file is present.  Could be from a broken process \
                   or the process is currently running.  Do you want to delete to continue?(y/n)''')
             if del_run_file.lower()=='y':
                 os.remove(os.path.join(fs_subject_dir, 'scripts','IsRunning.lh+rh'))
                 
+        # do all the remaining freesurfer processing steps        
         for proc in self.anat_vars.process_list:
             subcommand(proc)
         
@@ -355,7 +480,8 @@ class process():
         # Specific to task = rest / run = run#
         fwd_fname = deriv_path.copy().update(suffix='fwd', extension='.fif')
         trans_fname = deriv_path.copy().update(suffix='trans',extension='.fif')
-                
+
+        # check to see if stuff is there, and if it isn't, make it                
         if fwd_fname.fpath.exists() and (redo_all is False):
             fwd = mne.read_forward_solution(fwd_fname)
             self.rest_fwd = fwd
@@ -424,12 +550,15 @@ class process():
         coreg.fit_icp(n_iterations=6, nasion_weight=.5, hsp_weight= 5, verbose=True)
         return coreg.trans
             
-    
+    # make the parcellation and subparcellation
     def do_make_aparc_sub(self):
         write_aparc_sub(subjid=f'sub-{self.subject}', 
                         subjects_dir=self.subjects_dir)
          
-    def do_beamformer(self):
+    
+    def do_beamformer(self):    # Function to do the beamformer    
+        
+        # read in all the necessary files
         dat_cov = mne.read_cov(self.fnames.rest_cov)
         forward = mne.read_forward_solution(self.fnames.rest_fwd)
         epochs = mne.read_epochs(self.fnames.rest_epo)
@@ -460,7 +589,7 @@ class process():
         stcs = apply_lcmv_epochs(epochs, filters, return_generator=True) 
         self.stcs = stcs
         
-    def do_label_psds(self):
+    def do_label_psds(self):    # Function to label the psds
         labels_lh=mne.read_labels_from_annot(f'sub-{self.subject}',
                                              parc='aparc_sub',
                                             subjects_dir=self.subjects_dir,
@@ -560,7 +689,7 @@ class process():
 
         # output some freesurfer QA metrics
 
-        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/{self.subject}_fsstats.tsv')          
+        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/sub-{self.subject}_fsstats.tsv')          
         
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
@@ -571,7 +700,7 @@ class process():
         for i in missing:
             print(f'Missing: {self.fnames[i]}')
         
-    def do_proc_allsteps(self):
+    def do_proc_allsteps(self): # doo all the steps for single subject command line processing
         self.load_data()
         self.vendor_prep()
         self.do_preproc()
@@ -583,7 +712,7 @@ class process():
         self.do_spectral_parameterization()
         
     
-    def check_alignment(self):
+    def check_alignment(self): # test function to look at alignment - not called
         self.trans = mne.read_trans(self.fnames['rest_trans'])
         self.load_data()
         mne.viz.plot_alignment(self.raw_rest.info,
@@ -592,11 +721,11 @@ class process():
                                     subjects_dir=self.subjects_dir,
                                     dig=True)
         
-def subcommand(function_str):
+def subcommand(function_str):   # simple function to run something on the command line
     from subprocess import check_call
     check_call(function_str.split(' '))
         
-def compile_fs_process_list(process):
+def compile_fs_process_list(process):   # function to determine what freesurfer steps still must be run
     process_steps=[]
     fs_subject = 'sub-'+process.subject
     if not(process.anat_vars.fsdict['001mgz']):
@@ -610,7 +739,7 @@ def compile_fs_process_list(process):
     return process_steps   
         
 
-def get_fs_filedict(subject, bids_root):
+def get_fs_filedict(subject, bids_root):    # make a dictionary of freesurfer filenames
     subjects_dir = op.join(bids_root, 'derivatives', 'freesurfer', 'subjects')
     
     fs_dict = {}
@@ -637,7 +766,7 @@ def get_fs_filedict(subject, bids_root):
             fs_dict[key]=False
     return fs_dict
  
-def check_datatype(filename):
+def check_datatype(filename):   # function to determine the file format of MEG data 
     '''Check datatype based on the vendor naming convention to choose best loader'''
     if os.path.splitext(filename)[-1] == '.ds':
         return 'ctf'
@@ -652,7 +781,7 @@ def check_datatype(filename):
     else:
         raise ValueError('Could not detect datatype')
         
-def return_dataloader(datatype):
+def return_dataloader(datatype):   # function to return a data loader based on file format
     '''Return the dataset loader for this dataset'''
     if datatype == 'ctf':
         return functools.partial(mne.io.read_raw_ctf, system_clock='ignore')
@@ -663,13 +792,13 @@ def return_dataloader(datatype):
     if datatype == 'kit':
         return mne.io.read_raw_kit
 
-def load_data(filename):
+def load_data(filename):    # simple function to load raw MEG data
     datatype = check_datatype(filename)
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
     return raw
 
-def assess_bads(raw_fname, vendor, is_eroom=False):
+def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad channels
     '''Code sampled from MNE python website
     https://mne.tools/dev/auto_tutorials/preprocessing/\
         plot_60_maxwell_filtering_sss.html'''
@@ -720,15 +849,36 @@ def assess_bads(raw_fname, vendor, is_eroom=False):
         
     # ignore references and use 'meg' coordinate frame for CTF and KIT
     
+    if vendor == 'CTF_275':
+        raw_check.apply_gradient_compensation(0)
+        auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
+            raw_check, cross_talk=None, calibration=None, coord_frame='meg',
+            return_scores=True, verbose=True, ignore_ref=True)
+        
+        # again, finding flat/bad channels is not great, so we add another algorithm
+        # since other vendors don't mix grads and mags, we only need to do this for
+        # a single channel type
+        
+        megs = mne.pick_types(raw_check.info, meg=True)
+        # get the standard deviation for each channel, and the trimmed mean of the stds
+        stdraw_megs = np.std(raw_check._data[megs,:],axis=1)
+        stdraw_trimmedmean_megs = sp.stats.trim_mean(stdraw_megs,0.1)
+        flat_megs = np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]
+        # need to use list comprehensions
+        flat_idx_megs = [flat_megs[i] for i in flat_megs.tolist()]
+        flats = []
+        for flat in flat_idx_megs:
+            flats.append(raw_check.info['ch_names'][megs[flat_idx_mags]]) 
+    
     else: 
         
         auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
             raw_check, cross_talk=None, calibration=None, coord_frame='meg',
             return_scores=True, verbose=True, ignore_ref=True)
     
-    # again, finding flat/bad channels is not great, so we add another algorithm
-    # since other vendors don't mix grads and mags, we only need to do this for
-    # a single channel type
+        # again, finding flat/bad channels is not great, so we add another algorithm
+        # since other vendors don't mix grads and mags, we only need to do this for
+        # a single channel type
     
         megs = mne.pick_types(raw_check.info, meg=True)
         # get the standard deviation for each channel, and the trimmed mean of the stds
@@ -972,39 +1122,48 @@ if __name__=='__main__':
                         action='store_true',
                         default=False
                         )
-    parser.add_argument('-proc_all_subjects',
+    parser.add_argument('-proc_fromcsv',
                         help='''Loop over all subjects in the bids_root
                         and process. Requires CSV file with processing manifest''',
                         default=None
                         )
-                            
-        
+                                   
     args = parser.parse_args()
+        
+    # print help if no arguments
+    if len(sys.argv) == 1:
+        parser.print_help()
+        parser.exit(1) 
     
     # set some defaults
-    
-    if args.run.lower()=='none': args.run=None
-    if args.session.lower()=='none': args.session=None
-    if args.emptyroom_tag.lower()=='none': args.emptyroom_tag=None
+    if args.run:
+        if args.run.lower()=='none': args.run=None
+    if args.session:
+        if args.session.lower()=='none': args.session=None
+    if args.emptyroom_tag:
+        if args.emptyroom_tag.lower()=='none': args.emptyroom_tag=None
     
     if not args.bids_root:
         bids_root = op.join(os.getcwd(), 'bids_out')
+        args.bids_root = bids_root
     else:
         bids_root=args.bids_root
         
     if not op.exists(bids_root):    # throw an error if the BIDS root directory doesn't exist
         parser.print_help()
-        raise ValueError('Please specify a correct -bids_root')       
+        raise ValueError('Please specify a correct -bids_root')     
         
     # Users can use a separate freesurfer directory if they have already done freesurfer processing.
-    # If the $bids_root/derivatives/freesurfer/subjects doesn't already exist, create it
-    
-    if not os.path.isdir(os.path.join(bids_root,'derivatives')):
-        os.makedirs(os.path.join(bids_root,'derivatives'))
-    if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer')):
-        os.makedirs(os.path.join(bids_root,'derivatives/freesurfer'))
-    if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer/subjects')):
-        os.makedirs(os.path.join(bids_root,'derivatives/freesurfer/subjects'))
+    # If the $bids_root/derivatives/freesurfer/subjects doesn't already exist, create it   
+     
+    if not args.subjects_dir:
+        args.subjects_dir = f'{bids_root}/derivatives/freesurfer/subjects'
+        if not os.path.isdir(os.path.join(bids_root,'derivatives')):
+            os.makedirs(os.path.join(bids_root,'derivatives'))
+        if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer')):
+            os.makedirs(os.path.join(bids_root,'derivatives/freesurfer'))
+        if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer/subjects')):
+            os.makedirs(os.path.join(bids_root,'derivatives/freesurfer/subjects'))
         
     # We have to find out if there is an fsaverage in the freesurfer directory, and if there is, if 
     # it is a sym link. If it's a link, it will break later one when we try to get the bem directory
@@ -1019,6 +1178,10 @@ if __name__=='__main__':
     # single subject vs. multiple subject processing.     
     
     if args.subject:    
+        
+        if args.proc_fromcsv != None:
+            raise ValueError("You can't specify both a subject id and a csv file, sorry")
+            
         print('processing a single subject %s' % args.subject)      
             
         # now, parse the inputs for freesurfer directory and subject (if not in derivatives)
@@ -1055,14 +1218,33 @@ if __name__=='__main__':
       
         ## placeholder for multi subject processing. 
                
-    elif args.proc_all_subjects:
-        print('Option not yet implemented, sorry, we are very tired ')
-        #subject_dframe = pd.read_csv(args.proc_all_subjects)
-        #subject_dframe.apply
-
+    elif args.proc_fromcsv:
         
-     
-
-    
-
-    
+        print('processing subject list from %s' % args.proc_fromcsv)
+        
+        dframe = pd.read_csv(args.proc_fromcsv, dtype={'sub':str, 'run':str, 'ses':str})
+        dframe = dframe.astype(object).replace(np.nan,None)
+        
+        for idx, row in dframe.iterrows():
+            
+            print(row)
+            if row['mripath'] == None:
+                print("Can't process subject %s, no MRI found" % args.subject)
+            
+            else:             
+                process_subj = process(subject = row['sub'],
+                                       bids_root = bids_root,
+                                       deriv_root = None,
+                                       subjects_dir = args.subjects_dir,
+                                       rest_tagname = None,
+                                       emptyroom_tagname = None,
+                                       session = str(row['ses']),
+                                       mains = args.mains,
+                                       run = str(row['run']),
+                                       t1_override=None,
+                                       fs_ave_fids=False,
+                                       check_paths=False,
+                                       csv_info=row)
+                process_subj.load_data()
+                process_subj.do_proc_allsteps()
+            
