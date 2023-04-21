@@ -22,13 +22,47 @@ import mne_bids
 from mne_bids import get_head_mri_trans
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import scipy as sp
+from mne_bids import BIDSPath
+import functools
 
-logger=logging.basicConfig()
+
 n_jobs = 5  #extract this from the configuration file
 os.environ['n_jobs'] = str(n_jobs)
 
-from mne_bids import BIDSPath
-import functools
+LOG_STYLE = 'DATETIME::LOGLEVEL::PROJECT::SUBJECT::MESSAGETAG::VALUE'
+LOG_DELIM = '::'
+logger = logging.getLogger()
+
+def get_subj_logger(subjid, session, log_dir=None):
+     '''Return the subject specific logger.
+     This is particularly useful in the multiprocessing where logging is not
+     necessarily in order'''
+     fmt = '%(asctime)s :: %(levelname)s :: %(message)s'
+     sub_ses = f'{subjid}_ses_{session}'
+     subj_logger = logging.getLogger(sub_ses)
+     if subj_logger.handlers != []:
+         # Check to make sure that more than one file handler is not added
+         tmp_ = [type(i) for i in subj_logger.handlers ]
+         if logging.FileHandler in tmp_:
+             return subj_logger
+     else:
+         fileHandle = logging.FileHandler(f'{log_dir}/{subjid}_ses-{session}_log.txt')
+         fileHandle.setLevel(logging.INFO)
+         fileHandle.setFormatter(logging.Formatter(fmt)) 
+         subj_logger.addHandler(fileHandle)
+         subj_logger.info('Initializing subject level enigma_anonymization log')
+     return subj_logger   
+
+
+#Decorator for functions
+def log(function):
+    def wrapper(*args, **kwargs):  
+        logger.info(f"{function.__name__}{LOG_DELIM}::START")
+        output = function(*args, **kwargs)
+        logger.info(f"{function.__name__}{LOG_DELIM}::COMPLETED")
+        return output
+    return wrapper
+
 
 # define a class that holds all the information about a single subject/session/run dataset for processing
 
@@ -320,6 +354,7 @@ class process():
 #       Load data
 # =============================================================================
 
+    @log
     def load_data(self):
         if not hasattr(self, 'raw_rest'):
             self.raw_rest = load_data(self.meg_rest_raw.fpath) 
@@ -331,6 +366,7 @@ class process():
         # datatype if the datatype is .fif
         self.vendor = mne.channels.channels._get_meg_system(self.raw_rest.info)
     
+    @log
     def check_paths(self):
         '''Verify that the raw data is present and can be found'''
         try:                            # Errors if MEG is not present
@@ -362,7 +398,7 @@ class process():
 # =============================================================================
 #       Vendor specific prep
 # =============================================================================
-
+    @log
     def vendor_prep(self):
         
         '''Different vendor types require special cleaning / initialization'''
@@ -401,6 +437,7 @@ class process():
 #       Preprocessing
 # =============================================================================
 
+    @log
     def _preproc(self,          # resampling, mains notch filtering, bandpass filtering
                 raw_inst=None,
                 deriv_path=None):
@@ -409,13 +446,15 @@ class process():
         raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'], n_jobs=n_jobs)
         raw_inst.save(deriv_path.copy().update(processing='filt', extension='.fif'), 
                       overwrite=True)
-
+        
+    @log
     def do_preproc(self):       # proc both rest and empty room
         '''Preprocess both datasets'''
         self._preproc(raw_inst=self.raw_rest, deriv_path=self.rest_derivpath)
         if self.raw_eroom != None:
             self._preproc(raw_inst=self.raw_eroom, deriv_path=self.eroom_derivpath)
-        
+    
+    @log
     def _proc_epochs(self,      # divide the rest data into epochs
                      raw_inst=None,
                      deriv_path=None):
@@ -432,7 +471,8 @@ class process():
         cov = mne.compute_covariance(epochs)
         cov_fname = deriv_path.copy().update(suffix='cov', extension='.fif')
         cov.save(cov_fname, overwrite=True)
-        
+    
+    @log
     def do_proc_epochs(self):   # epoch both the rest and the empty room
         self._proc_epochs(raw_inst=self.raw_rest,
                           deriv_path=self.rest_derivpath)
@@ -442,6 +482,7 @@ class process():
     
     # Process the anatomical MRI
     
+    @log
     def proc_mri(self, t1_override=None,redo_all=False):
         
         # if not provided with a separate T1 MRI filename, extract it from the BIDSpath objects
@@ -537,7 +578,8 @@ class process():
                                         n_jobs=n_jobs)
         self.rest_fwd=fwd
         mne.write_forward_solution(fwd_fname.fpath, fwd, overwrite=True)
-        
+    
+    @log
     def do_auto_coreg(self):
         '''Localize coarse fiducials based on fsaverage coregistration
         and fine tuned with iterative headshape fit.'''
@@ -551,11 +593,12 @@ class process():
         return coreg.trans
             
     # make the parcellation and subparcellation
+    @log
     def do_make_aparc_sub(self):
         write_aparc_sub(subjid=f'sub-{self.subject}', 
                         subjects_dir=self.subjects_dir)
          
-    
+    @log
     def do_beamformer(self):    # Function to do the beamformer    
         
         # read in all the necessary files
@@ -589,6 +632,7 @@ class process():
         stcs = apply_lcmv_epochs(epochs, filters, return_generator=True) 
         self.stcs = stcs
         
+    @log    
     def do_label_psds(self):    # Function to label the psds
         labels_lh=mne.read_labels_from_annot(f'sub-{self.subject}',
                                              parc='aparc_sub',
@@ -609,7 +653,8 @@ class process():
         
         #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
         self.label_ts = np.stack(label_ts)
-        
+    
+    @log    
     def do_spectral_parameterization(self):
         '''
         Passes spectra to fooof alg for peak and 1/f analysis
@@ -690,7 +735,8 @@ class process():
         # output some freesurfer QA metrics
 
         subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/sub-{self.subject}_fsstats.tsv')          
-        
+    
+    @log
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
         missing = [i for i in self.fnames if not op.exists(self.fnames[i])]
@@ -1057,6 +1103,8 @@ def make_report(subject, subjects_dir, meg_filename, output_dir):
     report.save(report_filename) 
 
 def process_subject(subject, args):
+    logger = get_subj_logger(subject, args.session, log_dir)
+    logger.info('Initializing structure')
     proc = process(subject=subject, 
             bids_root=args.bids_root, 
             deriv_root=None,
@@ -1129,6 +1177,9 @@ if __name__=='__main__':
                         )
                                    
     args = parser.parse_args()
+    
+    logger=logging.getLogger()
+    logging.basicConfig(level=logging.INFO)
         
     # print help if no arguments
     if len(sys.argv) == 1:
@@ -1174,10 +1225,19 @@ if __name__=='__main__':
             
     # check and make sure all fsaverage files are present and download if not. 
     mne.datasets.fetch_fsaverage(op.join(bids_root,'derivatives/freesurfer/subjects/'))
+    
+    log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'
+    if not os.path.isdir(os.path.join(bids_root,'derivatives/ENIGMA_MEG')):
+        os.makedirs(os.path.join(bids_root,'derivatives/ENIGMA_MEG'))
+    if not os.path.isdir(os.path.join(bids_root,'derivatives/ENIGMA_MEG/logs')):
+        os.makedirs(os.path.join(bids_root,'derivatives/ENIGMA_MEG/logs'))
         
     # single subject vs. multiple subject processing.     
     
     if args.subject:    
+        
+        args.subject=args.subject.replace('sub-','')
+        print(args.subject)
         
         if args.proc_fromcsv != None:
             raise ValueError("You can't specify both a subject id and a csv file, sorry")
@@ -1190,12 +1250,12 @@ if __name__=='__main__':
         if args.subjects_dir:
             
             dir_entered = os.path.abspath(args.subjects_dir) # get absolute paths to compare
-            default_dir = os.path.abspath(os.path.join(bids_root, '/derivatives/freesurfer/subjects'))
+            default_dir = os.path.abspath(os.path.join(bids_root, 'derivatives/freesurfer/subjects'))
             
             if dir_entered == default_dir: # don't user -subjects_dir if using the default subjects_dir                
-                raise ValueError('Specified FS subjects dir same as default, please remove -subjects_dir and try again')
+                print('Specified FS subjects dir same as default')
                 
-            if args.fs_subject:
+            elif args.fs_subject:
                 if args.fs_subject == args.subject:
                     raise ValueError('Specified FS subject ID is same as subject ID, please remove -fs_subject and try again')
                 else:
@@ -1209,14 +1269,17 @@ if __name__=='__main__':
             else: # case where a different subjects dir was entered, but not a separate fs ID
                 # make sure subjects directory exists with same ID as BIDS ID
                 if os.path.isdir(os.path.join(args.subjects_dir, 'sub-'+args.subject.replace('sub-',''))):
-                        subprocess.call(['ln','-s',os.path.join(args.subjectsdir, 'sub-'+args.subject.replace('sub-','')),
+                        subprocess.call(['ln','-s',os.path.join(args.subjects_dir, 'sub-'+args.subject.replace('sub-','')),
                             os.path.join(default_dir, 'sub-'+args.subject.replace('sub-',''))])
                 else: 
                     raise ValueError('No folder for subject in specified subjects_dir, please try again')
       
+        logger = get_subj_logger(args.subject, args.session, log_dir)
+        logger.info(f'processing subject {args.subject} session {args.session}')
+        
         process_subject(args.subject, args)  # process the single specified subject
       
-        ## placeholder for multi subject processing. 
+    ## batch processing from a .csv file
                
     elif args.proc_fromcsv:
         
@@ -1228,17 +1291,23 @@ if __name__=='__main__':
         for idx, row in dframe.iterrows():
             
             print(row)
+            
+            subject=row['sub']
+            session=str(row['ses'])
+            logger = get_subj_logger(subject, session, log_dir)
+            logger.info(f'processing subject {subject} session {session}')
+            
             if row['mripath'] == None:
                 print("Can't process subject %s, no MRI found" % args.subject)
             
             else:             
-                process_subj = process(subject = row['sub'],
+                process_subj = process(subject = subject,
                                        bids_root = bids_root,
                                        deriv_root = None,
                                        subjects_dir = args.subjects_dir,
                                        rest_tagname = None,
                                        emptyroom_tagname = None,
-                                       session = str(row['ses']),
+                                       session = session,
                                        mains = args.mains,
                                        run = str(row['run']),
                                        t1_override=None,
@@ -1247,4 +1316,4 @@ if __name__=='__main__':
                                        csv_info=row)
                 process_subj.load_data()
                 process_subj.do_proc_allsteps()
-            
+
