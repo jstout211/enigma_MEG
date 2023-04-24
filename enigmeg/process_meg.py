@@ -734,7 +734,7 @@ class process():
 
         # output some freesurfer QA metrics
 
-        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/sub-{self.subject}_fsstats.tsv')          
+        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
     
     @log
     def list_outputs(self):
