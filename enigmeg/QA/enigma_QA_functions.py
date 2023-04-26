@@ -19,7 +19,7 @@ def gen_coreg_pngs(subjstruct):
     from mne.viz import set_3d_view
     
     subjid = subjstruct.subject
-    
+    print(subjstruct.meg_rest_raw.fpath)
     subjstruct.raw_rest = load_data(subjstruct.meg_rest_raw.fpath)
    
     subjstruct.trans = mne.read_trans(subjstruct.fnames['rest_trans'])
@@ -48,7 +48,7 @@ def gen_coreg_pngs(subjstruct):
     ax[2].imshow(img3)
     tmp=ax[2].axis('off')
    
-    png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
+    png_path=subjstruct.QA_dir
     figname = op.join(png_path, 'sub-' + subjid + '_coreg.png')
     
     fig.savefig(figname, dpi=300,bbox_inches='tight')
@@ -57,16 +57,15 @@ def gen_coreg_pngs(subjstruct):
 def gen_bem_pngs(subjstruct):
     
     from mne.viz import plot_bem
-
-    
+  
     subjid = subjstruct.subject
     
     enigma_root = op.join(subjstruct.deriv_root, 'ENIGMA_MEG')
     enigma_subj_path = op.join(enigma_root, 'sub-' + subjid)
-    src_path = op.join(enigma_subj_path, 'meg/sub-' + subjid + '_src.fif')
+    src_path = subjstruct.fnames['src']
     src = mne.read_source_spaces(src_path, subjstruct.subjects_dir)
         
-    png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
+    png_path=png_path=subjstruct.QA_dir
     figname_bem = op.join(png_path, 'sub-' + subjid + '_bem.png')
     
     fig=plot_bem(subject='sub-'+subjid, subjects_dir=subjstruct.subjects_dir, brain_surfaces='white', 
@@ -84,10 +83,10 @@ def gen_src_pngs(subjstruct):
     
     enigma_root = op.join(subjstruct.deriv_root, 'ENIGMA_MEG')
     enigma_subj_path = op.join(enigma_root, 'sub-' + subjid)
-    src_path = op.join(enigma_subj_path, 'meg/sub-' + subjid + '_src.fif')
+    src_path = src_path = subjstruct.fnames['src']
     src = mne.read_source_spaces(src_path, subjstruct.subjects_dir)
 
-    png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
+    png_path=png_path=subjstruct.QA_dir
     figname_src = op.join(png_path, 'sub-' + subjid + '_src.png')
 
     fig=src.plot(subjects_dir=subjstruct.subjects_dir)
@@ -119,7 +118,7 @@ def gen_surf_pngs(subjstruct):
     
     subjid = subjstruct.subject
     
-    png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
+    png_path=png_path=subjstruct.QA_dir
     figname_surf = op.join(png_path, 'sub-' + subjid + '_surf.png')
     
     labels = mne.read_labels_from_annot('sub-'+subjid, subjects_dir=subjstruct.subjects_dir,
@@ -190,7 +189,7 @@ def gen_epo_pngs(subjstruct):
     
     subjid = subjstruct.subject
     
-    png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
+    png_path=png_path=subjstruct.QA_dir
     figname_epo_psd = op.join(png_path, 'sub-' + subjid + '_spectra.png')
     
     epo_path = subjstruct.rest_derivpath.copy().update(suffix='epo', extension='.fif')
@@ -207,7 +206,7 @@ def gen_fooof_pngs(subjstruct):
     
     subjid = subjstruct.subject
     
-    fooof_dir = subjstruct.deriv_root + '/ENIGMA_MEG/sub-' +subjid + '/meg/fooof_results'
+    fooof_dir = subjstruct.fooof_dir
     fooof_results = op.join(fooof_dir, 'Band_rel_power.csv')
     fooof_dframe = pd.read_csv(fooof_results, delimiter='\t')  
     fooof_dframe = fooof_dframe.rename(columns={'Unnamed: 0':'Parcel'})
@@ -273,7 +272,7 @@ def gen_fooof_pngs(subjstruct):
     img4=brain.screenshot()
     brain.close()
     
-    png_path=op.join(subjstruct.deriv_root,'ENIGMA_MEG_QA/' + 'sub-'+subjid)
+    png_path=png_path=subjstruct.QA_dir
     figname_alpha = op.join(png_path, 'sub-' + subjid + '_beamformer.png')
     
     fig, ax = plt.subplots(2,2)

@@ -34,6 +34,8 @@ epoch_len = 4.0
 mt_bandwidth = 2 # bandwidth for multitaper
 n_bins = 177
 
+logger=logging.getLogger()
+
 # Function to retrieve the subject/session specific logger
 
 def get_subj_logger(subjid, session, log_dir=None):
@@ -78,7 +80,7 @@ class process():
             subjects_dir=None,
             rest_tagname='rest',
             emptyroom_tagname='emptyroom',
-            session=1, 
+            session='1', 
             mains=60,
             run='1',
             t1_override=None,
@@ -104,6 +106,11 @@ class process():
         self.enigma_root = op.join( # enigma output directory
             self.deriv_root,
             'ENIGMA_MEG'
+            )
+        
+        self.QA_dir = op.join( # QA output directory
+            self.deriv_root,
+            'ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + session 
             )
         
         if subjects_dir is None:    # Freesurfer subjects directory
@@ -225,6 +232,8 @@ class process():
             run=entities['run'],
             suffix='meg',
             extension=datatype)
+        self.QA_dir = BIDSPath(root=self.QA_dir,subject=subject, session=session)
+
         
         # if there's an emptyroom path provided, extract the entities from the filepath
         # and update the BIDS path objects
@@ -287,6 +296,8 @@ class process():
         _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', 
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')
+        self.fooof_dir = self.deriv_path.directory / \
+            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
         
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -343,8 +354,10 @@ class process():
         
         _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', 
                                                      run=self.meg_rest_raw.run,
-                                                     extension='.h5')
-        
+                                                     extension='.h5')       
+        self.fooof_dir = self.deriv_path.directory / \
+            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+             
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
         

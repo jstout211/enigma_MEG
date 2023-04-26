@@ -206,5 +206,5 @@ if __name__=='__main__':
         allsubj_df = pd.concat([allsubj_df, subj_df])
 
     # save out the dataframe as a .csv file
-    allsubj_df.to_csv('ParsedBIDS_dataframe.csv')
+    allsubj_df.to_csv('ParsedBIDS_dataframe.csv', index=False)
     
