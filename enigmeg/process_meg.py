@@ -1153,7 +1153,7 @@ if __name__=='__main__':
                         and process. Requires CSV file with processing manifest''',
                         default=None
                         )
-    parser.add_argument('n_jobs',
+    parser.add_argument('-n_jobs',
                         help='''number of jobs to run concurrently for 
                         multithreaded operations''',
                         default=1
