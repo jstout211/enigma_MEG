@@ -25,13 +25,16 @@ import scipy as sp
 from mne_bids import BIDSPath
 import functools
 
+# define some variables
 
-n_jobs = 5  #extract this from the configuration file
-os.environ['n_jobs'] = str(n_jobs)
+fmin = 1
+fmax = 45
+sfreq = 300
+epoch_len = 4.0
+mt_bandwidth = 2 # bandwidth for multitaper
+n_bins = 177
 
-LOG_STYLE = 'DATETIME::LOGLEVEL::PROJECT::SUBJECT::MESSAGETAG::VALUE'
-LOG_DELIM = '::'
-logger = logging.getLogger()
+# Function to retrieve the subject/session specific logger
 
 def get_subj_logger(subjid, session, log_dir=None):
      '''Return the subject specific logger.
@@ -40,12 +43,11 @@ def get_subj_logger(subjid, session, log_dir=None):
      fmt = '%(asctime)s :: %(levelname)s :: %(message)s'
      sub_ses = f'{subjid}_ses_{session}'
      subj_logger = logging.getLogger(sub_ses)
-     if subj_logger.handlers != []:
-         # Check to make sure that more than one file handler is not added
+     if subj_logger.handlers != []: # if not first time requested, use the file handler already defined
          tmp_ = [type(i) for i in subj_logger.handlers ]
          if logging.FileHandler in tmp_:
              return subj_logger
-     else:
+     else: # first time requested, add the file handler
          fileHandle = logging.FileHandler(f'{log_dir}/{subjid}_ses-{session}_log.txt')
          fileHandle.setLevel(logging.INFO)
          fileHandle.setFormatter(logging.Formatter(fmt)) 
@@ -54,12 +56,13 @@ def get_subj_logger(subjid, session, log_dir=None):
      return subj_logger   
 
 
-#Decorator for functions
+#Decorator for logging functions
+
 def log(function):
     def wrapper(*args, **kwargs):  
-        logger.info(f"{function.__name__}{LOG_DELIM}::START")
+        logger.info(f"{function.__name__} :: START")
         output = function(*args, **kwargs)
-        logger.info(f"{function.__name__}{LOG_DELIM}::COMPLETED")
+        logger.info(f"{function.__name__} :: COMPLETED")
         return output
     return wrapper
 
@@ -111,12 +114,12 @@ class process():
                 )
         else:
             self.subjects_dir = subjects_dir
-        self.proc_vars=munch.Munch()
-        self.proc_vars['fmin'] = 1
-        self.proc_vars['fmax'] = 45
-        self.proc_vars['sfreq'] = 300
+        self.proc_vars=munch.Munch()    # set some parameters
+        self.proc_vars['fmin'] = fmin
+        self.proc_vars['fmax'] = fmax
+        self.proc_vars['sfreq'] = sfreq
         self.proc_vars['mains'] = mains
-        self.proc_vars['epoch_len']=4.0  #seconds
+        self.proc_vars['epoch_len']=epoch_len  #seconds
         
         # t1_override is used when you are processing a single subject (so csv_info=None) but the 
         # name of the anatomical does not follow the same subj/ses/run hierarchy as the meg
@@ -398,6 +401,7 @@ class process():
 # =============================================================================
 #       Vendor specific prep
 # =============================================================================
+
     @log
     def vendor_prep(self):
         
@@ -413,7 +417,7 @@ class process():
                     logging.info('Applying 3rd order gradient to emptyroom data')
                     self.apply_gradient_compensation(3)
          
-            
+        # run bad channel assessments on rest and emptyroom (if present)
         rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
         if hasattr(self, 'raw_eroom'):
             er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
@@ -425,6 +429,7 @@ class process():
         # remove duplicates
         all_bad = list(set(all_bad))
             
+        # mark bad/flat channels as such in datasets
         self.raw_rest.info['bads'] = all_bad
         if hasattr(self, 'raw_eroom'):
             self.raw_eroom.info['bads'] = all_bad
@@ -523,11 +528,11 @@ class process():
         trans_fname = deriv_path.copy().update(suffix='trans',extension='.fif')
 
         # check to see if stuff is there, and if it isn't, make it                
-        if fwd_fname.fpath.exists() and (redo_all is False):
+        if fwd_fname.fpath.exists() and (redo_all is False):        # forward solution
             fwd = mne.read_forward_solution(fwd_fname)
             self.rest_fwd = fwd
         
-        watershed_check_path=op.join(self.subjects_dir,
+        watershed_check_path=op.join(self.subjects_dir,             # watershed bem
                                      f'sub-{self.subject}',
                                      'bem',
                                      'inner_skull.surf'
@@ -547,7 +552,7 @@ class process():
         else:
             bem_sol = mne.read_bem_solution(bem_fname)
             
-        if (not src_fname.fpath.exists()) or (redo_all is True):
+        if (not src_fname.fpath.exists()) or (redo_all is True):    # source space
             src = mne.setup_source_space(f'sub-{self.subject}',
                                          spacing='oct6', add_dist='patch',
                                  subjects_dir=self.subjects_dir)
@@ -555,7 +560,7 @@ class process():
         else:
             src = mne.read_source_spaces(src_fname.fpath)
         
-        if (not trans_fname.fpath.exists()) or (redo_all is True):
+        if (not trans_fname.fpath.exists()) or (redo_all is True):  # transformation
             if self._use_fsave_coreg==True:
                 trans = self.do_auto_coreg()
             else:
@@ -574,6 +579,7 @@ class process():
             mne.write_trans(trans_fname.fpath, trans, overwrite=True)
         else:
             trans = mne.read_trans(trans_fname.fpath)
+        # make the forward solution
         fwd = mne.make_forward_solution(self.raw_rest.info, trans, src, bem_sol, eeg=False, 
                                         n_jobs=n_jobs)
         self.rest_fwd=fwd
@@ -633,7 +639,7 @@ class process():
         self.stcs = stcs
         
     @log    
-    def do_label_psds(self):    # Function to label the psds
+    def do_label_psds(self):    # Function to extract the psd for each label. Takes a long time. 
         labels_lh=mne.read_labels_from_annot(f'sub-{self.subject}',
                                              parc='aparc_sub',
                                             subjects_dir=self.subjects_dir,
@@ -664,8 +670,7 @@ class process():
         None.
 
         '''
-        #HACK HARDCODED FREQ BINS
-        freq_bins = np.linspace(1,45,177)    ######################################3######### FIX
+        freq_bins = np.linspace(fmin,fmax,n_bins)    ######################################3######### FIX
     
         #Initialize 
         labels = self.labels
@@ -721,8 +726,7 @@ class process():
         for mean_band, band_idx in enumerate(band_idxs):
             band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
         
-        output_filename = os.path.join(outfolder, 'Band_rel_power.csv')
-        
+        output_filename = os.path.join(outfolder, 'Band_rel_power.csv')       
     
         bands_str = [str(i) for i in bands]
         label_names = [i.name for i in labels]
@@ -736,7 +740,7 @@ class process():
 
         subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
     
-    @log
+    # hidden debugging function to list all output files generated
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
         missing = [i for i in self.fnames if not op.exists(self.fnames[i])]
@@ -745,7 +749,9 @@ class process():
         print('\n\n')
         for i in missing:
             print(f'Missing: {self.fnames[i]}')
-        
+    
+    # perform all processing steps on an instance of the process class
+    
     def do_proc_allsteps(self): # doo all the steps for single subject command line processing
         self.load_data()
         self.vendor_prep()
@@ -758,6 +764,7 @@ class process():
         self.do_spectral_parameterization()
         
     
+    # hidden debugging function to check alignment
     def check_alignment(self): # test function to look at alignment - not called
         self.trans = mne.read_trans(self.fnames['rest_trans'])
         self.load_data()
@@ -963,6 +970,7 @@ def write_aparc_sub(subjid=None, subjects_dir=None):
                               parc='aparc_sub', subjects_dir=subjects_dir, 
                               overwrite=True)
 
+# hidden testing functions
 def load_test_data(**kwargs):
     proc = process(subject='ON02747',
                         bids_root=op.expanduser('~/ds004215'),
@@ -974,6 +982,7 @@ def load_test_data(**kwargs):
     # proc.load_data()
     return proc
 
+# hidden testing functions
 def load_test_data_noer(**kwargs):
     proc = process(subject='ON02747',
                         bids_root=op.expanduser('~/ds004215'),
@@ -990,7 +999,7 @@ def load_test_data_noer(**kwargs):
 # if __name__!='__main__':
 # proc = load_test_data(run='01')
 
-# !!! Fix hardcoded variables   
+# calculate the psd for the epochs, currently not in use
 def label_psd(epoch_vector, fs=None):
     '''Calculate the source level power spectral density from the label epochs'''
     # from scipy.signal import welch
@@ -999,19 +1008,21 @@ def label_psd(epoch_vector, fs=None):
     from mne.time_frequency.multitaper import psd_array_multitaper
     epoch_spectra, freq_bins = psd_array_multitaper(epoch_vector, 
                                                     fs, 
-                                                    fmin=1, fmax=45,
-                                                    bandwidth=2, 
+                                                    fmin=fmin, fmax=fmax,
+                                                    bandwidth=mt_bandwidth, 
                                                     n_jobs=1, 
                                                     adaptive=True, 
                                                     low_bias=True) 
     
     return freq_bins, np.median(epoch_spectra, axis=0) 
 
+# calculate mean within frequency bands; currently not in use
 def frequency_band_mean(label_by_freq=None, freq_band_list=None):
     '''Calculate the mean within the frequency bands'''
     for freqs in freq_band_list:
         label_by_freq()
 
+# simple function to get frequency indices
 def get_freq_idx(bands, freq_bins):
     ''' Get the frequency indexes'''
     output=[]
@@ -1020,55 +1031,7 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
-
-#
-#def parse_proc_inputs(proc_file):
-    # Load csv processing tab separated file
-#    proc_dframe = pd.read_csv(proc_file, sep='\t')    
-    
-    # Reject subjects with ignore flags
-#    keep_idx = proc_dframe.ignore.isna()   #May want to make a list of possible ignores
-#    proc_dframe = proc_dframe[keep_idx]
-    
-#    for idx, dseries in proc_dframe.iterrows():
-#        print(dseries)
-        
-#        dseries['output_dir']=op.expanduser(dseries['output_dir'])
-        
-#        from types import SimpleNamespace
-#        info = SimpleNamespace()
-#        info.SUBJECTS_DIR = dseries['fs_subjects_dir']
-        
-#        info.outfolder = op.join(dseries['output_dir'], dseries['subject'])
-#       info.bem_sol_filename = op.join(info.outfolder, 'bem_sol-sol.fif') 
-#       info.src_filename = op.join(info.outfolder, 'source_space-src.fif')
-        
-#        os.environ['SUBJECTS_DIR']=dseries['fs_subjects_dir']
-        
-        #Determine if meg_file_path is a full path or relative path
-#        if not op.isabs(dseries['meg_file_path']):
-#            if op.isabs(dseries['meg_top_dir']):
-#                dseries['meg_file_path'] = op.join(dseries['meg_top_dir'], 
-#                                                   dseries['meg_file_path'])
-#            else:
-#                raise ValueError('This is not a valid path')
-        
-        #Perform the same check on the emptyroom data
-#       if not op.isabs(dseries['eroom_file_path']):
-#           if op.isabs(dseries['meg_top_dir']):
-#               dseries['eroom_file_path'] = op.join(dseries['meg_top_dir'], 
-#                                                  dseries['eroom_file_path'])
-#            else:
-#                raise ValueError('This is not a valid path')        
-            
-#        inputs = {'filename' : dseries['meg_file_path'],
-#                  'subjid' : dseries['subject'],
-#                  'trans' : dseries['trans_file'],
-#                  'info' : info ,
-#                  'line_freq' : dseries['line_freq'],
-#                  'emptyroom_filename' : dseries['eroom_file_path']}
-#        main(**inputs)
-
+# function for plotting head/meg alignment, not currently in use
 def plot_QA_head_sensor_align(info, raw, trans):
     '''Plot and save the head and sensor alignment and save to the output folder'''
     from mayavi import mlab
@@ -1091,6 +1054,7 @@ def plot_QA_head_sensor_align(info, raw, trans):
     fig.scene.save_png(op.join(outfolder, 'front_posQA.png'))
 
 
+# make a report. Currently not in use
 def make_report(subject, subjects_dir, meg_filename, output_dir):
     #Create report from output
     report = Report(image_format='png', subjects_dir=subjects_dir,
@@ -1101,6 +1065,7 @@ def make_report(subject, subjects_dir, meg_filename, output_dir):
     report.parse_folder(output_dir, on_error='ignore', mri_decim=10)
     report_filename = op.join(output_dir, 'QA_report.html')
     report.save(report_filename) 
+
 
 def process_subject(subject, args):
     logger = get_subj_logger(subject, args.session, log_dir)
@@ -1175,12 +1140,20 @@ if __name__=='__main__':
                         and process. Requires CSV file with processing manifest''',
                         default=None
                         )
+    parser.add_argument('n_jobs',
+                        help='''number of jobs to run concurrently for 
+                        multithreaded operations''',
+                        default=1
+                        )
                                    
     args = parser.parse_args()
     
     logger=logging.getLogger()
     logging.basicConfig(level=logging.INFO)
-        
+    
+    n_jobs = args.n_jobs  #extract this from the configuration file
+    os.environ['n_jobs'] = str(n_jobs)
+    
     # print help if no arguments
     if len(sys.argv) == 1:
         parser.print_help()
@@ -1288,7 +1261,7 @@ if __name__=='__main__':
         dframe = pd.read_csv(args.proc_fromcsv, dtype={'sub':str, 'run':str, 'ses':str})
         dframe = dframe.astype(object).replace(np.nan,None)
         
-        for idx, row in dframe.iterrows():
+        for idx, row in dframe.iterrows():  # iterate over each row in the .csv file
             
             print(row)
             
