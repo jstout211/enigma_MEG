@@ -1189,21 +1189,19 @@ if __name__=='__main__':
     if not op.exists(bids_root):    # throw an error if the BIDS root directory doesn't exist
         parser.print_help()
         raise ValueError('Please specify a correct -bids_root')     
-        
-    # Users can use a separate freesurfer directory if they have already done freesurfer processing.
-    # If the $bids_root/derivatives/freesurfer/subjects doesn't already exist, create it   
-     
-    if not args.subjects_dir:
-        args.subjects_dir = f'{bids_root}/derivatives/freesurfer/subjects'
-        if not os.path.isdir(os.path.join(bids_root,'derivatives')):
-            os.makedirs(os.path.join(bids_root,'derivatives'))
-        if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer')):
-            os.makedirs(os.path.join(bids_root,'derivatives/freesurfer'))
-        if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer/subjects')):
-            os.makedirs(os.path.join(bids_root,'derivatives/freesurfer/subjects'))
+    
+    # To make file handling easier, even if there is another subjects directory, we'll create one in 
+    # the BIDS derivatives/ folder and set up symbolic links there. 
+    
+    if not os.path.isdir(os.path.join(bids_root,'derivatives')):
+        os.makedirs(os.path.join(bids_root,'derivatives'))
+    if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer')):
+        os.makedirs(os.path.join(bids_root,'derivatives/freesurfer'))
+    if not os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer/subjects')):
+        os.makedirs(os.path.join(bids_root,'derivatives/freesurfer/subjects'))
         
     # We have to find out if there is an fsaverage in the freesurfer directory, and if there is, if 
-    # it is a sym link. If it's a link, it will break later one when we try to get the bem directory
+    # it is a sym link. If it's a link, it will break later when we try to get the bem directory
     
     if os.path.isdir(os.path.join(bids_root,'derivatives/freesurfer/subjects/fsaverage')):
         if os.path.islink(os.path.join(bids_root,'derivatives/freesurfer/subjects/fsaverage')):
@@ -1222,7 +1220,7 @@ if __name__=='__main__':
     
     if args.subject:    
         
-        args.subject=args.subject.replace('sub-','')
+        args.subject=args.subject.replace('sub-','') # strip the sub- off for uniformity
         print(args.subject)
         
         if args.proc_fromcsv != None:
@@ -1238,27 +1236,30 @@ if __name__=='__main__':
             dir_entered = os.path.abspath(args.subjects_dir) # get absolute paths to compare
             default_dir = os.path.abspath(os.path.join(bids_root, 'derivatives/freesurfer/subjects'))
             
-            if dir_entered == default_dir: # don't user -subjects_dir if using the default subjects_dir                
+            if dir_entered == default_dir: # don't use -subjects_dir if using the default subjects_dir                
                 print('Specified FS subjects dir same as default')
                 
             elif args.fs_subject:
-                if args.fs_subject == args.subject:
+                if args.fs_subject == ('sub-' + args.subject):
                     raise ValueError('Specified FS subject ID is same as subject ID, please remove -fs_subject and try again')
                 else:
                     # make a symbolic link from the existing freesurfer directory to the subjects directory 
                     # in the derivatives folder in the bids tree. Make sure we match the bids name
-                    print('linking freesurfer subject %s to bids subject %s in derivatives folder',
-                                 (args.fs_subject, args.subject))
+                    print('linking freesurfer subject %s to bids subject %s in derivatives folder',(args.fs_subject, args.subject))
                     subprocess.call(['ln','-s',os.path.join(dir_entered, args.fs_subject),
-                                 os.path.join(default_dir, 'sub-'+args.subject.replace('sub-',''))])
+                                 os.path.join(default_dir, 'sub-'+args.subject)])
                     
             else: # case where a different subjects dir was entered, but not a separate fs ID
                 # make sure subjects directory exists with same ID as BIDS ID
-                if os.path.isdir(os.path.join(args.subjects_dir, 'sub-'+args.subject.replace('sub-',''))):
-                        subprocess.call(['ln','-s',os.path.join(args.subjects_dir, 'sub-'+args.subject.replace('sub-','')),
-                            os.path.join(default_dir, 'sub-'+args.subject.replace('sub-',''))])
+                # make a symbolic link for the subject in the derivatives/freesurfer/subjects directory
+                if os.path.isdir(os.path.join(dir_entered, 'sub-'+args.subject)):
+                        subprocess.call(['ln','-s',os.path.join(dir_entered, 'sub-'+args.subject),
+                            os.path.join(default_dir, 'sub-'+args.subject)])
                 else: 
                     raise ValueError('No folder for subject in specified subjects_dir, please try again')
+            
+            # now that we've set up the symbolic links, we can now use the default subjects directory
+            args.subjects_dir = default_dir
       
         logger = get_subj_logger(args.subject, args.session, log_dir)
         logger.info(f'processing subject {args.subject} session {args.session}')
@@ -1268,6 +1269,20 @@ if __name__=='__main__':
     ## batch processing from a .csv file
                
     elif args.proc_fromcsv:
+        
+        # if the user specified a subjects_dir, check to see if it is the same as the default dir
+        if args.subjects_dir:
+                
+            dir_entered = os.path.abspath(args.subjects_dir) # get absolute paths to compare
+            default_dir = os.path.abspath(os.path.join(bids_root, 'derivatives/freesurfer/subjects'))
+            
+            if dir_entered == default_dir: # if the directories are the same, replace with absolute path
+                print('Specified FS subjects dir same as default')
+                args.subjects_dir = default_dir
+                need_link = False
+            else:
+                args.subjects_dir = dir_entered
+                need_link = True
         
         print('processing subject list from %s' % args.proc_fromcsv)
         
@@ -1279,11 +1294,15 @@ if __name__=='__main__':
             print(row)
             
             subject=row['sub']
+            subject = subject.replace('sub-','')
+            
             session=str(row['ses'])
             logger = get_subj_logger(subject, session, log_dir)
             logger.info(f'processing subject {subject} session {session}')
             
+
             if row['mripath'] == None:
+                logger.info('No MRI, cannot process any further')
                 print("Can't process subject %s, no MRI found" % args.subject)
             
             else:             

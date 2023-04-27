@@ -19,6 +19,9 @@ def gen_coreg_pngs(subjstruct):
     from mne.viz import set_3d_view
     
     subjid = subjstruct.subject
+    session = subjstruct.meg_rest_raw.session
+    run = subjstruct.meg_rest_raw.run
+    
     print(subjstruct.meg_rest_raw.fpath)
     subjstruct.raw_rest = load_data(subjstruct.meg_rest_raw.fpath)
    
@@ -49,7 +52,8 @@ def gen_coreg_pngs(subjstruct):
     tmp=ax[2].axis('off')
    
     png_path=subjstruct.QA_dir
-    figname = op.join(png_path, 'sub-' + subjid + '_coreg.png')
+
+    figname = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_coreg.png')
     
     fig.savefig(figname, dpi=300,bbox_inches='tight')
     plt.close(fig)
@@ -59,6 +63,8 @@ def gen_bem_pngs(subjstruct):
     from mne.viz import plot_bem
   
     subjid = subjstruct.subject
+    session = subjstruct.meg_rest_raw.session
+    run = subjstruct.meg_rest_raw.run
     
     enigma_root = op.join(subjstruct.deriv_root, 'ENIGMA_MEG')
     enigma_subj_path = op.join(enigma_root, 'sub-' + subjid)
@@ -66,7 +72,8 @@ def gen_bem_pngs(subjstruct):
     src = mne.read_source_spaces(src_path, subjstruct.subjects_dir)
         
     png_path=png_path=subjstruct.QA_dir
-    figname_bem = op.join(png_path, 'sub-' + subjid + '_bem.png')
+
+    figname_bem = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_bem.png')
     
     fig=plot_bem(subject='sub-'+subjid, subjects_dir=subjstruct.subjects_dir, brain_surfaces='white', 
              slices=[50, 100, 150, 200], show=False, show_indices=True, mri='T1.mgz', show_orientation=True)
@@ -80,6 +87,8 @@ def gen_src_pngs(subjstruct):
     import matplotlib.image as img
     
     subjid = subjstruct.subject
+    session = subjstruct.meg_rest_raw.session
+    run = subjstruct.meg_rest_raw.run
     
     enigma_root = op.join(subjstruct.deriv_root, 'ENIGMA_MEG')
     enigma_subj_path = op.join(enigma_root, 'sub-' + subjid)
@@ -87,7 +96,8 @@ def gen_src_pngs(subjstruct):
     src = mne.read_source_spaces(src_path, subjstruct.subjects_dir)
 
     png_path=png_path=subjstruct.QA_dir
-    figname_src = op.join(png_path, 'sub-' + subjid + '_src.png')
+
+    figname_src = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_src.png')
 
     fig=src.plot(subjects_dir=subjstruct.subjects_dir)
     set_3d_view(fig,**views_dicts['both']['frontal'])
@@ -117,9 +127,11 @@ def gen_surf_pngs(subjstruct):
     Brain = mne.viz.get_brain_class()
     
     subjid = subjstruct.subject
+    session = subjstruct.meg_rest_raw.session
+    run = subjstruct.meg_rest_raw.run
     
     png_path=png_path=subjstruct.QA_dir
-    figname_surf = op.join(png_path, 'sub-' + subjid + '_surf.png')
+    figname_surf = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_surf.png')
     
     labels = mne.read_labels_from_annot('sub-'+subjid, subjects_dir=subjstruct.subjects_dir,
                                         parc='aparc', hemi='both',surf_name='white')
@@ -188,9 +200,11 @@ def gen_surf_pngs(subjstruct):
 def gen_epo_pngs(subjstruct):
     
     subjid = subjstruct.subject
+    session = subjstruct.meg_rest_raw.session
+    run = subjstruct.meg_rest_raw.run
     
     png_path=png_path=subjstruct.QA_dir
-    figname_epo_psd = op.join(png_path, 'sub-' + subjid + '_spectra.png')
+    figname_epo_psd = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_spectra.png')
     
     epo_path = subjstruct.rest_derivpath.copy().update(suffix='epo', extension='.fif')
     epochs = mne.read_epochs(epo_path)
@@ -205,6 +219,8 @@ def gen_fooof_pngs(subjstruct):
     import numpy as np
     
     subjid = subjstruct.subject
+    session = subjstruct.meg_rest_raw.session
+    run = subjstruct.meg_rest_raw.run
     
     fooof_dir = subjstruct.fooof_dir
     fooof_results = op.join(fooof_dir, 'Band_rel_power.csv')
@@ -273,7 +289,7 @@ def gen_fooof_pngs(subjstruct):
     brain.close()
     
     png_path=png_path=subjstruct.QA_dir
-    figname_alpha = op.join(png_path, 'sub-' + subjid + '_beamformer.png')
+    figname_alpha = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_beamformer.png')
     
     fig, ax = plt.subplots(2,2)
     ax[0][0].imshow(img1)

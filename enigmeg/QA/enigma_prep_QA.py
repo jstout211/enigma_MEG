@@ -35,7 +35,6 @@ if __name__=='__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-bids_root', help='''BIDS root directory''')
-    parser.add_argument('-subjects_dir', help='''Freesurfer subjects_dir can be assigned at the commandline if not already exported''')
     parser.add_argument('-subjid', help='''Define the subject id to process''')
     parser.add_argument('-session', help='''Session number''', default=None)
     parser.add_argument('-run', help='''Run number, note that 01 is different from 1''', default='1')
@@ -62,10 +61,7 @@ if __name__=='__main__':
     if not op.exists(enigma_root):
         raise ValueError('No ENIGMA_MEG directory - did you run process_meg.py?')
                 
-    if args.subjects_dir == None:
-        subjects_dir = op.join(derivatives_dir,'freesurfer/subjects')
-    else:
-        subjects_dir = args.subjects_dir      
+    subjects_dir = op.join(derivatives_dir,'freesurfer/subjects')  
 
     QA_dir = op.join(derivatives_dir,'ENIGMA_MEG_QA/')
 
