@@ -3,106 +3,82 @@
 """
 Created on Tue Mar  9 16:26:19 2021
 
-@author: stoutjd
+@author: MNE python and A Nugent
 """
-#!
-######
-# Need to determine the number of bins for freqs to use as output of extract labels
-# Need to also determine the sampling frequency - currently hard coded in _pca15_fft
-####
-
-import mne
-from mne import source_estimate as mod_source_estimate
-import numpy as np
-from numpy import linalg
-from mne.time_frequency import psd_array_multitaper
-from scipy.stats import trim_mean
-import os
-
-num_freq_bins=177  #Hardcoded freq bins - Bad form
-
-
-
-def _pca15_fft(flip, data):
-    U, s, V = linalg.svd(data, full_matrices=False)
-    
-    maxeig=15
-    if 'n_jobs' in os.environ:
-        n_jobs = int(os.environ['n_jobs'])
-    else:
-        n_jobs=1
-    # use average power in label for scaling
-    epoch_spectra, freq_bins = psd_array_multitaper(V[0:maxeig], 
-                                                300,                    #!!!!################ HardCodede
-                                                fmin=1, fmax=45,
-                                                bandwidth=2, 
-                                                n_jobs=n_jobs, 
-                                                adaptive=True, 
-                                                low_bias=True, 
-                                                normalization='full') 
-    
-    eigval_weighted_spectra=s[0:maxeig,np.newaxis]*epoch_spectra
-    
-    # Reject top and bottom 10% using trimmed mean
-    output_spectra = trim_mean(eigval_weighted_spectra, 0.1, axis=0)
-    # Normalize by number of samples
-    normalized_spectra = output_spectra / np.sqrt(len(data))
-    return  output_spectra 
-
-from mne.source_estimate import _label_funcs
-_label_funcs['pca15_multitaper']=_pca15_fft
-
-
-
-'''
-The code below is from mne python 0.21.1
-Changes were made to utilize the extract label function while
-modifying the extraction process.  
-
-This will be monkeypatched into the processing before calling
-
-'''
-from mne.source_estimate import _validate_type, _check_option, _volume_labels,\
-    SourceSpaces, _prepare_label_extraction
 import copy
 import numpy as np
-_label_funcs=mod_source_estimate._label_funcs
-    
-def mod_gen_extract_label_time_course(stcs, labels, src, mode='mean',
-                                   allow_empty=False, trans=None,
+
+from mne.fixes import _safe_svd
+from mne.source_space import SourceSpaces
+from mne.utils import (logger, _validate_type)
+
+from mne import source_estimate as mod_source_estimate
+
+
+from mne.source_estimate import (_pca_flip, _volume_labels,
+        _BaseSourceEstimate,_BaseVolSourceEstimate,_BaseVectorSourceEstimate,
+        _prepare_label_extraction)
+
+
+
+def _pca(flip, data):
+    U, s, V = _safe_svd(data, full_matrices=False)
+    # determine sign-flip
+    # use average power in label for scaling
+    scale = np.linalg.norm(s) / np.sqrt(len(data))
+    if np.mean(V[0]<0):
+        sign=-1
+    else:
+        sign=1
+    return sign * scale * V[0]
+
+_label_funcs = {
+    'mean': lambda flip, data: np.mean(data, axis=0),
+    'mean_flip': lambda flip, data: np.mean(flip * data, axis=0),
+    'max': lambda flip, data: np.max(np.abs(data), axis=0),
+    'pca_flip': _pca_flip,
+    'pca': _pca
+}
+
+def mod_gen_extract_label_time_course(stcs, labels, src, *, mode='mean',
+                                   allow_empty=False,
                                    mri_resolution=True, verbose=None):
     # loop through source estimates and extract time series
-    # _validate_type(src, SourceSpaces)
-    # _check_option('mode', mode, sorted(_label_funcs.keys()) + ['auto'])
+    from scipy import sparse
+    if src is None and mode in ['mean', 'max', 'pca']:
+        kind = 'surface'
+    else:
+        _validate_type(src, SourceSpaces)
+        kind = src.kind
+    #_check_option('mode', mode, _get_default_label_modes())
 
-    # kind = src.kind
-    # if kind in ('surface', 'mixed'):
-    #     if not isinstance(labels, list):
-    #         labels = [labels]
-    #     use_sparse = False
-    # else:
-    #     labels = _volume_labels(src, labels, trans, mri_resolution)
-    #     use_sparse = bool(mri_resolution)
+    if kind in ('surface', 'mixed'):
+        if not isinstance(labels, list):
+            labels = [labels]
+        use_sparse = False
+    else:
+        labels = _volume_labels(src, labels, mri_resolution)
+        use_sparse = bool(mri_resolution)
     n_mode = len(labels)  # how many processed with the given mode
-    n_mean = 0 # len(src[2:]) #if kind == 'mixed' else 0
+    n_mean = len(src[2:]) if kind == 'mixed' else 0
     n_labels = n_mode + n_mean
     vertno = func = None
     for si, stc in enumerate(stcs):
-    #     _validate_type(stc, _BaseSourceEstimate, 'stcs[%d]' % (si,),
-    #                    'source estimate')
-    #     if isinstance(stc, (_BaseVolSourceEstimate,
-    #                         _BaseVectorSourceEstimate)):
-    #         _check_option(
-    #             'mode', mode, ('mean', 'max', 'auto'),
-    #             'when using a vector and/or volume source estimate')
-    #         mode = 'mean' if mode == 'auto' else mode
-    #     else:
-    #         mode = 'mean_flip' if mode == 'auto' else mode
+        _validate_type(stc, _BaseSourceEstimate, 'stcs[%d]' % (si,),
+                       'source estimate')
+        #_check_option(
+        #    'mode', mode, _get_allowed_label_modes(stc),
+        #    'when using a vector and/or volume source estimate')
+        if isinstance(stc, (_BaseVolSourceEstimate,
+                            _BaseVectorSourceEstimate)):
+            mode = 'mean' if mode == 'auto' else mode
+        else:
+            mode = 'mean_flip' if mode == 'auto' else mode
         if vertno is None:
             vertno = copy.deepcopy(stc.vertices)  # avoid keeping a ref
             nvert = np.array([len(v) for v in vertno])
             label_vertidx, src_flip = _prepare_label_extraction(
-                stc, labels, src, mode, allow_empty, False)
+                stc, labels, src, mode, allow_empty, use_sparse)
             func = _label_funcs[mode]
         # make sure the stc is compatible with the source space
         if len(vertno) != len(stc.vertices):
@@ -118,26 +94,23 @@ def mod_gen_extract_label_time_course(stcs, labels, src, mode='mean',
             if not np.array_equal(svn, vn):
                 raise ValueError('stc not compatible with source space')
 
-        # logger.info('Extracting time courses for %d labels (mode: %s)'
-        #             % (n_labels, mode))
+        logger.info('Extracting time courses for %d labels (mode: %s)'
+                    % (n_labels, mode))
 
-        # CHANGES >>
         # do the extraction
-        label_tc = np.zeros((n_labels,) + (num_freq_bins,),
-                            dtype=stc.data.dtype)        
-        # label_tc = np.zeros((n_labels,) + stc.data.shape[1:],
-        #                     dtype=stc.data.dtype)
+        label_tc = np.zeros((n_labels,) + stc.data.shape[1:],
+                            dtype=stc.data.dtype)
         for i, (vertidx, flip) in enumerate(zip(label_vertidx, src_flip)):
             if vertidx is not None:
-                # if isinstance(vertidx, sparse.csr_matrix):
-                #     assert mri_resolution
-                #     assert vertidx.shape[1] == stc.data.shape[0]
-                #     this_data = np.reshape(stc.data, (stc.data.shape[0], -1))
-                #     this_data = vertidx @ this_data
-                #     this_data.shape = \
-                #         (this_data.shape[0],) + stc.data.shape[1:]
-                # else:
-                this_data = stc.data[vertidx]
+                if isinstance(vertidx, sparse.csr_matrix):
+                    assert mri_resolution
+                    assert vertidx.shape[1] == stc.data.shape[0]
+                    this_data = np.reshape(stc.data, (stc.data.shape[0], -1))
+                    this_data = vertidx @ this_data
+                    this_data.shape = \
+                        (this_data.shape[0],) + stc.data.shape[1:]
+                else:
+                    this_data = stc.data[vertidx]
                 label_tc[i] = func(flip, this_data)
 
         # extract label time series for the vol src space (only mean supported)

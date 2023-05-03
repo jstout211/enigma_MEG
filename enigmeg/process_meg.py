@@ -20,7 +20,7 @@ import munch
 import subprocess
 import mne_bids
 from mne_bids import get_head_mri_trans
-from mne.beamformer import make_lcmv, apply_lcmv_epochs
+from mne.beamformer import make_dics, apply_dics_csd
 import scipy as sp
 from mne_bids import BIDSPath
 import functools
@@ -284,16 +284,16 @@ class process():
         if eroompath!=None:
             _tmp['eroom_epo']=eroom_deriv.copy().update(suffix='epo')
         
-        _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
+        _tmp['rest_csd']=rest_deriv.copy().update(suffix='csd', extension='.h5')
         if eroompath!=None:
-            _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
+            _tmp['eroom_csd']=eroom_deriv.copy().update(suffix='csd', extension='.h5')
         
         _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
         
-        _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', 
+        _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')
         self.fooof_dir = self.deriv_path.directory / \
@@ -343,16 +343,16 @@ class process():
         #_tmp['rest_epo_clean']=_tmp['rest_epo'].copy().update(processing='clean')
         #_tmp['eroom_epo_clean']=_tmp['eroom_epo'].copy().update(processing='clean')
         
-        _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov')
+        _tmp['rest_csd']=rest_deriv.copy().update(suffix='csd', extension='.h5')
         if emptyroom_tagname!=None:
-            _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov')
+            _tmp['eroom_csd']=eroom_deriv.copy().update(suffix='csd', extension='.h5')
         
         _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
         
-        _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv', 
+        _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')       
         self.fooof_dir = self.deriv_path.directory / \
@@ -477,18 +477,20 @@ class process():
                      raw_inst=None,
                      deriv_path=None):
         '''Create and save epochs
-        Create and save covariance'''
+        Create and save cross-spectral density'''
         epochs = mne.make_fixed_length_epochs(raw_inst, 
                                               duration=self.proc_vars['epoch_len'], 
                                               preload=True)
         epochs_fname = deriv_path.copy().update(suffix='epo', extension='.fif')
         epochs.save(epochs_fname, overwrite=True)
         
-        # compute the covariance for the epoched data
+        # compute the cross spectral density for the epoched data
+        # multitaper better but slower, use fourier for testing
         
-        cov = mne.compute_covariance(epochs)
-        cov_fname = deriv_path.copy().update(suffix='cov', extension='.fif')
-        cov.save(cov_fname, overwrite=True)
+        #csd = mne.time_frequency.csd_fourier(epochs,fmin=fmin,fmax=fmax,n_jobs=n_jobs)
+        csd = mne.time_frequency.csd_multitaper(epochs,fmin=fmin,fmax=fmax,n_jobs=n_jobs)
+        csd_fname = deriv_path.copy().update(suffix='csd', extension='.h5')
+        csd.save(str(csd_fname.fpath), overwrite=True)
     
     @log
     def do_proc_epochs(self):   # epoch both the rest and the empty room
@@ -621,14 +623,14 @@ class process():
     def do_beamformer(self):    # Function to do the beamformer    
         
         # read in all the necessary files
-        dat_cov = mne.read_cov(self.fnames.rest_cov)
+        dat_csd = mne.time_frequency.read_csd(self.fnames.rest_csd)
         forward = mne.read_forward_solution(self.fnames.rest_fwd)
         epochs = mne.read_epochs(self.fnames.rest_epo)
-        fname_lcmv = self.fnames.lcmv #Pre-assign output name
+        fname_dics = self.fnames.dics #Pre-assign output name
         
         # If emptyroom present - use in beamformer
         if self.meg_er_raw != None:
-            noise_cov = mne.read_cov(self.fnames.eroom_cov)
+            noise_csd = mne.time_frequency.read_csd(self.fnames.eroom_csd)
             noise_rank = mne.compute_rank(self.raw_eroom)
             epo_rank = mne.compute_rank(epochs)
             if 'mag' in epo_rank:
@@ -637,19 +639,19 @@ class process():
             if 'grad' in epo_rank:
                 if epo_rank['grad'] < noise_rank['grad']:
                     noise_rank['grad']=epo_rank['grad']
-            filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, 
-                    noise_cov=noise_cov,  pick_ori='max-power',
-                    weight_norm='unit-noise-gain', rank=noise_rank)
+            filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05, pick_ori='max-power',
+                    noise_csd=noise_csd, inversion='single', weight_norm=None, depth=1, rank=noise_rank)
+
         else:
             #Build beamformer without emptyroom noise
             epo_rank = mne.compute_rank(epochs)
-            filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, 
-                            pick_ori='max-power',
-                            weight_norm='unit-noise-gain', rank=epo_rank)
+            filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05,pick_ori='max-power',
+                    inversion='single', weight_norm=None, depth=1, rank=noise_rank)
         
-        filters.save(fname_lcmv, overwrite=True)
-        stcs = apply_lcmv_epochs(epochs, filters, return_generator=True) 
-        self.stcs = stcs
+        filters.save(fname_dics, overwrite=True)
+        psds, freqs = apply_dics_csd(dat_csd, filters) 
+        self.psds = psds
+        self.freqs = freqs
         
     @log    
     def do_label_psds(self):    # Function to extract the psd for each label. Takes a long time. 
@@ -664,12 +666,11 @@ class process():
         labels=labels_lh + labels_rh 
         self.labels = labels
         
-        #Monkey patch of mne.source_estimate to perform 15 component SVD
-        label_ts = mod_source_estimate.extract_label_time_course(self.stcs, 
+        label_ts = mne.source_estimate.extract_label_time_course(self.psds, 
                                                                  labels, 
                                                                  self.rest_fwd['src'],
-                                                                 mode='pca15_multitaper')
-        
+                                                                 mode='pca')
+
         #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
         self.label_ts = np.stack(label_ts)
     
@@ -683,7 +684,7 @@ class process():
         None.
 
         '''
-        freq_bins = np.linspace(fmin,fmax,n_bins)    ######################################3######### FIX
+        freq_bins = np.array(self.freqs)    
     
         #Initialize 
         labels = self.labels
@@ -698,8 +699,8 @@ class process():
         #Create PSD for each label
         label_stack = self.label_ts
         for label_idx in range(len(self.labels)):
-            print(str(label_idx))
-            current_psd = label_stack[:,label_idx, :].mean(axis=0) 
+            #current_psd = label_stack[:,label_idx, :].mean(axis=0)  ###???
+            current_psd = label_stack[label_idx, :]
             label_power[label_idx,:] = current_psd
             
             #spectral_image_path = os.path.join(outfolder, 'Spectra_'+
@@ -717,6 +718,7 @@ class process():
                     alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
                 else:
                     alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
+                    print('label_idx: %d, alpha_peak: %f' % (label_idx, alpha_peak[label_idx]))
             except:
                 alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<    
             

@@ -242,8 +242,8 @@ def gen_fooof_pngs(subjstruct):
     if 'corpuscallosum' in names2_rh: names2_rh.remove('corpuscallosum')
     if 'unknown' in names2_rh: names2_rh.remove('unknown')
     
-    roi_data_lh = np.zeros(600)
-    roi_data_rh = np.zeros(600)
+    roi_data_lh = np.zeros(len(labels_lh))
+    roi_data_rh = np.zeros(len(labels_rh))
     
     for idx,name in enumerate(names2_lh):
         if fooof_dframe_lh.loc[idx, 'Parcel'].split('-')[0] != name:
