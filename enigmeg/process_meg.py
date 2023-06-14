@@ -13,8 +13,10 @@ import mne
 from mne import Report
 import numpy as np
 import pandas as pd
+import enigmeg
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.mod_label_extract import mod_source_estimate
+from enigmeg.QA.enigma_QA_GUI_functions import build_status_dict
 import logging
 import munch 
 import subprocess
@@ -24,6 +26,9 @@ from mne.beamformer import make_dics, apply_dics_csd
 import scipy as sp
 from mne_bids import BIDSPath
 import functools
+import MEGnet
+from MEGnet.prep_inputs.ICA import main as ICA
+from tensorflow import keras
 
 # define some variables
 
@@ -287,7 +292,7 @@ class process():
         _tmp['rest_csd']=rest_deriv.copy().update(suffix='csd', extension='.h5')
         if eroompath!=None:
             _tmp['eroom_csd']=eroom_deriv.copy().update(suffix='csd', extension='.h5')
-        
+             
         _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
@@ -298,6 +303,9 @@ class process():
                                                      extension='.h5')
         self.fooof_dir = self.deriv_path.directory / \
             f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+        self.ica_dir = self.deriv_path.directory / \
+            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_run={self.meg_rest_raw.run}_ica'
+        self.ica_fname = f'{self.meg_rest_raw.basename}_ica_0-ica.fif'
         
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -351,7 +359,7 @@ class process():
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
-        
+        _tmp['ica'] = self.deriv_path.copy().update(suffix='ica', extension='.fif')
         _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')       
@@ -464,6 +472,41 @@ class process():
         raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'], n_jobs=n_jobs)
         raw_inst.save(deriv_path.copy().update(processing='filt', extension='.fif'), 
                       overwrite=True)
+    
+    @log
+    def do_ica(self):    
+        ica_basename = self.meg_rest_raw.basename + '_ica'
+        ica_folder = self.deriv_path.directory
+        if not os.path.exists(ica_folder): 
+            os.mkdir(ica_folder)
+        ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], save_preproc=True, save_ica=True, 
+            results_dir=ica_folder, outbasename=ica_basename)            
+
+    def prep_ica_qa(self):
+        ica_basename = self.meg_rest_raw.basename + '_ica'
+        ica_folder = os.path.join(self.deriv_path.directory, ica_basename)
+        ica_fname = os.path.join(ica_folder, ica_basename + '_0-ica.fif')
+        raw_fname = os.path.join(ica_folder, ica_basename + '_250srate_meg.fif')
+        
+        prep_fcn_path = op.join(enigmeg.__path__[0], 'QA/make_ica_qa.py')
+        
+        output_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + self.meg_rest_raw.session
+        
+        subprocess.run(['python', prep_fcn_path, '-ica_fname', ica_fname, '-raw_fname', raw_fname,
+                        '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
+                
+    def do_classify_ica(self):
+        self.meg_rest_raw.icacomps = classify_icacomps_megnet
+        
+    def set_ica_comps_manual(self):
+        newdict = parse_manual_ica_qa(self)
+        self.meg_rest_raw.icacomps = newdict[self.meg_rest_raw.basename]
+        
+    def do_clean_ica(self):
+        print("removing ica components")
+        ica=mne.preprocessing.read_ica(op.join(self.ica_dir,self.ica_filename))
+        ica.exclude = self.meg_rest_raw.icacomps
+        ica.apply(raw_rest)
         
     @log
     def do_preproc(self):       # proc both rest and empty room
@@ -640,13 +683,13 @@ class process():
                 if epo_rank['grad'] < noise_rank['grad']:
                     noise_rank['grad']=epo_rank['grad']
             filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05, pick_ori='max-power',
-                    noise_csd=noise_csd, inversion='single', weight_norm=None, depth=1, rank=noise_rank)
+                    noise_csd=noise_csd, inversion='matrix', weight_norm='unit-noise-gain', rank=noise_rank)
 
         else:
             #Build beamformer without emptyroom noise
             epo_rank = mne.compute_rank(epochs)
             filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05,pick_ori='max-power',
-                    inversion='single', weight_norm=None, depth=1, rank=noise_rank)
+                    inversion='matrix', weight_norm='unit-noise-gain', rank=noise_rank)
         
         filters.save(fname_dics, overwrite=True)
         psds, freqs = apply_dics_csd(dat_csd, filters) 
@@ -1081,8 +1124,23 @@ def make_report(subject, subjects_dir, meg_filename, output_dir):
     report_filename = op.join(output_dir, 'QA_report.html')
     report.save(report_filename) 
 
-
 def process_subject(subject, args):
+    logger = get_subj_logger(subject, args.session, log_dir)
+    logger.info('Initializing structure')
+    proc = process(subject=subject, 
+            bids_root=args.bids_root, 
+            deriv_root=None,
+            subjects_dir=None,
+            rest_tagname=args.rest_tag,
+            emptyroom_tagname=args.emptyroom_tag, 
+            session=args.session, 
+            mains=float(args.mains),
+            run=args.run,
+            t1_override=None,
+            fs_ave_fids=args.fs_ave_fids)           
+    proc.do_proc_allsteps()
+    
+def process_subject_up_to_icaqa(subject, args):
     logger = get_subj_logger(subject, args.session, log_dir)
     logger.info('Initializing structure')
     proc = process(subject=subject, 
@@ -1098,7 +1156,63 @@ def process_subject(subject, args):
             fs_ave_fids=args.fs_ave_fids
             )
     proc.load_data()
-    proc.do_proc_allsteps()
+    proc.do_ica()
+    proc.prep_ica_qa()    
+    
+def process_subject_after_icaqa(subject, args):
+    logger = get_subj_logger(subject, args.session, log_dir)
+    logger.info('Initializing structure')
+    proc = process(subject=subject, 
+            bids_root=args.bids_root, 
+            deriv_root=None,
+            subjects_dir=None,
+            rest_tagname=args.rest_tag,
+            emptyroom_tagname=args.emptyroom_tag, 
+            session=args.session, 
+            mains=float(args.mains),
+            run=args.run,
+            t1_override=None,
+            fs_ave_fids=args.fs_ave_fids
+            )
+    proc.load_data()
+    proc.set_ica_comps_manual()
+    proc.do_clean_ica()
+    proc.do_preproc()
+    proc.proc_mri(t1_override=proc._t1_override)
+    proc.do_beamformer()
+    proc.do_make_aparc_sub()
+    proc.do_label_psds()
+    proc.do_spectral_parameterization()
+        
+def parse_manual_ica_qa(self):
+    logfile_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/ica_QA_logfile.txt'
+    with open(logfile_path) as f:
+        logcontents = f.readlines()
+    dictionary = build_status_dict(logcontents)
+
+    newdict = {}
+    for key, value in dictionary.items():
+        subjrun = key.split('_icacomp-')[0]
+
+        if newdict == {}:  # if this is the first key and the new dict is empty
+            if dictionary[key].strip('\n') == 'BAD':  # if component is bad
+                dropcomp = key.split('_icacomp-')[1].split('.png')[0]
+                newdict = {subjrun: [dropcomp]}
+            else:
+                newdict = {subjrun: []}  # if compoenent is good
+                   
+        elif subjrun in newdict.keys():   # If the key is already in the new dict
+            if dictionary[key].strip('\n') == 'BAD':  # If component is bad (if comp is good, do nothing)
+                dropcomp = key.split('_icacomp-')[1].split('.png')[0]
+                newdict[subjrun].append(dropcomp)
+    
+        else: # if the key isn't in the new dictionary
+            if dictionary[key].strip('\n') == 'BAD':  # if compoenent is bad
+                dropcomp = key.split('_icacomp-')[1].split('.png')[0]
+                newdict[subjrun] = [dropcomp]
+            else:
+                newdict[subjrun] = [] # if compoenent is good
+        return newdict
 
     
 if __name__=='__main__':
@@ -1159,6 +1273,14 @@ if __name__=='__main__':
                         help='''number of jobs to run concurrently for 
                         multithreaded operations''',
                         default=1
+                        )
+    parser.add_argument('-ica_manual_qa_prep',
+                        help='''if set to 1, stop after ICA for manual QA''',
+                        default=0
+                        )
+    parser.add_argument('-process_manual_ica_qa',
+                        help='''If set to 1, pick up analysis after performing manual ICA QA''',
+                        default=0
                         )
                                    
     args = parser.parse_args()
@@ -1266,8 +1388,13 @@ if __name__=='__main__':
         logger = get_subj_logger(args.subject, args.session, log_dir)
         logger.info(f'processing subject {args.subject} session {args.session}')
         
-        process_subject(args.subject, args)  # process the single specified subject
-      
+        if (args.ica_manual_qa_prep == 1):
+            process_subject_up_to_icaqa(args.subject, args)
+        if (args.process_manual_ica_qa == 1):
+            process_subject_after_icaqa(args.subject, args)
+        else:
+            process_subject(args.subject, args)  # process the single specified subject
+  
     ## batch processing from a .csv file
                
     elif args.proc_fromcsv:
@@ -1322,5 +1449,19 @@ if __name__=='__main__':
                                        check_paths=False,
                                        csv_info=row)
                 process_subj.load_data()
-                process_subj.do_proc_allsteps()
-
+                
+                if (args.ica_manual_qa_prep == 1):
+                    process_subj.do_ica()
+                    process_subj.prep_ica_qa()
+                elif(args.process_manual_ica_qa == 1):
+                    process_subj.set_ica_comps_manual()
+                    process_subj.do_clean_ica()
+                    process_subj.do_preproc()
+                    process_subj.proc_mri()
+                    process_subj.do_beamformer()
+                    process_subj.do_make_aparc_sub()
+                    process_subj.do_label_psds()
+                    process_subj.do_spectral_parameterization()
+                    
+                else:    
+                    process_subj.do_proc_allsteps()

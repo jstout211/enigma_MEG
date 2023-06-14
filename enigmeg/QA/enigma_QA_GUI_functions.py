@@ -53,7 +53,8 @@ class sub_qa_info():
     def get_subjid(self):
         base = op.basename(self.fname)
         try:
-            return base.split('/')[-1].split('_')[0]
+            #return base.split('/')[-1].split('_')[0]
+            return base
         except:
             return None
         
@@ -143,8 +144,7 @@ def create_window_layout(sub_obj_list=None, qa_type=None,
                                          expand_y=True))
                 current_idx +=1
             layout.append(row)
-        layout.append([sg.Button('PREV'), sg.Button('NEXT'), sg.Button('EXIT'), 
-                       sg.Button('SAVE')])
+        layout.append([sg.Button('PREV'), sg.Button('NEXT'), sg.Button('SAVE AND EXIT')])
         window = sg.Window(qa_type, layout, resizable=True, auto_size_buttons=True,
                        scaling=True)
         return window
@@ -168,7 +168,7 @@ def initialize(bids_root, QAtype):
         history_log=[i[:-1] for i in history_log if i[-1:]=='\n']
         return_log=True
     logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.INFO, 
-                        format='%(asctime)s::%(levelname)s::%(message)s')
+                        format='%(asctime)s::%(levelname)s::%(message)s', filemode='w')
     logging.info("REVIEW_START")
     if return_log==True:
         return history_log
@@ -183,7 +183,7 @@ def get_last_review(history_log):
     rev_start_idx=0
     rev_end_idx=0
     for idx, line in enumerate(history_log):
-        cond=line.split('INFO:')[-1]
+        cond=line.split('INFO::')[-1]
         if cond=='REVIEW_START':
             rev_start_idx=idx
         elif cond=='REVIEW_FINISH':
@@ -248,7 +248,7 @@ def run_gui(sub_obj_list,rows=3,columns=2,imgsize=200, QAtype=None):
     modify_frame=False
     while True:             # Event Loop
         event, values = window.read()
-        if event in (sg.WIN_CLOSED, 'EXIT'):
+        if event in (sg.WIN_CLOSED, 'SAVE AND EXIT'):
             write_logfile(sub_obj_list)
             break
         if event=='NEXT':
@@ -263,8 +263,8 @@ def run_gui(sub_obj_list,rows=3,columns=2,imgsize=200, QAtype=None):
             else:
                 idx-=(GRID_SIZE[0]*GRID_SIZE[1])
                 modify_frame = True
-        if event=='SAVE':
-            write_logfile(sub_obj_list)
+        #if event=='SAVE':
+        #    write_logfile(sub_obj_list)
         if type(event) is sub_qa_info:
             event.button_set_status()
             image_ = resize_image(event.image_r,

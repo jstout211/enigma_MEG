@@ -20,7 +20,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument('-bids_root', help='''Location of bids directory, default=bids_out''')
-    parser.add_argument('-QAtype', help='''QA type to run. Options are 'coreg', 'bem','src','surf','spectra','beamformer''')
+    parser.add_argument('-QAtype', help='''QA type to run. Options are 'coreg', 'ica', 'bem','src','surf','spectra','beamformer''')
     parser.add_argument('-rows', help='''number of rows in QA browser, default=4''')
     parser.add_argument('-columns', help='''number of columns in QA browser, default=2''')
     parser.add_argument('-imgsize', help='''make images smaller or larger, default=200''')
@@ -45,11 +45,11 @@ if __name__ == '__main__':
         parser.print_help()
         raise ValueError('You must choose a QA type')
     else:
-        if args.QAtype not in ['coreg','surf','bem','src','spectra','beamformer']:
-            raise ValueError("QAtype not valid, must be one of 'coreg','surf','bem','src','spectra','beamformer'")
+        if args.QAtype not in ['coreg','ica','surf','bem','src','spectra','beamformer']:
+            raise ValueError("QAtype not valid, must be one of 'coreg', 'ica','surf','bem','src','spectra','beamformer'")
         QAtype = args.QAtype
     
-    if QAtype == 'coreg' or QAtype == 'bem' or QAtype == 'src':
+    if QAtype == 'coreg' or QAtype == 'bem' or QAtype == 'src' or QAtype == 'ica':
         column_default = 3
         row_default = 4
         size_default = 400
@@ -61,7 +61,7 @@ if __name__ == '__main__':
         column_default = 3
         row_default = 3
         size_default = 300   
-
+        
     if not args.imgsize:
         imgsize=size_default
     else:
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         
     # search for QA images matching the requested QAtype
 
-    image_list = glob.glob(op.join(QA_root,'*/*' + QAtype + '.png'))
+    image_list = glob.glob(op.join(QA_root,'*/*/*' + QAtype + '*.png'))
     sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
     
     #Update status based on previous log
