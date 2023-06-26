@@ -43,6 +43,7 @@ def get_rest_data(dataset='ds004215',
     curr_dir = os.getcwd()
     os.chdir(op.join(download_path, dataset))    
     dl.get(path=downloads)
+    !git checkout 1.0.1  #required because of openneuro
     
     os.chdir(curr_dir)    
 
@@ -52,15 +53,19 @@ if not os.path.exists(op.join(download_path,openneuro_dset)):
                       downloads=downloads
                       )
 rm_files = glob.glob('sub-ON02747/ses-01/anat/*')
-rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.json') 
-rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz')
+rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz') 
+rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.json')
 
 rm_files = [op.join(os.path.expanduser('~'),openneuro_dset,i) for i in rm_files]
 for fname in rm_files:
     try:
         os.unlink(fname)
     except:
-        pass
+        try:
+            os.remove(fname)
+        except:
+            pass
+
 
 hv_dir = op.join(download_path, 'ds004215')
 if not op.exists(op.join(hv_dir, 'derivatives')): 
