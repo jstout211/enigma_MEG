@@ -11,6 +11,8 @@ import glob
 import mne
 from enigmeg import process_meg
 
+os.environ['n_jobs']='1'
+
 
 
 download_path = os.path.expanduser('~')
@@ -32,11 +34,12 @@ def get_rest_data(dataset='ds004215',
                   downloads=downloads
                   ):
     '''Retrieve CTF rest data from NIMH HV dataset'''
-    dl.install(
-        path=op.join(download_path,dataset),
-        source=f'https://github.com/OpenNeuroDatasets/{openneuro_dset}.git',
-        branch=branch
-        )
+    if not op.exists(op.join(download_path,dataset)):
+        dl.install(
+            path=op.join(download_path,dataset),
+            source=f'https://github.com/OpenNeuroDatasets/{openneuro_dset}.git',
+            branch=branch
+            )
     curr_dir = os.getcwd()
     os.chdir(op.join(download_path, dataset))    
     dl.get(path=downloads)
@@ -48,12 +51,23 @@ if not os.path.exists(op.join(download_path,openneuro_dset)):
                       download_location=download_path, 
                       downloads=downloads
                       )
+rm_files = glob.glob('sub-ON02747/ses-01/anat/*')
+rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.json') 
+rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz')
 
-rm_files = ['sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.json',
-        'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz']
 rm_files = [op.join(os.path.expanduser('~'),openneuro_dset,i) for i in rm_files]
-if os.path.exists(rm_files[0]): os.remove(rm_files[0])
-if os.path.exists(rm_files[1]): os.remove(rm_files[1])
+for fname in rm_files:
+    try:
+        os.unlink(fname)
+    except:
+        pass
+
+hv_dir = op.join(download_path, 'ds004215')
+if not op.exists(op.join(hv_dir, 'derivatives')): 
+    os.symlink('/home/jstout/TESTING_scripts/derivatives', op.join(hv_dir, 'derivatives'))
+if not op.exists(op.join(hv_dir, 'derivatives','freesurfer')): 
+    os.symlink('/home/jstout/TESTING_scripts/derivatives/freesurfer', op.join(hv_dir, 'derivatives','freesurfer'))
+
 
 # =============================================================================
 # Build object instance

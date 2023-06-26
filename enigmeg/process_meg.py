@@ -141,6 +141,8 @@ class process():
             self._use_fsave_coreg=True
         else:
             self._use_fsave_coreg=False
+        
+        self._n_jobs = int(os.environ['n_jobs'])
             
 # =============================================================================
 #             Configure bids paths
@@ -467,9 +469,9 @@ class process():
     def _preproc(self,          # resampling, mains notch filtering, bandpass filtering
                 raw_inst=None,
                 deriv_path=None):
-        raw_inst.resample(self.proc_vars['sfreq'], n_jobs=n_jobs)
-        raw_inst.notch_filter(self.proc_vars['mains'], n_jobs=n_jobs) 
-        raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'], n_jobs=n_jobs)
+        raw_inst.resample(self.proc_vars['sfreq'], n_jobs=self._n_jobs)
+        raw_inst.notch_filter(self.proc_vars['mains'], n_jobs=self._n_jobs) 
+        raw_inst.filter(self.proc_vars['fmin'], self.proc_vars['fmax'], n_jobs=self._n_jobs)
         raw_inst.save(deriv_path.copy().update(processing='filt', extension='.fif'), 
                       overwrite=True)
     
@@ -530,8 +532,8 @@ class process():
         # compute the cross spectral density for the epoched data
         # multitaper better but slower, use fourier for testing
         
-        #csd = mne.time_frequency.csd_fourier(epochs,fmin=fmin,fmax=fmax,n_jobs=n_jobs)
-        csd = mne.time_frequency.csd_multitaper(epochs,fmin=fmin,fmax=fmax,n_jobs=n_jobs)
+        #csd = mne.time_frequency.csd_fourier(epochs,fmin=fmin,fmax=fmax,n_jobs=self._n_jobs)
+        csd = mne.time_frequency.csd_multitaper(epochs,fmin=fmin,fmax=fmax,n_jobs=self._n_jobs)
         csd_fname = deriv_path.copy().update(suffix='csd', extension='.h5')
         csd.save(str(csd_fname.fpath), overwrite=True)
     
@@ -639,7 +641,7 @@ class process():
             trans = mne.read_trans(trans_fname.fpath)
         # make the forward solution
         fwd = mne.make_forward_solution(self.raw_rest.info, trans, src, bem_sol, eeg=False, 
-                                        n_jobs=n_jobs)
+                                        n_jobs=self._n_jobs)
         self.rest_fwd=fwd
         mne.write_forward_solution(fwd_fname.fpath, fwd, overwrite=True)
     
