@@ -10,6 +10,7 @@ import datalad.api as dl
 import glob
 import mne
 from enigmeg import process_meg
+import subprocess
 
 os.environ['n_jobs']='1'
 
@@ -18,8 +19,8 @@ os.environ['n_jobs']='1'
 download_path = os.path.expanduser('~')
 openneuro_dset='ds004215'
 downloads=\
-    ['sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.json',
-      'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
+    ['sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz',
+     'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.json',
       'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_channels.tsv',
       'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_coordsystem.json',
       'sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.ds',
@@ -43,7 +44,7 @@ def get_rest_data(dataset='ds004215',
     curr_dir = os.getcwd()
     os.chdir(op.join(download_path, dataset))    
     dl.get(path=downloads)
-    !git checkout 1.0.1  #required because of openneuro
+    subprocess.run('git checkout 1.0.1'.split())  #required because of openneuro
     
     os.chdir(curr_dir)    
 
@@ -53,10 +54,18 @@ if not os.path.exists(op.join(download_path,openneuro_dset)):
                       downloads=downloads
                       )
 rm_files = glob.glob('sub-ON02747/ses-01/anat/*')
-rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz') 
-rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.json')
+if 'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz' in rm_files:
+    rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz') 
+if 'sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.json' in rm_files:
+    rm_files.remove('sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.json')
 
-rm_files = [op.join(os.path.expanduser('~'),openneuro_dset,i) for i in rm_files]
+print(rm_files)
+rm_files = [op.join('/home/jstout',openneuro_dset,i) for i in rm_files]
+print(rm_files)
+
+for fname in rm_files:
+    dl.unlock(fname)
+
 for fname in rm_files:
     try:
         os.unlink(fname)
