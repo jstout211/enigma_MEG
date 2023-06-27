@@ -1035,6 +1035,7 @@ def load_test_data(**kwargs):
     proc = process(subject='ON02747',
                         bids_root=op.expanduser('~/ds004215'),
                         session='01',
+                        run='01',
                         emptyroom_tagname='noise', 
                         mains=60,
                         t1_override='~/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz',
@@ -1216,7 +1217,7 @@ def parse_manual_ica_qa(self):
                 newdict[subjrun] = [] # if compoenent is good
         return newdict
 
-    
+#%%    
 if __name__=='__main__':
     import argparse
     
