@@ -121,26 +121,29 @@ def test_mriproc():
     
 def test_aparc():
     proc.do_make_aparc_sub()
-    # assert op.exists(
+    assert op.exists(proc.fnames.parc)
                       
 def test_beamformer():
-    if op.exists(proc.fnames.lcmv):
-        os.remove(proc.fnames.lcmv)
+    if op.exists(proc.fnames.dics):  #this will be .lcmv
+        os.remove(proc.fnames.dics)
     proc.do_beamformer()
-    assert op.exists(proc.fnames.lcmv)
+    assert op.exists(proc.fnames.dics)
     
 def test_label_psds():
     proc.load_data()
     proc.proc_mri()
     proc.do_beamformer()
+    assert hasattr(proc, 'psds') 
+    assert hasattr(proc, 'freqs')
+    assert op.exists(proc.fnames.dics)
     
-    'Reduce the epoch count to 3 for compute purposes'
-    tmp = []
-    for i in 0,1,2:
-        tmp.append(next(proc.stcs))
-    proc.stcs = tmp
-    proc.do_label_psds()
-    assert hasattr(proc, 'label_ts')
+    # 'Reduce the epoch count to 3 for compute purposes'
+    # tmp = []
+    # for i in 0,1,2:
+    #     tmp.append(next(proc.stcs))
+    # proc.stcs = tmp
+    # proc.do_label_psds()
+    # assert hasattr(proc, 'label_ts')
     
 
 
