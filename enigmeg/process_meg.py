@@ -28,7 +28,7 @@ from mne_bids import BIDSPath
 import functools
 import MEGnet
 from MEGnet.prep_inputs.ICA import main as ICA
-from tensorflow import keras
+#from tensorflow import keras
 
 # define some variables
 
@@ -1230,7 +1230,8 @@ if __name__=='__main__':
                         )
     parser.add_argument('-subjects_dir',
                         help='''Freesurfer subjects directory, only specify if not \
-                        bids_root/derivatives/freesurfer/subjects'''
+                        bids_root/derivatives/freesurfer/subjects''',
+                        default=None
                         )
     parser.add_argument('-fs_subject',
                         help='''Freefurfer subject ID if different from BIDS ID'''
@@ -1267,7 +1268,8 @@ if __name__=='__main__':
     parser.add_argument('-proc_fromcsv',
                         help='''Loop over all subjects in the bids_root
                         and process. Requires CSV file with processing manifest''',
-                        default=None
+                        action='store_true',
+                        default=False
                         )
     parser.add_argument('-n_jobs',
                         help='''number of jobs to run concurrently for 
@@ -1276,11 +1278,13 @@ if __name__=='__main__':
                         )
     parser.add_argument('-ica_manual_qa_prep',
                         help='''if set to 1, stop after ICA for manual QA''',
-                        default=0
+                        action='store_true',
+                        default=False
                         )
     parser.add_argument('-process_manual_ica_qa',
                         help='''If set to 1, pick up analysis after performing manual ICA QA''',
-                        default=0
+                        action='store_true',
+                        default=False
                         )
                                    
     args = parser.parse_args()
@@ -1314,6 +1318,9 @@ if __name__=='__main__':
         parser.print_help()
         raise ValueError('Please specify a correct -bids_root')     
     
+    print(bids_root)
+    print(args.subjects_dir)
+    
     # To make file handling easier, even if there is another subjects directory, we'll create one in 
     # the BIDS derivatives/ folder and set up symbolic links there. 
     
@@ -1332,7 +1339,9 @@ if __name__=='__main__':
             raise ValueError('$SUBJECTS_DIR/fsaverage cannot be a symlink; remove and rerun process_MEG to fetch data')
             
     # check and make sure all fsaverage files are present and download if not. 
-    mne.datasets.fetch_fsaverage(op.join(bids_root,'derivatives/freesurfer/subjects/'))
+    default_dir = os.path.abspath(os.path.join(bids_root, 'derivatives/freesurfer/subjects'))
+    print(default_dir)
+    mne.datasets.fetch_fsaverage(subjects_dir=default_dir,verbose='debug')
     
     log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'
     if not os.path.isdir(os.path.join(bids_root,'derivatives/ENIGMA_MEG')):
@@ -1347,18 +1356,18 @@ if __name__=='__main__':
         args.subject=args.subject.replace('sub-','') # strip the sub- off for uniformity
         print(args.subject)
         
-        if args.proc_fromcsv != None:
+        if args.proc_fromcsv:
             raise ValueError("You can't specify both a subject id and a csv file, sorry")
             
         print('processing a single subject %s' % args.subject)      
             
         # now, parse the inputs for freesurfer directory and subject (if not in derivatives)
         # so freesurfer processing doesn't have to be repeated if it exists elsewhere
+        print(args.subjects_dir)
     
-        if args.subjects_dir:
-            
+        if args.subjects_dir != None:
+                        
             dir_entered = os.path.abspath(args.subjects_dir) # get absolute paths to compare
-            default_dir = os.path.abspath(os.path.join(bids_root, 'derivatives/freesurfer/subjects'))
             
             if dir_entered == default_dir: # don't use -subjects_dir if using the default subjects_dir                
                 print('Specified FS subjects dir same as default')
@@ -1389,6 +1398,13 @@ if __name__=='__main__':
         logger.info(f'processing subject {args.subject} session {args.session}')
         
         if (args.ica_manual_qa_prep == 1):
+            qa_dir = f'{bids_root}/derivatives/ENIGMA_MEG_QA'
+            if not(qa_dir):
+                os.makedirs(qa_dir)
+            if not os.path.isdir(os.path.join(qa_dir, 'sub-'+args.subject)):
+                os.makedirs(os.path.join(qa_dir, 'sub-'+args.subject))
+            if not os.path.isdir(os.path.join(qa_dir, 'sub-'+args.subject+'/ses-'+args.session)):
+                os.makedirs(os.path.join(qa_dir, 'sub-'+args.subject+'/ses-'+args.session))     
             process_subject_up_to_icaqa(args.subject, args)
         if (args.process_manual_ica_qa == 1):
             process_subject_after_icaqa(args.subject, args)
@@ -1450,10 +1466,10 @@ if __name__=='__main__':
                                        csv_info=row)
                 process_subj.load_data()
                 
-                if (args.ica_manual_qa_prep == 1):
+                if args.ica_manual_qa_prep:
                     process_subj.do_ica()
                     process_subj.prep_ica_qa()
-                elif(args.process_manual_ica_qa == 1):
+                elif args.process_manual_ica_qa:
                     process_subj.set_ica_comps_manual()
                     process_subj.do_clean_ica()
                     process_subj.do_preproc()
@@ -1462,6 +1478,5 @@ if __name__=='__main__':
                     process_subj.do_make_aparc_sub()
                     process_subj.do_label_psds()
                     process_subj.do_spectral_parameterization()
-                    
                 else:    
                     process_subj.do_proc_allsteps()
