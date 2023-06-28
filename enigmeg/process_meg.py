@@ -306,7 +306,7 @@ class process():
         self.fooof_dir = self.deriv_path.directory / \
             f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
         self.ica_dir = self.deriv_path.directory / \
-            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_run={self.meg_rest_raw.run}_ica'
+                f'{self.meg_rest_raw.basename}_ica'
         self.ica_fname = f'{self.meg_rest_raw.basename}_ica_0-ica.fif'
         
         # Cast all bids paths to paths and save as dictionary
@@ -367,7 +367,10 @@ class process():
                                                      extension='.h5')       
         self.fooof_dir = self.deriv_path.directory / \
             f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
-             
+        self.ica_dir = self.deriv_path.directory / \
+                f'{self.meg_rest_raw.basename}_ica'
+        self.ica_fname = f'{self.meg_rest_raw.basename}_ica_0-ica.fif'
+    
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
         
@@ -498,17 +501,18 @@ class process():
                         '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
                 
     def do_classify_ica(self):
-        self.meg_rest_raw.icacomps = classify_icacomps_megnet
+        self.meg_rest_raw.icacomps = np.asarray(classify_icacomps_megnet).astype(int)
         
     def set_ica_comps_manual(self):
         newdict = parse_manual_ica_qa(self)
-        self.meg_rest_raw.icacomps = newdict[self.meg_rest_raw.basename]
+        self.meg_rest_raw.icacomps = np.asarray(newdict[self.meg_rest_raw.basename]).astype(int)
         
     def do_clean_ica(self):
         print("removing ica components")
-        ica=mne.preprocessing.read_ica(op.join(self.ica_dir,self.ica_filename))
+        ica=mne.preprocessing.read_ica(op.join(self.ica_dir,self.ica_fname))
         ica.exclude = self.meg_rest_raw.icacomps
-        ica.apply(raw_rest)
+        self.load_data()
+        ica.apply(self.raw_rest)
         
     @log
     def do_preproc(self):       # proc both rest and empty room
@@ -1215,7 +1219,7 @@ def parse_manual_ica_qa(self):
                 newdict[subjrun] = [dropcomp]
             else:
                 newdict[subjrun] = [] # if compoenent is good
-        return newdict
+    return newdict
 
 #%%    
 if __name__=='__main__':
@@ -1279,12 +1283,12 @@ if __name__=='__main__':
                         default=1
                         )
     parser.add_argument('-ica_manual_qa_prep',
-                        help='''if set to 1, stop after ICA for manual QA''',
+                        help='''if flag is present, stop after ICA for manual QA''',
                         action='store_true',
                         default=0
                         )
     parser.add_argument('-process_manual_ica_qa',
-                        help='''If set to 1, pick up analysis after performing manual ICA QA''',
+                        help='''If flag is present, pick up analysis after performing manual ICA QA''',
                         action='store_true',
                         default=0
                         )
