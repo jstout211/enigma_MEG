@@ -1229,7 +1229,8 @@ if __name__=='__main__':
     #                     help='''Config file for processing data'''
     #                     )
     parser.add_argument('-subject',
-                        help='''BIDS ID of subject to process'''
+                        help='''BIDS ID of subject to process''',
+                        default=None
                         )
     parser.add_argument('-subjects_dir',
                         help='''Freesurfer subjects directory, only specify if not \
@@ -1279,10 +1280,12 @@ if __name__=='__main__':
                         )
     parser.add_argument('-ica_manual_qa_prep',
                         help='''if set to 1, stop after ICA for manual QA''',
+                        action='store_true',
                         default=0
                         )
     parser.add_argument('-process_manual_ica_qa',
                         help='''If set to 1, pick up analysis after performing manual ICA QA''',
+                        action='store_true',
                         default=0
                         )
                                    
@@ -1391,10 +1394,20 @@ if __name__=='__main__':
         logger = get_subj_logger(args.subject, args.session, log_dir)
         logger.info(f'processing subject {args.subject} session {args.session}')
         
-        if (args.ica_manual_qa_prep == 1):
+        if args.ica_manual_qa_prep:
+            
+            qa_dir = f'{bids_root}/derivatives/ENIGMA_MEG_QA'
+            if not os.path.isdir(qa_dir):
+                os.makedirs(qa_dir)
+            if not os.path.isdir(os.path.join(qa_dir,'sub-'+args.subject)):
+                os.makedirs(os.path.join(qa_dir,'sub-'+args.subject))
+            if not os.path.isdir(os.path.join(qa_dir,'sub-'+args.subject+'/ses-'+args.session)):
+                os.makedirs(os.path.join(qa_dir,'sub-'+args.subject+'/ses-'+args.session))
             process_subject_up_to_icaqa(args.subject, args)
-        if (args.process_manual_ica_qa == 1):
+
+        elif args.process_manual_ica_qa:
             process_subject_after_icaqa(args.subject, args)
+
         else:
             process_subject(args.subject, args)  # process the single specified subject
   
