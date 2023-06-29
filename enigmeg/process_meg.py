@@ -525,8 +525,8 @@ class process():
     @log
     def do_clean_ica(self):         # Remove identified ICA components
         print("removing ica components")
-        ica=mne.preprocessing.read_ica(op.join(self.fnames.ica_folder,self.fnames.ica_fname))
-        ica.exclude = self.meg_rest_raw.icacomps
+        ica=mne.preprocessing.read_ica(op.join(self.fnames.ica_folder,self.fnames.ica))
+        ica.exclude = self.ica_comps_toremove #meg_rest_raw.icacomps
         self.load_data()
         ica.apply(self.raw_rest)
         
