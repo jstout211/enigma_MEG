@@ -34,6 +34,8 @@ from tensorflow import keras
 
 
 
+
+
 # define some variables
 
 fmin = 1
@@ -523,7 +525,7 @@ class process():
     @log
     def do_clean_ica(self):         # Remove identified ICA components
         print("removing ica components")
-        ica=mne.preprocessing.read_ica(op.join(self.ica_dir,self.ica_fname))
+        ica=mne.preprocessing.read_ica(op.join(self.fnames.ica_folder,self.fnames.ica_fname))
         ica.exclude = self.meg_rest_raw.icacomps
         self.load_data()
         ica.apply(self.raw_rest)
