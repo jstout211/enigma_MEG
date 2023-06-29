@@ -149,7 +149,7 @@ class process():
         self._n_jobs = int(os.environ['n_jobs'])
             
 # =============================================================================
-#             Configure bids paths
+#             Configure paths and filenames
 # =============================================================================
 
         self.bids_path = BIDSPath(
@@ -310,9 +310,6 @@ class process():
                                                      extension='.h5')
         self.fooof_dir = self.deriv_path.directory / \
             f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
-        self.ica_dir = self.deriv_path.directory / \
-                f'{self.meg_rest_raw.basename}_ica'
-        self.ica_fname = f'{self.meg_rest_raw.basename}_ica_0-ica.fif'
         
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -372,9 +369,6 @@ class process():
                                                      extension='.h5')       
         self.fooof_dir = self.deriv_path.directory / \
             f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
-        self.ica_dir = self.deriv_path.directory / \
-                f'{self.meg_rest_raw.basename}_ica'
-        self.ica_fname = f'{self.meg_rest_raw.basename}_ica_0-ica.fif'
     
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -484,7 +478,7 @@ class process():
                       overwrite=True)
     
     @log
-    def do_ica(self):    
+    def do_ica(self):           # perform the 20 component ICA using functions from megnet
         ica_basename = self.meg_rest_raw.basename + '_ica'
         ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], save_preproc=True, save_ica=True, 
         results_dir=self.deriv_path.directory, outbasename=ica_basename)  
@@ -492,11 +486,9 @@ class process():
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
 
-    def prep_ica_qa(self):
-        ica_basename = self.meg_rest_raw.basename + '_ica'
-        ica_folder = os.path.join(self.deriv_path.directory, ica_basename)
-        ica_fname = os.path.join(ica_folder, ica_basename + '_0-ica.fif')
-        raw_fname = os.path.join(ica_folder, ica_basename + '_250srate_meg.fif')
+    def prep_ica_qa(self):      # if desired, create QA images for ICA components
+        ica_fname = self.fnames.ica
+        raw_fname = self.fnames.ica_megnet_raw
         
         prep_fcn_path = op.join(enigmeg.__path__[0], 'QA/make_ica_qa.py')
         
@@ -505,26 +497,31 @@ class process():
         subprocess.run(['python', prep_fcn_path, '-ica_fname', ica_fname, '-raw_fname', raw_fname,
                         '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
     @log           
-    def do_classify_ica(self):
+    def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
         import tensorflow_addons as tfa #Required for loading. tfa f1_score embedded in model
         from scipy.io import loadmat
         model_path = op.join(MEGnet.__path__[0] ,  'model/MEGnet_final_model.h5')
         # This is set to use CPU in initial import
         kModel=keras.models.load_model(model_path)
-        arrSP_fnames = [op.join(proc.fnames.ica_folder, f'component{i}.mat') for i in range(1,21)]
-        arrTS = loadmat(op.join(proc.fnames.ica_folder, 'ICATimeSeries.mat'))['arrICATimeSeries'].T
+        arrSP_fnames = [op.join(self.fnames.ica_folder, f'component{i}.mat') for i in range(1,21)]
+        arrTS = loadmat(op.join(self.fnames.ica_folder, 'ICATimeSeries.mat'))['arrICATimeSeries'].T
         arrSP = np.stack([loadmat(i)['array'] for i in arrSP_fnames])
         preds, probs = fPredictChunkAndVoting_parrallel(kModel, arrTS, arrSP)
         self.meg_rest_ica_classes = preds.argmax(axis=1)
+        self.ica_comps_toremove = [index for index, value in enumerate(self.meg_rest_ica_classes) if value in [1, 2, 3]]
+        logstring = 'MEGNET classifications: ' + str(self.meg_rest_ica_classes)
+        logger.info(logstring)
+        logstring = 'Components to reject: ' + str(self.ica_comps_toremove)
+        logger.info(logstring)
 
-    def set_ica_comps_manual(self):
+    def set_ica_comps_manual(self): # If components were selected using manual QA, parse log files to generate list
         newdict = parse_manual_ica_qa(self)
-        self.meg_rest_raw.icacomps = np.asarray(newdict[self.meg_rest_raw.basename]).astype(int)
+        self.ica_comps_toremove = np.asarray(newdict[self.meg_rest_raw.basename]).astype(int)
         logstring = 'Components to reject: ' + str(self.meg_rest_raw.icacomps)
         logger.info(logstring)
         
     @log
-    def do_clean_ica(self):
+    def do_clean_ica(self):         # Remove identified ICA components
         print("removing ica components")
         ica=mne.preprocessing.read_ica(op.join(self.ica_dir,self.ica_fname))
         ica.exclude = self.meg_rest_raw.icacomps
@@ -532,14 +529,14 @@ class process():
         ica.apply(self.raw_rest)
         
     @log
-    def do_preproc(self):       # proc both rest and empty room
+    def do_preproc(self):           # proc both rest and empty room
         '''Preprocess both datasets'''
         self._preproc(raw_inst=self.raw_rest, deriv_path=self.rest_derivpath)
         if self.raw_eroom != None:
             self._preproc(raw_inst=self.raw_eroom, deriv_path=self.eroom_derivpath)
     
     @log
-    def _proc_epochs(self,      # divide the rest data into epochs
+    def _proc_epochs(self,          # divide the rest data into epochs
                      raw_inst=None,
                      deriv_path=None):
         '''Create and save epochs
@@ -566,9 +563,7 @@ class process():
             self._proc_epochs(raw_inst=self.raw_eroom, 
                               deriv_path=self.eroom_derivpath)
     
-    # Process the anatomical MRI
-    
-    @log
+    @log                        # Process the anatomical MRI
     def proc_mri(self, t1_override=None,redo_all=False):
         
         # if not provided with a separate T1 MRI filename, extract it from the BIDSpath objects
@@ -684,6 +679,10 @@ class process():
     def do_make_aparc_sub(self):
         write_aparc_sub(subjid=f'sub-{self.subject}', 
                         subjects_dir=self.subjects_dir)
+        
+# =============================================================================
+#       Source Localization and spectral parameterization
+# =============================================================================
          
     @log
     def do_beamformer(self):    # Function to do the beamformer    
@@ -777,16 +776,16 @@ class process():
                 tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
                                 out_image_path=spectral_image_path)
                 
-                #FIX FOR MULTIPLE ALPHA PEAKS
+                # work around for when fooof identifies multiple alpha peaks - set to np.nan
                 potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
                                         (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
                 if len(potential_alpha_idx) != 1:
-                    alpha_peak[label_idx] = np.nan         #############FIX ###########################3 FIX     
+                    alpha_peak[label_idx] = np.nan         
                 else:
                     alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
                     print('label_idx: %d, alpha_peak: %f' % (label_idx, alpha_peak[label_idx]))
             except:
-                alpha_peak[label_idx] = np.nan  #Fix <<<<<<<<<<<<<<    
+                alpha_peak[label_idx] = np.nan  # case where no alpha peak is identified - set to np.nan
             
         #Save the label spectrum to assemble the relative power
         freq_bin_names=[str(binval) for binval in freq_bins]
@@ -820,7 +819,29 @@ class process():
         # output some freesurfer QA metrics
 
         subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
+        
+# =============================================================================
+#       Perform all functions on an instance of the process class
+# =============================================================================
     
+    def do_proc_allsteps(self):             # do all the steps for single subject command line processing
+        self.load_data()
+        self.vendor_prep()
+        self.do_ica()
+        self.do_classify_ica()
+        self.do_preproc()
+        self.do_clean_ica()
+        self.do_proc_epochs()
+        self.proc_mri(t1_override=self._t1_override)
+        self.do_beamformer()
+        self.do_make_aparc_sub()
+        self.do_label_psds()
+        self.do_spectral_parameterization()
+        
+# =============================================================================
+#       Super secret hidden debugging functions. 
+# =============================================================================
+        
     # hidden debugging function to list all output files generated
     def list_outputs(self):
         exists = [i for i in self.fnames if op.exists(self.fnames[i])]
@@ -829,21 +850,7 @@ class process():
             print(f'Present: {self.fnames[i]}')
         print('\n\n')
         for i in missing:
-            print(f'Missing: {self.fnames[i]}')
-    
-    # perform all processing steps on an instance of the process class
-    
-    def do_proc_allsteps(self): # doo all the steps for single subject command line processing
-        self.load_data()
-        self.vendor_prep()
-        self.do_preproc()
-        self.do_proc_epochs()
-        self.proc_mri(t1_override=self._t1_override)
-        self.do_beamformer()
-        self.do_make_aparc_sub()
-        self.do_label_psds()
-        self.do_spectral_parameterization()
-        
+            print(f'Missing: {self.fnames[i]}')  
     
     # hidden debugging function to check alignment
     def check_alignment(self): # test function to look at alignment - not called
@@ -854,12 +861,18 @@ class process():
                                     subject='sub-'+self.bids_path.subject,
                                     subjects_dir=self.subjects_dir,
                                     dig=True)
+ 
+# =========================== End of class and method =========================        
         
-def subcommand(function_str):   # simple function to run something on the command line
+# =============================================================================
+#       Utility and helper functions
+# =============================================================================
+    
+def subcommand(function_str):               # simple function to run something on the command line
     from subprocess import check_call
     check_call(function_str.split(' '))
         
-def compile_fs_process_list(process):   # function to determine what freesurfer steps still must be run
+def compile_fs_process_list(process):       # function to determine what freesurfer steps still must be run
     process_steps=[]
     fs_subject = 'sub-'+process.subject
     if not(process.anat_vars.fsdict['001mgz']):
@@ -900,7 +913,7 @@ def get_fs_filedict(subject, bids_root):    # make a dictionary of freesurfer fi
             fs_dict[key]=False
     return fs_dict
  
-def check_datatype(filename):   # function to determine the file format of MEG data 
+def check_datatype(filename):               # function to determine the file format of MEG data 
     '''Check datatype based on the vendor naming convention to choose best loader'''
     if os.path.splitext(filename)[-1] == '.ds':
         return 'ctf'
@@ -915,7 +928,7 @@ def check_datatype(filename):   # function to determine the file format of MEG d
     else:
         raise ValueError('Could not detect datatype')
         
-def return_dataloader(datatype):   # function to return a data loader based on file format
+def return_dataloader(datatype):            # function to return a data loader based on file format
     '''Return the dataset loader for this dataset'''
     if datatype == 'ctf':
         return functools.partial(mne.io.read_raw_ctf, system_clock='ignore')
@@ -926,7 +939,7 @@ def return_dataloader(datatype):   # function to return a data loader based on f
     if datatype == 'kit':
         return mne.io.read_raw_kit
 
-def load_data(filename):    # simple function to load raw MEG data
+def load_data(filename):                    # simple function to load raw MEG data
     datatype = check_datatype(filename)
     dataloader = return_dataloader(datatype)
     raw = dataloader(filename, preload=True)
@@ -1030,7 +1043,7 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
             
     return auto_noisy_chs, auto_flat_chs            
 
-def write_aparc_sub(subjid=None, subjects_dir=None):
+def write_aparc_sub(subjid=None, subjects_dir=None):    # write the parcel annotation, fetch fsaverage if needed
     '''Check for fsaverage and aparc_sub and download
     Morph fsaverage aparc_sub labels to single subject data
     
@@ -1083,29 +1096,6 @@ def load_test_data_noer(**kwargs):
 # if __name__!='__main__':
 # proc = load_test_data()
 
-# calculate the psd for the epochs, currently not in use
-def label_psd(epoch_vector, fs=None):
-    '''Calculate the source level power spectral density from the label epochs'''
-    # from scipy.signal import welch
-    # freq_bins, epoch_spectra =  welch(epoch_vector, fs=fs, window='hanning') 
-    
-    from mne.time_frequency.multitaper import psd_array_multitaper
-    epoch_spectra, freq_bins = psd_array_multitaper(epoch_vector, 
-                                                    fs, 
-                                                    fmin=fmin, fmax=fmax,
-                                                    bandwidth=mt_bandwidth, 
-                                                    n_jobs=1, 
-                                                    adaptive=True, 
-                                                    low_bias=True) 
-    
-    return freq_bins, np.median(epoch_spectra, axis=0) 
-
-# calculate mean within frequency bands; currently not in use
-def frequency_band_mean(label_by_freq=None, freq_band_list=None):
-    '''Calculate the mean within the frequency bands'''
-    for freqs in freq_band_list:
-        label_by_freq()
-
 # simple function to get frequency indices
 def get_freq_idx(bands, freq_bins):
     ''' Get the frequency indexes'''
@@ -1115,40 +1105,9 @@ def get_freq_idx(bands, freq_bins):
         output.append(tmp)
     return output
 
-# function for plotting head/meg alignment, not currently in use
-def plot_QA_head_sensor_align(info, raw, trans):
-    '''Plot and save the head and sensor alignment and save to the output folder'''
-    from mayavi import mlab
-    mlab.options.offscreen = True
-    mne.viz.set_3d_backend('mayavi')
-    
-    outfolder = info.outfolder
-    subjid = info.subjid
-    subjects_dir = info.subjects_dir
-    
-    fig = mne.viz.plot_alignment(raw.info, trans, subject=subjid, dig=False,
-                     coord_frame='meg', subjects_dir=subjects_dir)
-    mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=0)
-    fig.scene.save_png(op.join(outfolder, 'lhead_posQA.png'))
-    
-    mne.viz.set_3d_view(figure=fig, azimuth=90, elevation=90)
-    fig.scene.save_png(op.join(outfolder, 'rhead_posQA.png'))
-    
-    mne.viz.set_3d_view(figure=fig, azimuth=0, elevation=90)
-    fig.scene.save_png(op.join(outfolder, 'front_posQA.png'))
-
-
-# make a report. Currently not in use
-def make_report(subject, subjects_dir, meg_filename, output_dir):
-    #Create report from output
-    report = Report(image_format='png', subjects_dir=subjects_dir,
-                   subject=subject,  
-                    raw_psd=False)  # use False for speed here
-    #info_fname=meg_filename,  
-    
-    report.parse_folder(output_dir, on_error='ignore', mri_decim=10)
-    report_filename = op.join(output_dir, 'QA_report.html')
-    report.save(report_filename) 
+# =============================================================================
+#       Master processing functions 
+# =============================================================================
 
 def process_subject(subject, args):
     logger = get_subj_logger(subject, args.session, log_dir)
@@ -1202,8 +1161,8 @@ def process_subject_after_icaqa(subject, args):
             )
     proc.load_data()
     proc.set_ica_comps_manual()
-    proc.do_clean_ica()
     proc.do_preproc()
+    proc.do_clean_ica()
     proc.proc_mri(t1_override=proc._t1_override)
     proc.do_beamformer()
     proc.do_make_aparc_sub()
@@ -1494,8 +1453,8 @@ if __name__=='__main__':
                     process_subj.prep_ica_qa()
                 elif(args.process_manual_ica_qa == 1):
                     process_subj.set_ica_comps_manual()
-                    process_subj.do_clean_ica()
                     process_subj.do_preproc()
+                    process_subj.do_clean_ica()
                     process_subj.proc_mri()
                     process_subj.do_beamformer()
                     process_subj.do_make_aparc_sub()
