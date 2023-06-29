@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Apr  3 16:08:12 2020
 
-
-@author: stoutjd
+@author: Jeff Stout and Allison Nugent
 """
 import os
 import os.path as op
@@ -28,7 +26,13 @@ from mne_bids import BIDSPath
 import functools
 import MEGnet
 from MEGnet.prep_inputs.ICA import main as ICA
+from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
+# Set tensorflow to use CPU
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from tensorflow import keras
+
+
 
 # define some variables
 
@@ -482,13 +486,12 @@ class process():
     @log
     def do_ica(self):    
         ica_basename = self.meg_rest_raw.basename + '_ica'
-        ica_folder = self.deriv_path.directory
-        if not os.path.exists(ica_folder): 
-            os.mkdir(ica_folder)
         ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], save_preproc=True, save_ica=True, 
-            results_dir=ica_folder, outbasename=ica_basename)            
-    
-    @log
+        results_dir=self.deriv_path.directory, outbasename=ica_basename)  
+        self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
+        self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
+        self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
+
     def prep_ica_qa(self):
         ica_basename = self.meg_rest_raw.basename + '_ica'
         ica_folder = os.path.join(self.deriv_path.directory, ica_basename)
@@ -503,9 +506,17 @@ class process():
                         '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
     @log           
     def do_classify_ica(self):
-        self.meg_rest_raw.icacomps = np.asarray(classify_icacomps_megnet).astype(int)
-    
-    @log
+        import tensorflow_addons as tfa #Required for loading. tfa f1_score embedded in model
+        from scipy.io import loadmat
+        model_path = op.join(MEGnet.__path__[0] ,  'model/MEGnet_final_model.h5')
+        # This is set to use CPU in initial import
+        kModel=keras.models.load_model(model_path)
+        arrSP_fnames = [op.join(proc.fnames.ica_folder, f'component{i}.mat') for i in range(1,21)]
+        arrTS = loadmat(op.join(proc.fnames.ica_folder, 'ICATimeSeries.mat'))['arrICATimeSeries'].T
+        arrSP = np.stack([loadmat(i)['array'] for i in arrSP_fnames])
+        preds, probs = fPredictChunkAndVoting_parrallel(kModel, arrTS, arrSP)
+        self.meg_rest_ica_classes = preds.argmax(axis=1)
+
     def set_ica_comps_manual(self):
         newdict = parse_manual_ica_qa(self)
         self.meg_rest_raw.icacomps = np.asarray(newdict[self.meg_rest_raw.basename]).astype(int)
@@ -1042,6 +1053,7 @@ def write_aparc_sub(subjid=None, subjects_dir=None):
 
 # hidden testing functions
 def load_test_data(**kwargs):
+    os.environ['n_jobs']='6'
     proc = process(subject='ON02747',
                         bids_root=op.expanduser('~/ds004215'),
                         session='01',
@@ -1055,6 +1067,7 @@ def load_test_data(**kwargs):
 
 # hidden testing functions
 def load_test_data_noer(**kwargs):
+    os.environ['n_jobs']='6'
     proc = process(subject='ON02747',
                         bids_root=op.expanduser('~/ds004215'),
                         session='01',
@@ -1068,7 +1081,7 @@ def load_test_data_noer(**kwargs):
 # print(__name__)
 # # For Testing run this cell
 # if __name__!='__main__':
-# proc = load_test_data(run='01')
+# proc = load_test_data()
 
 # calculate the psd for the epochs, currently not in use
 def label_psd(epoch_vector, fs=None):
