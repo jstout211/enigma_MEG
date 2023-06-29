@@ -100,7 +100,7 @@ class process():
 
         self.subject=subject.replace('sub-','')  # Strip sub- if present
         self.bids_root=bids_root
-        if deriv_root is None:
+        if deriv_root is None:                   # Derivatives directory
             self.deriv_root = op.join(
                 bids_root, 
                 'derivatives'
@@ -244,6 +244,7 @@ class process():
         
         # if there's an emptyroom path provided, extract the entities from the filepath
         # and update the BIDS path objects
+        
         if eroompath != None:
             entities = mne_bids.get_entities_from_fname(eroompath)
             self.eroom_derivpath.update(
@@ -486,7 +487,8 @@ class process():
             os.mkdir(ica_folder)
         ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], save_preproc=True, save_ica=True, 
             results_dir=ica_folder, outbasename=ica_basename)            
-
+    
+    @log
     def prep_ica_qa(self):
         ica_basename = self.meg_rest_raw.basename + '_ica'
         ica_folder = os.path.join(self.deriv_path.directory, ica_basename)
@@ -499,14 +501,18 @@ class process():
         
         subprocess.run(['python', prep_fcn_path, '-ica_fname', ica_fname, '-raw_fname', raw_fname,
                         '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
-                
+    @log           
     def do_classify_ica(self):
         self.meg_rest_raw.icacomps = np.asarray(classify_icacomps_megnet).astype(int)
-        
+    
+    @log
     def set_ica_comps_manual(self):
         newdict = parse_manual_ica_qa(self)
         self.meg_rest_raw.icacomps = np.asarray(newdict[self.meg_rest_raw.basename]).astype(int)
+        logstring = 'Components to reject: ' + str(self.meg_rest_raw.icacomps)
+        logger.info(logstring)
         
+    @log
     def do_clean_ica(self):
         print("removing ica components")
         ica=mne.preprocessing.read_ica(op.join(self.ica_dir,self.ica_fname))
