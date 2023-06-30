@@ -734,7 +734,7 @@ class process():
         label_ts = mne.source_estimate.extract_label_time_course(self.psds, 
                                                                  labels, 
                                                                  self.rest_fwd['src'],
-                                                                 mode='pca')
+                                                                 mode='mean')
 
         #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
         self.label_ts = np.stack(label_ts)
@@ -1163,6 +1163,7 @@ def process_subject_after_icaqa(subject, args):
     proc.set_ica_comps_manual()
     proc.do_preproc()
     proc.do_clean_ica()
+    proc.do_proc_epochs()
     proc.proc_mri(t1_override=proc._t1_override)
     proc.do_beamformer()
     proc.do_make_aparc_sub()
