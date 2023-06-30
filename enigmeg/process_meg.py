@@ -34,6 +34,8 @@ from tensorflow import keras
 
 
 
+
+
 # define some variables
 
 fmin = 1
@@ -523,8 +525,8 @@ class process():
     @log
     def do_clean_ica(self):         # Remove identified ICA components
         print("removing ica components")
-        ica=mne.preprocessing.read_ica(op.join(self.ica_dir,self.ica_fname))
-        ica.exclude = self.meg_rest_raw.icacomps
+        ica=mne.preprocessing.read_ica(op.join(self.fnames.ica_folder,self.fnames.ica))
+        ica.exclude = self.ica_comps_toremove #meg_rest_raw.icacomps
         self.load_data()
         ica.apply(self.raw_rest)
         
@@ -931,7 +933,8 @@ def check_datatype(filename):               # function to determine the file for
 def return_dataloader(datatype):            # function to return a data loader based on file format
     '''Return the dataset loader for this dataset'''
     if datatype == 'ctf':
-        return functools.partial(mne.io.read_raw_ctf, system_clock='ignore')
+        return functools.partial(mne.io.read_raw_ctf, system_clock='ignore',
+                                 clean_names=True)
     if datatype == 'fif':
         return functools.partial(mne.io.read_raw_fif, allow_maxshield=True)
     if datatype == '4d':
