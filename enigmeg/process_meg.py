@@ -921,7 +921,7 @@ def check_datatype(filename):               # function to determine the file for
         return 'ctf'
     elif os.path.splitext(filename)[-1] == '.fif':
         return 'fif'
-    elif os.path.splitext(filename)[-1] == '.4d' or ',' in filename:
+    elif os.path.splitext(filename)[-1] == '.4d' or ',' in str(filename):
         return '4d'
     elif os.path.splitext(filename)[-1] == '.sqd':
         return 'kit'
