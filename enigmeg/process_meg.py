@@ -74,7 +74,10 @@ def get_subj_logger(subjid, session, log_dir=None):
 def log(function):
     def wrapper(*args, **kwargs):  
         logger.info(f"{function.__name__} :: START")
-        output = function(*args, **kwargs)
+        try:
+            output = function(*args, **kwargs)
+        except as e:
+            logger.except(e)
         logger.info(f"{function.__name__} :: COMPLETED")
         return output
     return wrapper
