@@ -76,8 +76,8 @@ def log(function):
         logger.info(f"{function.__name__} :: START")
         try:
             output = function(*args, **kwargs)
-        except as e:
-            logger.except(e)
+        except BaseException as e:
+            logger.exception(e)
         logger.info(f"{function.__name__} :: COMPLETED")
         return output
     return wrapper
