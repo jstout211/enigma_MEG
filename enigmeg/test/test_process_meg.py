@@ -91,7 +91,7 @@ def test_load():
                         bids_root=op.join(download_path, openneuro_dset),
                         session='01',
                         run='01',
-                        emptyroom_tagname='noise', 
+                        emptyroom_tagname='artifact', 
                         mains=60)
     
     assert proc.check_paths() == None
