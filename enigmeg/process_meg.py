@@ -314,7 +314,7 @@ class process():
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')
         self.fooof_dir = self.deriv_path.directory / \
-            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+            proc.deriv_path.copy().update(datatype=None, extension=None).basename
         
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -373,7 +373,7 @@ class process():
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')       
         self.fooof_dir = self.deriv_path.directory / \
-            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+            proc.deriv_path.copy().update(datatype=None, extension=None).basename
     
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -763,7 +763,7 @@ class process():
         alpha_peak = np.zeros(len(labels))
         
         outfolder = self.deriv_path.directory / \
-            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+            self.deriv_path.copy().update(datatype=None, extension=None).basename
         self.results_dir = outfolder
         if not os.path.exists(outfolder): os.mkdir(outfolder)
         
@@ -824,7 +824,7 @@ class process():
 
         # output some freesurfer QA metrics
 
-        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
+        #subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
         
 # =============================================================================
 #       Perform all functions on an instance of the process class
