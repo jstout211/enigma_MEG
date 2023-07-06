@@ -724,7 +724,7 @@ class process():
             #Build beamformer without emptyroom noise
             epo_rank = mne.compute_rank(epochs)
             filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05,pick_ori='max-power',
-                    inversion='matrix', weight_norm='unit-noise-gain', rank=noise_rank)
+                    inversion='matrix', weight_norm='unit-noise-gain', rank=epo_rank)
         
         filters.save(fname_dics, overwrite=True)
         psds, freqs = apply_dics_csd(dat_csd, filters) 
