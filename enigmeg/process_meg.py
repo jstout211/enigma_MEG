@@ -442,12 +442,12 @@ class process():
         if self.vendor[0] == 'CTF_275':
             if self.raw_rest.compensation_grade != 3:
                 logging.info('Applying 3rd order gradient to rest data')
-                self.apply_gradient_compensation(3)
+                self.raw_rest.apply_gradient_compensation(3)
             if hasattr(self, 'raw_eroom'):
                 if self.raw_eroom != None: 
                     if self.raw_eroom.compensation_grade != 3:
                         logging.info('Applying 3rd order gradient to emptyroom data')
-                        self.apply_gradient_compensation(3)
+                        self.raw_eroom.apply_gradient_compensation(3)
          
         # run bad channel assessments on rest and emptyroom (if present)
         rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
