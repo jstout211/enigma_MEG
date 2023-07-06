@@ -497,7 +497,8 @@ class process():
         
         prep_fcn_path = op.join(enigmeg.__path__[0], 'QA/make_ica_qa.py')
         
-        output_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + self.meg_rest_raw.session
+        output_path = str(proc.deriv_path.directory).replace('ENIGMA_MEG','ENIGMA_MEG_QA')
+        output_path = op.dirname(output_path)
         
         subprocess.run(['python', prep_fcn_path, '-ica_fname', ica_fname, '-raw_fname', raw_fname,
                         '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
