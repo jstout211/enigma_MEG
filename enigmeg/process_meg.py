@@ -78,6 +78,7 @@ def log(function):
             output = function(*args, **kwargs)
         except BaseException as e:
             logger.exception(f"{function.__name__} :: " + str(e))
+            raise
         logger.info(f"{function.__name__} :: COMPLETED")
         return output
     return wrapper
@@ -122,10 +123,10 @@ class process():
             'ENIGMA_MEG'
             )
         
-        self.QA_dir = op.join( # QA output directory
-            self.deriv_root,
-            'ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + session 
-            )
+#        self.QA_dir = op.join( # QA output directory
+#            self.deriv_root,
+#            'ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + session 
+#            )
         
         if subjects_dir is None:    # Freesurfer subjects directory
             self.subjects_dir = op.join(
@@ -178,7 +179,7 @@ class process():
             run=run
             )
         
-        if emptyroom_tagname == None and not csv_info['eroom']:
+        if emptyroom_tagname == None: # and not csv_info['eroom']:
             self.eroom_derivpath = None
         else:
             self.eroom_derivpath = self.deriv_path.copy().update(
@@ -192,7 +193,7 @@ class process():
             run=run
             )
         
-        if emptyroom_tagname == None and not csv_info['eroom']:
+        if emptyroom_tagname == None: # and not csv_info['eroom']:
             self.meg_er_raw = None
         else:
             self.meg_er_raw = self.bids_path.copy().update(
@@ -314,7 +315,7 @@ class process():
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')
         self.fooof_dir = self.deriv_path.directory / \
-            proc.deriv_path.copy().update(datatype=None, extension=None).basename
+            self.deriv_path.copy().update(datatype=None, extension=None).basename
         
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -373,7 +374,7 @@ class process():
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')       
         self.fooof_dir = self.deriv_path.directory / \
-            proc.deriv_path.copy().update(datatype=None, extension=None).basename
+            self.deriv_path.copy().update(datatype=None, extension=None).basename
     
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -443,26 +444,32 @@ class process():
                 logging.info('Applying 3rd order gradient to rest data')
                 self.apply_gradient_compensation(3)
             if hasattr(self, 'raw_eroom'):
-                if self.raw_eroom.compensation_grade != 3:
-                    logging.info('Applying 3rd order gradient to emptyroom data')
-                    self.apply_gradient_compensation(3)
+                if self.raw_eroom != None: 
+                    if self.raw_eroom.compensation_grade != 3:
+                        logging.info('Applying 3rd order gradient to emptyroom data')
+                        self.apply_gradient_compensation(3)
          
         # run bad channel assessments on rest and emptyroom (if present)
         rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
         if hasattr(self, 'raw_eroom'):
-            er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
+            if self.raw_eroom != None:
+                er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
         else:
             er_bad = []
             er_flat =[]
-        all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
+        if self.raw_eroom != None:
+            all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
                 rest_bad + rest_flat + er_bad + er_flat
+        else:
+            all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat 
         # remove duplicates
         all_bad = list(set(all_bad))
             
         # mark bad/flat channels as such in datasets
         self.raw_rest.info['bads'] = all_bad
         if hasattr(self, 'raw_eroom'):
-            self.raw_eroom.info['bads'] = all_bad
+            if self.raw_eroom != None:
+                self.raw_eroom.info['bads'] = all_bad
         
         print('bad or flat channels')
         print(all_bad)           
