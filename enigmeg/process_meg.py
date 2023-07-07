@@ -170,6 +170,7 @@ class process():
         # QA output directory
         self.QA_dir = self.deriv_path.copy().update(datatype=None, extension=None, 
                                                     suffix=None).basename
+        os.makedirs(self.QA_dir, exist_ok=True)
         
         if not op.exists(self.deriv_path.directory): 
             self.deriv_path.directory.mkdir(parents=True)
