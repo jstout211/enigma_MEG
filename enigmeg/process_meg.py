@@ -123,10 +123,6 @@ class process():
             'ENIGMA_MEG'
             )
         
-#        self.QA_dir = op.join( # QA output directory
-#            self.deriv_root,
-#            'ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + session 
-#            )
         
         if subjects_dir is None:    # Freesurfer subjects directory
             self.subjects_dir = op.join(
@@ -170,6 +166,10 @@ class process():
             datatype='meg', 
             suffix='meg'
             )
+        
+        # QA output directory
+        self.QA_dir = self.deriv_path.copy().update(datatype=None, extension=None, 
+                                                    suffix=None).basename
         
         if not op.exists(self.deriv_path.directory): 
             self.deriv_path.directory.mkdir(parents=True)
