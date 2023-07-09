@@ -433,7 +433,7 @@ class process():
     def vendor_prep(self):
         
         '''Different vendor types require special cleaning / initialization'''
-        
+        print('vendor = %s' % self.vendor[0])
         ## Apply 3rd order gradient for CTF datasets  
         if self.vendor[0] == 'CTF_275':
             if self.raw_rest.compensation_grade != 3:
@@ -445,6 +445,7 @@ class process():
                     self.apply_gradient_compensation(3)
          
         # run bad channel assessments on rest and emptyroom (if present)
+
         rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
         if hasattr(self, 'raw_eroom'):
             er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
@@ -457,9 +458,10 @@ class process():
         all_bad = list(set(all_bad))
             
         # mark bad/flat channels as such in datasets
-        self.raw_rest.info['bads'] = all_bad
+        self.bad_channels = all_bad
+        self.raw_rest.drop_channels(all_bad)
         if hasattr(self, 'raw_eroom'):
-            self.raw_eroom.info['bads'] = all_bad
+            self.raw_eroom.drop_channels(all_bad)
         
         print('bad or flat channels')
         print(all_bad)           
@@ -482,8 +484,9 @@ class process():
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
         ica_basename = self.meg_rest_raw.basename + '_ica'
+        bad_channels = self.bad_channels
         ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], save_preproc=True, save_ica=True, 
-        results_dir=self.deriv_path.directory, outbasename=ica_basename)  
+        results_dir=self.deriv_path.directory, outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
         self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
@@ -955,13 +958,12 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
     from mne.preprocessing import find_bad_channels_maxwell
     # load data with load_data to ensure correct function is chosen
     raw = load_data(raw_fname)    
-    if raw.times[-1] > 60.0:
-        raw.crop(tmax=60)    
+    #if raw.times[-1] > 60.0:
+    #raw.crop(tmax=60.0)    
     raw.info['bads'] = []
     raw_check = raw.copy()
     
     if vendor == '306m' or vendor == '122m':
-        
         if is_eroom==False:
             auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
                 raw_check, cross_talk=None, calibration=None,
@@ -999,7 +1001,7 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         
     # ignore references and use 'meg' coordinate frame for CTF and KIT
     
-    if vendor == 'CTF_275':
+    elif vendor == 'CTF_275':
         raw_check.apply_gradient_compensation(0)
         auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
             raw_check, cross_talk=None, calibration=None, coord_frame='meg',
@@ -1021,7 +1023,6 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
             flats.append(raw_check.info['ch_names'][megs[flat_idx_mags]]) 
     
     else: 
-        
         auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
             raw_check, cross_talk=None, calibration=None, coord_frame='meg',
             return_scores=True, verbose=True, ignore_ref=True)
@@ -1043,6 +1044,7 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
     
     auto_flat_chs = auto_flat_chs + flats
     auto_flat_chs = list(set(auto_flat_chs))
+    print(auto_noisy_chs, auto_flat_chs)
             
     return auto_noisy_chs, auto_flat_chs            
 
@@ -1144,6 +1146,7 @@ def process_subject_up_to_icaqa(subject, args):
             fs_ave_fids=args.fs_ave_fids
             )
     proc.load_data()
+    proc.vendor_prep()
     proc.do_ica()
     proc.prep_ica_qa()    
     
@@ -1163,6 +1166,7 @@ def process_subject_after_icaqa(subject, args):
             fs_ave_fids=args.fs_ave_fids
             )
     proc.load_data()
+    proc.vendor_prep()
     proc.set_ica_comps_manual()
     proc.do_preproc()
     proc.do_clean_ica()
@@ -1450,12 +1454,15 @@ if __name__=='__main__':
                                        fs_ave_fids=False,
                                        check_paths=False,
                                        csv_info=row)
+                
                 process_subj.load_data()
                 
                 if (args.ica_manual_qa_prep == 1):
+                    process_subj.vendor_prep()
                     process_subj.do_ica()
                     process_subj.prep_ica_qa()
                 elif(args.process_manual_ica_qa == 1):
+                    process_subj.vendor_prep()
                     process_subj.set_ica_comps_manual()
                     process_subj.do_preproc()
                     process_subj.do_clean_ica()
