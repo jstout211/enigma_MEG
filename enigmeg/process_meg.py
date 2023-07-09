@@ -74,7 +74,11 @@ def get_subj_logger(subjid, session, log_dir=None):
 def log(function):
     def wrapper(*args, **kwargs):  
         logger.info(f"{function.__name__} :: START")
-        output = function(*args, **kwargs)
+        try:
+            output = function(*args, **kwargs)
+        except BaseException as e:
+            logger.exception(f"{function.__name__} :: " + str(e))
+            raise
         logger.info(f"{function.__name__} :: COMPLETED")
         return output
     return wrapper
@@ -119,10 +123,6 @@ class process():
             'ENIGMA_MEG'
             )
         
-        self.QA_dir = op.join( # QA output directory
-            self.deriv_root,
-            'ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + session 
-            )
         
         if subjects_dir is None:    # Freesurfer subjects directory
             self.subjects_dir = op.join(
@@ -167,6 +167,11 @@ class process():
             suffix='meg'
             )
         
+        # QA output directory
+        self.QA_dir = self.deriv_path.copy().update(datatype=None, extension=None, 
+                                                    suffix=None).basename
+        os.makedirs(self.QA_dir, exist_ok=True)
+        
         if not op.exists(self.deriv_path.directory): 
             self.deriv_path.directory.mkdir(parents=True)
         
@@ -175,7 +180,7 @@ class process():
             run=run
             )
         
-        if emptyroom_tagname == None and not csv_info['eroom']:
+        if emptyroom_tagname == None: # and not csv_info['eroom']:
             self.eroom_derivpath = None
         else:
             self.eroom_derivpath = self.deriv_path.copy().update(
@@ -189,7 +194,7 @@ class process():
             run=run
             )
         
-        if emptyroom_tagname == None and not csv_info['eroom']:
+        if emptyroom_tagname == None: # and not csv_info['eroom']:
             self.meg_er_raw = None
         else:
             self.meg_er_raw = self.bids_path.copy().update(
@@ -311,7 +316,7 @@ class process():
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')
         self.fooof_dir = self.deriv_path.directory / \
-            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+            self.deriv_path.copy().update(datatype=None, extension=None).basename
         
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -370,7 +375,7 @@ class process():
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')       
         self.fooof_dir = self.deriv_path.directory / \
-            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+            self.deriv_path.copy().update(datatype=None, extension=None).basename
     
         # Cast all bids paths to paths and save as dictionary
         path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
@@ -438,22 +443,27 @@ class process():
         if self.vendor[0] == 'CTF_275':
             if self.raw_rest.compensation_grade != 3:
                 logging.info('Applying 3rd order gradient to rest data')
-                self.apply_gradient_compensation(3)
+                self.raw_rest.apply_gradient_compensation(3)
             if hasattr(self, 'raw_eroom'):
-                if self.raw_eroom.compensation_grade != 3:
-                    logging.info('Applying 3rd order gradient to emptyroom data')
-                    self.apply_gradient_compensation(3)
+                if self.raw_eroom != None: 
+                    if self.raw_eroom.compensation_grade != 3:
+                        logging.info('Applying 3rd order gradient to emptyroom data')
+                        self.raw_eroom.apply_gradient_compensation(3)
          
         # run bad channel assessments on rest and emptyroom (if present)
 
         rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
         if hasattr(self, 'raw_eroom'):
-            er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
+            if self.raw_eroom != None:
+                er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
         else:
             er_bad = []
             er_flat =[]
-        all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
+        if self.raw_eroom != None:
+            all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
                 rest_bad + rest_flat + er_bad + er_flat
+        else:
+            all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat 
         # remove duplicates
         all_bad = list(set(all_bad))
             
@@ -497,7 +507,8 @@ class process():
         
         prep_fcn_path = op.join(enigmeg.__path__[0], 'QA/make_ica_qa.py')
         
-        output_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/sub-' + self.subject + '/ses-' + self.meg_rest_raw.session
+        output_path = str(proc.deriv_path.directory).replace('ENIGMA_MEG','ENIGMA_MEG_QA')
+        output_path = op.dirname(output_path)
         
         subprocess.run(['python', prep_fcn_path, '-ica_fname', ica_fname, '-raw_fname', raw_fname,
                         '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
@@ -716,7 +727,7 @@ class process():
             #Build beamformer without emptyroom noise
             epo_rank = mne.compute_rank(epochs)
             filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05,pick_ori='max-power',
-                    inversion='matrix', weight_norm='unit-noise-gain', rank=noise_rank)
+                    inversion='matrix', weight_norm='unit-noise-gain', rank=epo_rank)
         
         filters.save(fname_dics, overwrite=True)
         psds, freqs = apply_dics_csd(dat_csd, filters) 
@@ -762,7 +773,7 @@ class process():
         alpha_peak = np.zeros(len(labels))
         
         outfolder = self.deriv_path.directory / \
-            f'sub-{self.subject}_ses-{self.meg_rest_raw.session}_fooof_results_run-{self.meg_rest_raw.run}'
+            self.deriv_path.copy().update(datatype=None, extension=None).basename
         self.results_dir = outfolder
         if not os.path.exists(outfolder): os.mkdir(outfolder)
         
@@ -823,7 +834,7 @@ class process():
 
         # output some freesurfer QA metrics
 
-        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
+        #subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
         
 # =============================================================================
 #       Perform all functions on an instance of the process class
@@ -924,7 +935,7 @@ def check_datatype(filename):               # function to determine the file for
         return 'ctf'
     elif os.path.splitext(filename)[-1] == '.fif':
         return 'fif'
-    elif os.path.splitext(filename)[-1] == '.4d' or ',' in filename:
+    elif os.path.splitext(filename)[-1] == '.4d' or ',' in str(filename):
         return '4d'
     elif os.path.splitext(filename)[-1] == '.sqd':
         return 'kit'

@@ -7,7 +7,7 @@ Created on Thu Jan 12 14:34:01 2023
 """
 
 import os, os.path as op
-demo_dir = '/home/jstout/src/enigma_OHBM/RESULTS_OHBM/DEMOG'
+demo_dir = '/home/jstout/src/enigma_OHBM/RESULTS_OHBM_FIN/DEMOG'
 topdir = demo_dir
 os.chdir(topdir)
 
