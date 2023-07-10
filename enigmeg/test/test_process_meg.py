@@ -43,9 +43,9 @@ def test_preproc():
 def test_create_epochs():
     assert proc.do_proc_epochs() == None
     assert op.exists(proc.fnames.rest_epo)
-    assert op.exists(proc.fnames.rest_cov)
+    assert op.exists(proc.fnames.rest_csd)
     assert op.exists(proc.fnames.eroom_epo)
-    assert op.exists(proc.fnames.eroom_cov)
+    assert op.exists(proc.fnames.eroom_csd)
 
 def test_mriproc():
     proc.proc_mri() #redo_all=True)
