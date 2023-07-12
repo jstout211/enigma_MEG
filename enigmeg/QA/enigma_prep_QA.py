@@ -98,7 +98,7 @@ if __name__=='__main__':
                         t1_override=None,
                         fs_ave_fids=False
                         )
-    
+        subjstruct.QA_dir = png_path
         _prepare_QA(subjstruct)
     
     elif args.proc_fromcsv:

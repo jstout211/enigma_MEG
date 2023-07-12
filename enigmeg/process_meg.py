@@ -13,14 +13,15 @@ import numpy as np
 import pandas as pd
 import enigmeg
 from enigmeg.spectral_peak_analysis import calc_spec_peak
-from enigmeg.mod_label_extract import mod_source_estimate
 from enigmeg.QA.enigma_QA_GUI_functions import build_status_dict
+from enigmeg import mod_label_extract
 import logging
 import munch 
 import subprocess
 import mne_bids
 from mne_bids import get_head_mri_trans
 from mne.beamformer import make_dics, apply_dics_csd
+from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import scipy as sp
 from mne_bids import BIDSPath
 import functools
@@ -101,6 +102,7 @@ class process():
             t1_override=None,
             fs_ave_fids=False, 
             check_paths=True,
+            do_dics=False,
             csv_info=None
             ):
         
@@ -149,6 +151,8 @@ class process():
             self._use_fsave_coreg=False
         
         self._n_jobs = int(os.environ['n_jobs'])
+        
+        self.do_dics = do_dics
             
 # =============================================================================
 #             Configure paths and filenames
@@ -311,10 +315,14 @@ class process():
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
-        
-        _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
+        if self.do_dics:
+            _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
                                                      run=self.meg_rest_raw.run,
                                                      extension='.h5')
+        else:
+            _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv',
+                                                     run=self.meg_rest_raw.run,
+                                                     extension='h5')
         self.fooof_dir = self.deriv_path.directory / \
             self.deriv_path.copy().update(datatype=None, extension=None).basename
         
@@ -362,18 +370,28 @@ class process():
         #_tmp['rest_epo_clean']=_tmp['rest_epo'].copy().update(processing='clean')
         #_tmp['eroom_epo_clean']=_tmp['eroom_epo'].copy().update(processing='clean')
         
-        _tmp['rest_csd']=rest_deriv.copy().update(suffix='csd', extension='.h5')
-        if emptyroom_tagname!=None:
-            _tmp['eroom_csd']=eroom_deriv.copy().update(suffix='csd', extension='.h5')
+        if self.do_dics:
+            _tmp['rest_csd']=rest_deriv.copy().update(suffix='csd', extension='.h5')
+            if emptyroom_tagname!=None:
+                _tmp['eroom_csd']=eroom_deriv.copy().update(suffix='csd', extension='.h5')
+        else:
+            _tmp['rest_cov']=rest_deriv.copy().update(suffix='cov', extension='.fif')
+            if emptyroom_tagname!=None:
+                _tmp['eroom_cov']=eroom_deriv.copy().update(suffix='cov', extension='.fif')
         
         _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
         _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
         _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
         _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
         _tmp['ica'] = self.deriv_path.copy().update(suffix='ica', extension='.fif')
-        _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
+        if self.do_dics:
+            _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
                                                      run=self.meg_rest_raw.run,
-                                                     extension='.h5')       
+                                                     extension='.h5')  
+        else:
+            _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv',
+                                                     run=self.meg_rest_raw.run,
+                                                     extension='.h5')
         self.fooof_dir = self.deriv_path.directory / \
             self.deriv_path.copy().update(datatype=None, extension=None).basename
     
@@ -507,7 +525,7 @@ class process():
         
         prep_fcn_path = op.join(enigmeg.__path__[0], 'QA/make_ica_qa.py')
         
-        output_path = str(proc.deriv_path.directory).replace('ENIGMA_MEG','ENIGMA_MEG_QA')
+        output_path = str(self.deriv_path.directory).replace('ENIGMA_MEG','ENIGMA_MEG_QA')
         output_path = op.dirname(output_path)
         
         subprocess.run(['python', prep_fcn_path, '-ica_fname', ica_fname, '-raw_fname', raw_fname,
@@ -531,15 +549,23 @@ class process():
         logger.info(logstring)
 
     def set_ica_comps_manual(self): # If components were selected using manual QA, parse log files to generate list
+        # lots of filenames have to be redefined here, if we've picked up after doing manual QA
+        ica_basename = self.meg_rest_raw.basename + '_ica'
+        self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
+        self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
+        self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
         newdict = parse_manual_ica_qa(self)
         self.ica_comps_toremove = np.asarray(newdict[self.meg_rest_raw.basename]).astype(int)
-        logstring = 'Components to reject: ' + str(self.meg_rest_raw.icacomps)
+        logstring = 'Components to reject: ' + str(self.ica_comps_toremove)
         logger.info(logstring)
         
     @log
     def do_clean_ica(self):         # Remove identified ICA components
+    
         print("removing ica components")
-        ica=mne.preprocessing.read_ica(op.join(self.fnames.ica_folder,self.fnames.ica))
+        print("self.fnames.ica_folder %s" % self.fnames.ica_folder)
+        print("self.fnames.ica %s" % self.fnames.ica)
+        ica=mne.preprocessing.read_ica(op.join(self.fnames.ica))
         ica.exclude = self.ica_comps_toremove #meg_rest_raw.icacomps
         self.load_data()
         ica.apply(self.raw_rest)
@@ -563,13 +589,17 @@ class process():
         epochs_fname = deriv_path.copy().update(suffix='epo', extension='.fif')
         epochs.save(epochs_fname, overwrite=True)
         
-        # compute the cross spectral density for the epoched data
-        # multitaper better but slower, use fourier for testing
-        
-        #csd = mne.time_frequency.csd_fourier(epochs,fmin=fmin,fmax=fmax,n_jobs=self._n_jobs)
-        csd = mne.time_frequency.csd_multitaper(epochs,fmin=fmin,fmax=fmax,n_jobs=self._n_jobs)
-        csd_fname = deriv_path.copy().update(suffix='csd', extension='.h5')
-        csd.save(str(csd_fname.fpath), overwrite=True)
+        if self.do_dics:
+            # compute the cross spectral density for the epoched data
+            # multitaper better but slower, use fourier for testing
+            #csd = mne.time_frequency.csd_fourier(epochs,fmin=fmin,fmax=fmax,n_jobs=self._n_jobs)
+            csd = mne.time_frequency.csd_multitaper(epochs,fmin=fmin,fmax=fmax,n_jobs=self._n_jobs)
+            csd_fname = deriv_path.copy().update(suffix='csd', extension='.h5')
+            csd.save(str(csd_fname.fpath), overwrite=True)
+        else:
+            cov = mne.compute_covariance(epochs)
+            cov_fname = deriv_path.copy().update(suffix='cov', extension='fif')
+            cov.save(cov_fname, overwrite=True)
     
     @log
     def do_proc_epochs(self):   # epoch both the rest and the empty room
@@ -703,15 +733,21 @@ class process():
     @log
     def do_beamformer(self):    # Function to do the beamformer    
         
-        # read in all the necessary files
-        dat_csd = mne.time_frequency.read_csd(self.fnames.rest_csd)
-        forward = mne.read_forward_solution(self.fnames.rest_fwd)
-        epochs = mne.read_epochs(self.fnames.rest_epo)
-        fname_dics = self.fnames.dics #Pre-assign output name
-        
+        if self.do_dics:
+            # read in all the necessary files
+            dat_csd = mne.time_frequency.read_csd(self.fnames.rest_csd)
+            forward = mne.read_forward_solution(self.fnames.rest_fwd)
+            epochs = mne.read_epochs(self.fnames.rest_epo)
+            fname_dics = self.fnames.dics #Pre-assign output name
+        else:
+            dat_cov = mne.read_cov(self.fnames.rest_cov)
+            forward = mne.read_forward_solution(self.fnames.rest_fwd)
+            epochs = mne.read_epochs(self.fnames.rest_epo)
+            fname_lcmv = self.fnames.lcmv #Pre-assign output name
+            
         # If emptyroom present - use in beamformer
         if self.meg_er_raw != None:
-            noise_csd = mne.time_frequency.read_csd(self.fnames.eroom_csd)
+
             noise_rank = mne.compute_rank(self.raw_eroom)
             epo_rank = mne.compute_rank(epochs)
             if 'mag' in epo_rank:
@@ -720,19 +756,37 @@ class process():
             if 'grad' in epo_rank:
                 if epo_rank['grad'] < noise_rank['grad']:
                     noise_rank['grad']=epo_rank['grad']
-            filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05, pick_ori='max-power',
-                    noise_csd=noise_csd, inversion='matrix', weight_norm='unit-noise-gain', rank=noise_rank)
-
+                
+            if self.do_dics:
+                noise_csd = mne.time_frequency.read_csd(self.fnames.eroom_csd)
+                #filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05, pick_ori='max-power',
+                #    noise_csd=noise_csd, inversion='matrix', weight_norm='unit-noise-gain', rank=noise_rank)
+                filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05, pick_ori='max-power',
+                    noise_csd=noise_csd, inversion='single', weight_norm=None, depth=1, rank=noise_rank)
+            else:
+                noise_cov = mne.read_cov(self.fnames.eroom_cov)
+                filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, noise_cov=noise_cov,  pick_ori='max-power',
+                    weight_norm='unit-noise-gain', rank=noise_rank)
         else:
             #Build beamformer without emptyroom noise
             epo_rank = mne.compute_rank(epochs)
-            filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05,pick_ori='max-power',
+                
+            if self.do_dics:
+                filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05,pick_ori='max-power',
                     inversion='matrix', weight_norm='unit-noise-gain', rank=epo_rank)
+            else:
+                filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05,
+                            pick_ori='max-power', weight_norm='unit-noise-gain', rank=epo_rank)
         
-        filters.save(fname_dics, overwrite=True)
-        psds, freqs = apply_dics_csd(dat_csd, filters) 
-        self.psds = psds
-        self.freqs = freqs
+        if self.do_dics:
+            filters.save(fname_dics, overwrite=True)
+            psds, freqs = apply_dics_csd(dat_csd, filters) 
+            self.psds = psds
+            self.freqs = freqs
+        else:
+            filters.save(fname_lcmv, overwrite=True)
+            stcs = apply_lcmv_epochs(epochs, filters, return_generator=True)
+            self.stcs=stcs
         
     @log    
     def do_label_psds(self):    # Function to extract the psd for each label. Takes a long time. 
@@ -747,11 +801,17 @@ class process():
         labels=labels_lh + labels_rh 
         self.labels = labels
         
-        label_ts = mne.source_estimate.extract_label_time_course(self.psds, 
+        if self.do_dics:
+            label_ts = mne.source_estimate.extract_label_time_course(self.psds, 
                                                                  labels, 
                                                                  self.rest_fwd['src'],
                                                                  mode='mean')
-
+        else:
+            label_ts = mod_label_extract.mod_extract_label_time_course(self.stcs,
+                                                         labels,
+                                                         self.rest_fwd['src'],
+                                                         mode='pca15_multitaper')
+                                                         
         #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
         self.label_ts = np.stack(label_ts)
     
@@ -765,8 +825,11 @@ class process():
         None.
 
         '''
-        freq_bins = np.array(self.freqs)    
-    
+        if self.do_dics:
+            freq_bins = np.array(self.freqs)    
+        else:
+            freq_bins = np.linspace(fmin,fmax,n_bins)
+            
         #Initialize 
         labels = self.labels
         label_power = np.zeros([len(labels), len(freq_bins)])  
@@ -780,8 +843,10 @@ class process():
         #Create PSD for each label
         label_stack = self.label_ts
         for label_idx in range(len(self.labels)):
-            #current_psd = label_stack[:,label_idx, :].mean(axis=0)  ###???
-            current_psd = label_stack[label_idx, :]
+            if self.do_dics:
+                current_psd = label_stack[label_idx, :]
+            else:
+                current_psd = label_stack[:,label_idx, :].mean(axis=0)  ###???
             label_power[label_idx,:] = current_psd
             
             #spectral_image_path = os.path.join(outfolder, 'Spectra_'+
@@ -834,7 +899,7 @@ class process():
 
         # output some freesurfer QA metrics
 
-        #subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
+        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
         
 # =============================================================================
 #       Perform all functions on an instance of the process class
@@ -969,8 +1034,8 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
     from mne.preprocessing import find_bad_channels_maxwell
     # load data with load_data to ensure correct function is chosen
     raw = load_data(raw_fname)    
-    #if raw.times[-1] > 60.0:
-    #raw.crop(tmax=60.0)    
+    if raw.times[-1] > 60.0:
+        raw.crop(tmax=60.0)    
     raw.info['bads'] = []
     raw_check = raw.copy()
     
@@ -1138,7 +1203,8 @@ def process_subject(subject, args):
             mains=float(args.mains),
             run=args.run,
             t1_override=None,
-            fs_ave_fids=args.fs_ave_fids)           
+            fs_ave_fids=args.fs_ave_fids,
+            do_dics=args.do_dics)           
     proc.do_proc_allsteps()
     
 def process_subject_up_to_icaqa(subject, args):
@@ -1154,7 +1220,8 @@ def process_subject_up_to_icaqa(subject, args):
             mains=float(args.mains),
             run=args.run,
             t1_override=None,
-            fs_ave_fids=args.fs_ave_fids
+            fs_ave_fids=args.fs_ave_fids,
+            do_dics=args.do_dics
             )
     proc.load_data()
     proc.vendor_prep()
@@ -1174,7 +1241,8 @@ def process_subject_after_icaqa(subject, args):
             mains=float(args.mains),
             run=args.run,
             t1_override=None,
-            fs_ave_fids=args.fs_ave_fids
+            fs_ave_fids=args.fs_ave_fids,
+            do_dics=args.do_dics
             )
     proc.load_data()
     proc.vendor_prep()
@@ -1286,6 +1354,11 @@ if __name__=='__main__':
                         )
     parser.add_argument('-process_manual_ica_qa',
                         help='''If flag is present, pick up analysis after performing manual ICA QA''',
+                        action='store_true',
+                        default=0
+                        )
+    parser.add_argument('-do_dics',
+                        help='''If flag is present, do a DICS beamformer. Otherwise, do lcmv. ''',
                         action='store_true',
                         default=0
                         )
@@ -1461,9 +1534,10 @@ if __name__=='__main__':
                                        session = session,
                                        mains = args.mains,
                                        run = str(row['run']),
-                                       t1_override=None,
-                                       fs_ave_fids=False,
-                                       check_paths=False,
+                                       t1_override = None,
+                                       fs_ave_fids = False,
+                                       check_paths = False,
+                                       do_dics = args.do_dics,
                                        csv_info=row)
                 
                 process_subj.load_data()

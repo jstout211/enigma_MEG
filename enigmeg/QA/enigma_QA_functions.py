@@ -131,6 +131,7 @@ def gen_surf_pngs(subjstruct):
     run = subjstruct.meg_rest_raw.run
     
     png_path=png_path=subjstruct.QA_dir
+    
     figname_surf = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_surf.png')
     
     labels = mne.read_labels_from_annot('sub-'+subjid, subjects_dir=subjstruct.subjects_dir,
@@ -204,6 +205,7 @@ def gen_epo_pngs(subjstruct):
     run = subjstruct.meg_rest_raw.run
     
     png_path=png_path=subjstruct.QA_dir
+    
     figname_epo_psd = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_spectra.png')
     
     epo_path = subjstruct.rest_derivpath.copy().update(suffix='epo', extension='.fif')
@@ -288,7 +290,8 @@ def gen_fooof_pngs(subjstruct):
     img4=brain.screenshot()
     brain.close()
     
-    png_path=png_path=subjstruct.QA_dir
+    png_path=subjstruct.QA_dir
+
     figname_alpha = op.join(png_path, 'sub-' + subjid + '_ses-' + session + '_run-' + run + '_beamformer.png')
     
     fig, ax = plt.subplots(2,2)
@@ -303,4 +306,5 @@ def gen_fooof_pngs(subjstruct):
     plt.tight_layout()
     #plt.show()
     fig.savefig(figname_alpha, dpi=300,bbox_inches='tight')
+    print('figname_alpha: %s' % figname_alpha)
     plt.close(fig)
