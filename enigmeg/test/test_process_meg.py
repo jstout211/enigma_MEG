@@ -37,6 +37,11 @@ def test_load():
     return proc
 
 proc = test_load()
+
+def test_vendor_prep():
+    assert proc.vendor_prep() == None
+    assert proc.bad_channels != None
+
 def test_preproc():
     assert proc.do_preproc() == None
     
@@ -48,6 +53,10 @@ def test_create_epochs():
     assert op.exists(proc.fnames.eroom_epo)
     assert op.exists(proc.fnames.eroom_cov) 
     #assert op.exists(proc.fnames.eroom_csd) #add for dics call
+
+def test_icaclean():
+    assert proc.do_ica() == None
+    assert proc.do_classify_ica() == None
 
 def test_mriproc():
     proc.proc_mri() #redo_all=True)
@@ -89,5 +98,7 @@ def test_label_psds():
     proc.do_label_psds()
     assert hasattr(proc, 'label_ts')
     
-
+def test_do_spectral_param():
+    assert proc.do_spectral_parameterization() == None
+    #assert op.exists(proc.fnames.spectra_csv) 
 
