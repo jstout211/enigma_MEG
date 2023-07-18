@@ -534,7 +534,7 @@ class process():
     def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
         import tensorflow_addons as tfa #Required for loading. tfa f1_score embedded in model
         from scipy.io import loadmat
-        model_path = op.join(MEGnet.__path__[0] ,  'model/MEGnet_final_model.h5')
+        model_path = op.join(MEGnet.__path__[0] ,  'model_v2')
         # This is set to use CPU in initial import
         kModel=keras.models.load_model(model_path)
         arrSP_fnames = [op.join(self.fnames.ica_folder, f'component{i}.mat') for i in range(1,21)]
