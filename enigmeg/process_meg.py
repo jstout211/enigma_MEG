@@ -905,7 +905,15 @@ class process():
         output_dframe['AlphaPeak'] = alpha_peak
         output_dframe.to_csv(self.fnames['power'], sep='\t')  
 
-        # output some freesurfer QA metrics
+    @log    
+    def do_mri_segstats(self):
+        '''
+        Self-explanatory does mri_segstats
+        
+        Returns
+        -------
+        # outputs a .tsv 
+        '''
 
         subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
         
@@ -926,6 +934,7 @@ class process():
         self.do_make_aparc_sub()
         self.do_label_psds()
         self.do_spectral_parameterization()
+        self.do_mri_segstats()
         
 # =============================================================================
 #       Super secret hidden debugging functions. 
@@ -1256,6 +1265,7 @@ def process_subject_after_icaqa(subject, args):
     proc.do_make_aparc_sub()
     proc.do_label_psds()
     proc.do_spectral_parameterization()
+    proc.do_mri_segstats()
         
 def parse_manual_ica_qa(self):
     logfile_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/ica_QA_logfile.txt'
@@ -1557,6 +1567,7 @@ if __name__=='__main__':
                     process_subj.do_make_aparc_sub()
                     process_subj.do_label_psds()
                     process_subj.do_spectral_parameterization()
+                    process_subj.do_mri_segstats()
                     
                 else:    
                     process_subj.do_proc_allsteps()
