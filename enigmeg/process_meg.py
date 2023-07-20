@@ -404,6 +404,13 @@ class process():
         # Additional non-bids path files
         path_dict['parc'] = op.join(self.subjects_dir, 'morph-maps', 
                                f'sub-{self.subject}-fsaverage-morph.fif') 
+        
+        outfolder = self.deriv_path.directory / \
+            self.deriv_path.copy().update(datatype=None, extension=None).basename
+            
+        path_dict['spectra'] = str(outfolder) + '_label_spectra.csv'
+        path_dict['power'] = str(outfolder) + '_band_rel_power.csv'
+        
         return munch.Munch(path_dict)
 
 # =============================================================================
@@ -840,7 +847,6 @@ class process():
         
         outfolder = self.deriv_path.directory / \
             self.deriv_path.copy().update(datatype=None, extension=None).basename
-        self.results_dir = outfolder
         if not os.path.exists(outfolder): os.mkdir(outfolder)
         
         #Create PSD for each label
@@ -874,7 +880,8 @@ class process():
         #Save the label spectrum to assemble the relative power
         freq_bin_names=[str(binval) for binval in freq_bins]
         label_spectra_dframe = pd.DataFrame(label_power, columns=[freq_bin_names])
-        label_spectra_dframe.to_csv( os.path.join(outfolder, 'label_spectra.csv') , index=False)
+        label_spectra_dframe.to_csv(self.fnames['spectra'] , index=False)
+
         # with open(os.path.join(info.outfolder, 'label_spectra.npy'), 'wb') as f:
         #     np.save(f, label_power)
         
@@ -888,9 +895,7 @@ class process():
         band_means = np.zeros([len(labels), len(bands)]) 
         #Loop over all bands, select the indexes assocaited with the band and average    
         for mean_band, band_idx in enumerate(band_idxs):
-            band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1) 
-        
-        output_filename = os.path.join(outfolder, 'Band_rel_power.csv')       
+            band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1)    
     
         bands_str = [str(i) for i in bands]
         label_names = [i.name for i in labels]
@@ -898,7 +903,7 @@ class process():
         output_dframe = pd.DataFrame(band_means, columns=bands_str, 
                                      index=label_names)
         output_dframe['AlphaPeak'] = alpha_peak
-        output_dframe.to_csv(output_filename, sep='\t')  
+        output_dframe.to_csv(self.fnames['power'], sep='\t')  
 
         # output some freesurfer QA metrics
 
