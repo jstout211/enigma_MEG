@@ -222,7 +222,9 @@ class process():
             
         self.anat_vars=munch.Munch()
         self.anat_vars.fsdict = get_fs_filedict(self.subject,self.bids_root)
-        self.anat_vars.process_list = compile_fs_process_list(self)              
+        self.anat_vars.process_list = compile_fs_process_list(self)     
+
+        self.check_for_files()         
 
             
     # This function initializes the bids path structures for the case where the paths have
@@ -413,6 +415,18 @@ class process():
         
         return munch.Munch(path_dict)
 
+    @log
+    def check_for_files(self):
+        if not os.path.isfile(self.fnames['raw_rest']):
+            raise ValueError('Raw MEG file not present')
+        if self.meg_er_raw != None:
+             if not os.path.isfile(self.fnames['raw_eroom']):
+                 raise ValueError('EmptyRoom dataset not present')
+        if not os.path.isfile(str(self.fnames['anat'])):
+            raise ValueError('Anatomical MRI not present')     
+        
+        
+        
 # =============================================================================
 #       Load data
 # =============================================================================
