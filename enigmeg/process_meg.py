@@ -150,7 +150,10 @@ class process():
         else:
             self._use_fsave_coreg=False
         
-        self._n_jobs = int(os.environ['n_jobs'])
+        try: 
+            self._n_jobs = int(os.environ['n_jobs'])
+        except:
+            self._n_jobs = 1
         
         self.do_dics = do_dics
             
