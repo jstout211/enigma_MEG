@@ -1064,16 +1064,13 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         stdraw_trimmedmean_grads = sp.stats.trim_mean(stdraw_grads,0.1)
         # we can't use the same threshold here, because grads have a much greater 
         # variance in the variances 
-        flat_mags = np.where(stdraw_mags < stdraw_trimmedmean_mags/100)[0]
-        flat_grads = np.where(stdraw_grads < stdraw_trimmedmean_grads/1000)[0]
-        # need to use list comprehensions
-        flat_idx_mags = [flat_mags[i] for i in flat_mags.tolist()]
-        flat_idx_grads = [flat_grads[i] for i in flat_grads.tolist()]
+        flat_idx_mags = mags[np.where(stdraw_mags < stdraw_trimmedmean_mags/100)[0]]
+        flat_idx_grads = grads[np.where(stdraw_grads < stdraw_trimmedmean_grads/1000)[0]]
         flats = []
         for flat in flat_idx_mags:
-            flats.append(raw_check.info['ch_names'][mags[flat_idx_mags]])
+            flats.append(raw_check.info['ch_names'][flat_idx_mags])
         for flat in flat_idx_grads:
-            flats.append(raw_check.info['ch_names'][grads[flat_idx_grads]])
+            flats.append(raw_check.info['ch_names'][flat_idx_grads])
         
     # ignore references and use 'meg' coordinate frame for CTF and KIT
     
@@ -1091,12 +1088,10 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         # get the standard deviation for each channel, and the trimmed mean of the stds
         stdraw_megs = np.std(raw_check._data[megs,:],axis=1)
         stdraw_trimmedmean_megs = sp.stats.trim_mean(stdraw_megs,0.1)
-        flat_megs = np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]
-        # need to use list comprehensions
-        flat_idx_megs = [flat_megs[i] for i in flat_megs.tolist()]
+        flat_idx_megs = megs[np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]]
         flats = []
         for flat in flat_idx_megs:
-            flats.append(raw_check.info['ch_names'][megs[flat_idx_mags]]) 
+            flats.append(raw_check.info['ch_names'][flat_idx_mags]) 
     
     else: 
         auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
@@ -1111,12 +1106,10 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         # get the standard deviation for each channel, and the trimmed mean of the stds
         stdraw_megs = np.std(raw_check._data[megs,:],axis=1)
         stdraw_trimmedmean_megs = sp.stats.trim_mean(stdraw_megs,0.1)
-        flat_megs = np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]
-        # need to use list comprehensions
-        flat_idx_megs = [flat_megs[i] for i in flat_megs.tolist()]
+        flat_idx_megs = megs[np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]]
         flats = []
         for flat in flat_idx_megs:
-            flats.append(raw_check.info['ch_names'][megs[flat_idx_mags]])    
+            flats.append(raw_check.info['ch_names'][flat_idx_mags]) 
     
     auto_flat_chs = auto_flat_chs + flats
     auto_flat_chs = list(set(auto_flat_chs))
