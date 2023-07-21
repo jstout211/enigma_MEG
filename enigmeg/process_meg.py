@@ -49,7 +49,7 @@ n_bins = 177
 
 # parameters for rejecting bad epochs
 reject_dict = dict(mag=5000e-15, grad=5000e-13)
-std_thresh = 6
+std_thresh = 15
 
 logger=logging.getLogger()
 
@@ -613,6 +613,8 @@ class process():
         '''Create and save epochs
         Create and save cross-spectral density'''
         evts = mne.make_fixed_length_events(raw_inst, duration=self.proc_vars['epoch_len'])
+        logstring = 'Original number of epochs: ' + str(len(evts))
+        logger.info(logstring)
         epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, preload=True, baseline=None)
         #epochs = mne.make_fixed_length_epochs(raw_inst, 
         #                                      duration=self.proc_vars['epoch_len'], 
@@ -620,7 +622,8 @@ class process():
         z = zscore(np.std(epochs._data, axis=2), axis=0)
         bad_epochs = np.where(z>std_thresh)[0]
         epochs.drop(indices=bad_epochs)
-        
+        logstring = 'Final number of epochs: ' + str(epochs.__len__())
+        logger.info(logstring)
         epochs_fname = deriv_path.copy().update(suffix='epo', extension='.fif')
         epochs.save(epochs_fname, overwrite=True)
         
@@ -1110,9 +1113,9 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         flat_idx_grads = grads[np.where(stdraw_grads < stdraw_trimmedmean_grads/1000)[0]]
         flats = []
         for flat in flat_idx_mags:
-            flats.append(raw_check.info['ch_names'][flat_idx_mags])
+            flats.append(raw_check.info['ch_names'][int(flat_idx_mags)])
         for flat in flat_idx_grads:
-            flats.append(raw_check.info['ch_names'][flat_idx_grads])
+            flats.append(raw_check.info['ch_names'][int(flat_idx_grads)])
         
     # ignore references and use 'meg' coordinate frame for CTF and KIT
     
