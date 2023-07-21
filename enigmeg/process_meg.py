@@ -28,6 +28,7 @@ import functools
 import MEGnet
 from MEGnet.prep_inputs.ICA import main as ICA
 from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
+from scipy.stats import zscore
 # Set tensorflow to use CPU
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -45,6 +46,10 @@ sfreq = 300
 epoch_len = 4.0
 mt_bandwidth = 2 # bandwidth for multitaper
 n_bins = 177
+
+# parameters for rejecting bad epochs
+reject_dict = dict(mag=5000e-15, grad=5000e-13)
+std_thresh = 6
 
 logger=logging.getLogger()
 
@@ -607,9 +612,15 @@ class process():
                      deriv_path=None):
         '''Create and save epochs
         Create and save cross-spectral density'''
-        epochs = mne.make_fixed_length_epochs(raw_inst, 
-                                              duration=self.proc_vars['epoch_len'], 
-                                              preload=True)
+        evts = mne.make_fixed_length_events(raw_inst, duration=self.proc_vars['epoch_len'])
+        epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, preload=True, baseline=None)
+        #epochs = mne.make_fixed_length_epochs(raw_inst, 
+        #                                      duration=self.proc_vars['epoch_len'], 
+        #                                      preload=True)
+        z = zscore(np.std(epochs._data, axis=2), axis=0)
+        bad_epochs = np.where(z>std_thresh)[0]
+        epochs.drop(indices=bad_epochs)
+        
         epochs_fname = deriv_path.copy().update(suffix='epo', extension='.fif')
         epochs.save(epochs_fname, overwrite=True)
         
