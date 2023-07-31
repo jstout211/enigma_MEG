@@ -220,8 +220,8 @@ class process():
                                                           check=False)
         
         if check_paths==True:
-            self.check_paths()
             self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
+            self.check_paths()
         elif csv_info is not None:
             self.fnames=self.initialize_fromcsv(csv_info)
             
@@ -422,10 +422,10 @@ class process():
 
     @log
     def check_for_files(self):
-        if not os.path.isfile(self.fnames['raw_rest']):
+        if not os.path.exists(self.fnames['raw_rest']):
             raise ValueError('Raw MEG file not present')
         if self.meg_er_raw != None:
-             if not os.path.isfile(self.fnames['raw_eroom']):
+             if not os.path.exists(self.fnames['raw_eroom']):
                  raise ValueError('EmptyRoom dataset not present')
         if not os.path.isfile(str(self.fnames['anat'])):
             raise ValueError('Anatomical MRI not present')     
