@@ -8,7 +8,7 @@ import os
 import os.path as op
 import sys
 import mne
-from mne import Report
+import re
 import numpy as np
 import pandas as pd
 import enigmeg
@@ -940,10 +940,20 @@ class process():
         
         Returns
         -------
-        # outputs a .tsv 
+        # outputs eTIV, lh.orig.nofix holes, rh.orig.nofix holes, and average holes 
         '''
-
-        subcommand(f'mri_segstats --qa-stats sub-{self.subject} {self.enigma_root}/sub-{self.subject}/ses-{self.meg_rest_raw.session}/sub-{self.subject}_fsstats.tsv')          
+     
+        out = subprocess.get_output(f'mri_segstats --seg {self.subjects_dir}/sub-{self.subject}/mri/aseg.mgz --subject sub-{self.subject} --etiv-only')
+        pattern = r"atlas_icv \(eTIV\) = (\d+) mm\^3"
+        tiv = re.search(pattern,out).group(1)
+        out = subprocess.get_output(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/lh.orig.nofix')
+        pattern = r"index = (\d+)"
+        lh_holes = re.search(pattern,out).group(1)
+        out = subprocess.get_output(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/rh.orig.nofix')
+        pattern = r"index = (\d+)"
+        rh_holes = re.search(pattern,out).group(1)               
+        logstring = 'eTIV: ' + str(tiv) + 'lh_holes: ' + str(lh_holes) + 'rh_holes: ' + str(rh_holes) + 'avg_holes: ' + str((lh_holes+rh_holes)/2)
+        logger.info(logstring)
         
 # =============================================================================
 #       Perform all functions on an instance of the process class
