@@ -1424,6 +1424,11 @@ if __name__=='__main__':
                         action='store_true',
                         default=0
                         )
+    parser.add_argument('-remove_old',
+                        help='''If flag is present, remove any files from a prior run (excepting freesurfer ddata). ''',
+                        action='store_true',
+                        default=0
+                        )
                                    
     args = parser.parse_args()
     
@@ -1488,7 +1493,15 @@ if __name__=='__main__':
         
         args.subject=args.subject.replace('sub-','') # strip the sub- off for uniformity
         print(args.subject)
-        
+                
+        if args.remove_old:
+            print('Removing files from prior runs')
+            logfilename = args.subject + '_ses-' + str(args.session) + '_log.txt'
+            subprocess.call['rm', os.path.join(log_dir, logfilename)]
+            subject_enigmadir = 'sub-' + args.subject
+            enigmadir = os.path.join(bids_root,'derivatives/ENIGMA_MEG')
+            subprocess.call['rm -r', os.path.join(enigmadir, subject_enigmadir)]
+            
         if args.proc_fromcsv != None:
             raise ValueError("You can't specify both a subject id and a csv file, sorry")
             
@@ -1581,6 +1594,13 @@ if __name__=='__main__':
             logger = get_subj_logger(subject, session, log_dir)
             logger.info(f'processing subject {subject} session {session}')
             
+            if args.remove_old:
+                print('Removing files from prior runs')
+                logfilename = subject + '_ses-' + str(session) + '_log.txt'
+                subprocess.call['rm', os.path.join(log_dir, logfilename)]
+                subject_enigmadir = 'sub-' + subject
+                enigmadir = os.path.join(bids_root,'derivatives/ENIGMA_MEG')
+                subprocess.call['rm -r', os.path.join(enigmadir, subject_enigmadir)]
 
             if row['mripath'] == None:
                 logger.info('No MRI, cannot process any further')
