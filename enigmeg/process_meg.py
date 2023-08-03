@@ -116,6 +116,8 @@ class process():
 # =============================================================================
 
         self.subject=subject.replace('sub-','')  # Strip sub- if present
+        self.session = session
+        self.run = run
         self.bids_root=bids_root
         if deriv_root is None:                   # Derivatives directory
             self.deriv_root = op.join(
@@ -589,14 +591,18 @@ class process():
         logger.info(logstring)
         
     @log
-    def do_clean_ica(self):         # Remove identified ICA components
-    
+    def do_clean_ica(self):         # Remove identified ICA components    
         print("removing ica components")
         print("self.fnames.ica_folder %s" % self.fnames.ica_folder)
         print("self.fnames.ica %s" % self.fnames.ica)
+        QAdir = op.join(self.bids_root,'derivatives/ENIGMA_MEG_QA')
+        QAsubjdir = QAdir + '/sub-' + self.subject + '/ses-' + self.session
+        figname_icaoverlay = QAsubjdir + '/sub-' + self.subject + '_ses-' + self.session + '_run-' + self.run + '_cleaned.png'
         ica=mne.preprocessing.read_ica(op.join(self.fnames.ica))
         ica.exclude = self.ica_comps_toremove #meg_rest_raw.icacomps
         self.load_data()
+        fig=ica.plot_overlay(self.raw_rest, exclude=self.ica_comps_toremove)
+        fig.savefig(figname_icaoverlay)
         ica.apply(self.raw_rest)
         
     @log
@@ -1320,6 +1326,7 @@ def process_subject_after_icaqa(subject, args):
         
 def parse_manual_ica_qa(self):
     logfile_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/ica_QA_logfile.txt'
+    self_subjrun = 'sub-' + self.subject + '_ses-' + self.session + '_task-rest_run-' + self.run
     with open(logfile_path) as f:
         logcontents = f.readlines()
     dictionary = build_status_dict(logcontents)
@@ -1327,25 +1334,29 @@ def parse_manual_ica_qa(self):
     newdict = {}
     for key, value in dictionary.items():
         subjrun = key.split('_icacomp-')[0]
+        
+        # while the code here was originally set up to process the file and create a dictionary for all subjects, this outer conditional staement 
+        # has it only check for bad components and add to the dictionary for the current subject being processed. 
+        if subjrun == self_subjrun:     
 
-        if newdict == {}:  # if this is the first key and the new dict is empty
-            if dictionary[key].strip('\n') == 'BAD':  # if component is bad
-                dropcomp = key.split('_icacomp-')[1].split('.png')[0]
-                newdict = {subjrun: [dropcomp]}
-            else:
-                newdict = {subjrun: []}  # if compoenent is good
+            if newdict == {}:  # if this is the first key and the new dict is empty
+                if dictionary[key].strip('\n') == 'BAD':  # if component is bad
+                    dropcomp = key.split('_icacomp-')[1].split('.png')[0]
+                    newdict = {subjrun: [dropcomp]}
+                else:
+                    newdict = {subjrun: []}  # if compoenent is good
                    
-        elif subjrun in newdict.keys():   # If the key is already in the new dict
-            if dictionary[key].strip('\n') == 'BAD':  # If component is bad (if comp is good, do nothing)
-                dropcomp = key.split('_icacomp-')[1].split('.png')[0]
-                newdict[subjrun].append(dropcomp)
+            elif subjrun in newdict.keys():   # If the key is already in the new dict
+                if dictionary[key].strip('\n') == 'BAD':  # If component is bad (if comp is good, do nothing)
+                    dropcomp = key.split('_icacomp-')[1].split('.png')[0]
+                    newdict[subjrun].append(dropcomp)
     
-        else: # if the key isn't in the new dictionary
-            if dictionary[key].strip('\n') == 'BAD':  # if compoenent is bad
-                dropcomp = key.split('_icacomp-')[1].split('.png')[0]
-                newdict[subjrun] = [dropcomp]
-            else:
-                newdict[subjrun] = [] # if compoenent is good
+            else: # if the key isn't in the new dictionary
+                if dictionary[key].strip('\n') == 'BAD':  # if compoenent is bad
+                    dropcomp = key.split('_icacomp-')[1].split('.png')[0]
+                    newdict[subjrun] = [dropcomp]
+                else:
+                    newdict[subjrun] = [] # if compoenent is good
     return newdict
 
 #%%    
@@ -1356,9 +1367,7 @@ if __name__=='__main__':
     parser.add_argument('-bids_root',
                         help='''Top level directory of the bids data'''
                         )
-    # parser.add_argument('-config', 
-    #                     help='''Config file for processing data'''
-    #                     )
+
     parser.add_argument('-subject',
                         help='''BIDS ID of subject to process''',
                         default=None

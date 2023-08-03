@@ -45,8 +45,8 @@ if __name__ == '__main__':
         parser.print_help()
         raise ValueError('You must choose a QA type')
     else:
-        if args.QAtype not in ['coreg','ica','surf','bem','src','spectra','beamformer']:
-            raise ValueError("QAtype not valid, must be one of 'coreg', 'ica','surf','bem','src','spectra','beamformer'")
+        if args.QAtype not in ['coreg','ica','surf','bem','src','spectra','beamformer','cleaned']:
+            raise ValueError("QAtype not valid, must be one of 'coreg', 'ica','surf','bem','src','spectra','beamformer','cleaned'")
         QAtype = args.QAtype
     
     if QAtype == 'coreg' or QAtype == 'bem' or QAtype == 'src' or QAtype == 'ica':
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         column_default = 2
         row_default = 3
         size_default = 300
-    elif QAtype == 'spectra' or QAtype == 'beamformer':
+    elif QAtype == 'spectra' or QAtype == 'beamformer' or QAtype == 'cleaned':
         column_default = 3
         row_default = 3
         size_default = 300   
