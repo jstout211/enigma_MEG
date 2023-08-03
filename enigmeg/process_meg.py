@@ -1438,6 +1438,8 @@ if __name__=='__main__':
     n_jobs = args.n_jobs  #extract this from the configuration file
     os.environ['n_jobs'] = str(n_jobs)
     
+    os.environ['MNE_3D_OPTION_ANTIALIAS'] = 'false' # necessary for headless operation
+    
     # print help if no arguments
     if len(sys.argv) == 1:
         parser.print_help()
