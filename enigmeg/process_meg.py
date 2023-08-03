@@ -625,6 +625,8 @@ class process():
         epochs.drop(indices=bad_epochs)
         logstring = 'Final number of epochs: ' + str(epochs.__len__())
         logger.info(logstring)
+        logstring = 'Total time in seconds: ' + str(epochs.__len__() * self.proc_vars['epoch_len'])
+        logger.info(logstring)
         epochs_fname = deriv_path.copy().update(suffix='epo', extension='.fif')
         epochs.save(epochs_fname, overwrite=True)
         
