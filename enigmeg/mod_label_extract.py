@@ -12,6 +12,7 @@ from mne.fixes import _safe_svd
 from mne.source_space import SourceSpaces
 from mne.utils import (logger, _validate_type)
 from types import GeneratorType
+import scipy
 
 #from mne import source_estimate as mod_source_estimate
 
@@ -26,7 +27,7 @@ import os
 
 num_freq_bins=177  #Hardcoded freq bins - Bad form
 
-def _pca15_fft(flip, data):
+def _pca15_fft(flip, data, fmin, fmax, srate):
     U, s, V = linalg.svd(data, full_matrices=False)
     
     maxeig=15
@@ -36,8 +37,8 @@ def _pca15_fft(flip, data):
         n_jobs=1
     # use average power in label for scaling
     epoch_spectra, freq_bins = psd_array_multitaper(V[0:maxeig], 
-                                                300,                    #!!!!################ HardCodede
-                                                fmin=1, fmax=45,
+                                                srate,                    #!!!!################ HardCodede
+                                                fmin=fmin, fmax=fmax,
                                                 bandwidth=2, 
                                                 n_jobs=n_jobs, 
                                                 adaptive=True, 
@@ -67,7 +68,8 @@ This will be monkeypatched into the processing before calling
 
 def mod_gen_extract_label_time_course(stcs, labels, src, *, mode='mean',
                                    allow_empty=False, trans=None,
-                                   mri_resolution=True, verbose=None):
+                                   mri_resolution=True, verbose=None,
+                                   fmin=1, fmax=45):
     # loop through source estimates and extract time series
     #from scipy import sparse
     #if src is None and mode in ['mean', 'max', 'pca']:
@@ -99,6 +101,12 @@ def mod_gen_extract_label_time_course(stcs, labels, src, *, mode='mean',
         #    mode = 'mean' if mode == 'auto' else mode
         #else:
         #    mode = 'mean_flip' if mode == 'auto' else mode
+        n_timepoints = np.shape(stc.data)[1]
+        freqs = scipy.fft.rfftfreq(n_timepoints, stc.tstep)
+        freq_mask = (freqs >= fmin) & (freqs <= fmax)
+        freqs = freqs[freq_mask]
+        n_bins=len(freqs)
+        srate = 1/stc.tstep
         if vertno is None:
             vertno = copy.deepcopy(stc.vertices)  # avoid keeping a ref
             nvert = np.array([len(v) for v in vertno])
@@ -123,7 +131,7 @@ def mod_gen_extract_label_time_course(stcs, labels, src, *, mode='mean',
         #            % (n_labels, mode))
 
         # do the extraction
-        label_tc = np.zeros((n_labels,) + (num_freq_bins,),
+        label_tc = np.zeros((n_labels,) + (n_bins,),
                             dtype=stc.data.dtype)
         for i, (vertidx, flip) in enumerate(zip(label_vertidx, src_flip)):
             if vertidx is not None:
@@ -136,7 +144,7 @@ def mod_gen_extract_label_time_course(stcs, labels, src, *, mode='mean',
                 #        (this_data.shape[0],) + stc.data.shape[1:]
                 #else:
                 this_data = stc.data[vertidx]
-                label_tc[i] = func(flip, this_data)
+                label_tc[i] = func(flip, this_data, fmin, fmax, srate)
 
         # extract label time series for the vol src space (only mean supported)
         offset = nvert[:-n_mean].sum()  # effectively :2 or :0
@@ -159,6 +167,8 @@ def mod_extract_label_time_course(
     *,
     mri_resolution=True,
     verbose=None,
+    fmin=1,
+    fmax=45
 ):
     """Extract label time course for lists of labels and source estimates.
 
@@ -198,9 +208,11 @@ def mod_extract_label_time_course(
         stcs = [stcs]
         return_several = False
         return_generator = False
+        print('not a generator')
     else:
+        print('return several')
         return_several = True
-
+    print('running mod_gen_extract_label_time_course')
     label_tc = mod_gen_extract_label_time_course(
         stcs,
         labels,
@@ -208,6 +220,8 @@ def mod_extract_label_time_course(
         mode=mode,
         allow_empty=allow_empty,
         mri_resolution=mri_resolution,
+        fmin=fmin,
+        fmax=fmax
     )
 
     if not return_generator:

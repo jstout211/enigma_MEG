@@ -615,7 +615,8 @@ class process():
         evts = mne.make_fixed_length_events(raw_inst, duration=self.proc_vars['epoch_len'])
         logstring = 'Original number of epochs: ' + str(len(evts))
         logger.info(logstring)
-        epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, preload=True, baseline=None)
+        tmax = self.proc_vars['epoch_len'] - 1/self.proc_vars['sfreq']
+        epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, preload=True, baseline=None, tmin=0, tmax=tmax)
         #epochs = mne.make_fixed_length_epochs(raw_inst, 
         #                                      duration=self.proc_vars['epoch_len'], 
         #                                      preload=True)
@@ -636,7 +637,7 @@ class process():
             csd.save(str(csd_fname.fpath), overwrite=True)
         else:
             cov = mne.compute_covariance(epochs)
-            cov_fname = deriv_path.copy().update(suffix='cov', extension='fif')
+            cov_fname = deriv_path.copy().update(suffix='cov', extension='.fif')
             cov.save(cov_fname, overwrite=True)
     
     @log
@@ -845,10 +846,13 @@ class process():
                                                                  self.rest_fwd['src'],
                                                                  mode='mean')
         else:
+            
             label_ts = mod_label_extract.mod_extract_label_time_course(self.stcs,
                                                          labels,
                                                          self.rest_fwd['src'],
-                                                         mode='pca15_multitaper')
+                                                         mode='pca15_multitaper',
+                                                         fmin=self.proc_vars['fmin'], 
+                                                         fmax=self.proc_vars['fmax'])
                                                          
         #Convert list of numpy arrays to ndarray (Epoch/Label/Sample)
         self.label_ts = np.stack(label_ts)
@@ -872,6 +876,8 @@ class process():
         labels = self.labels
         label_power = np.zeros([len(labels), len(freq_bins)])  
         alpha_peak = np.zeros(len(labels))
+        offset = np.zeros(len(labels))
+        exponent = np.zeros(len(labels))
         
         outfolder = self.deriv_path.directory / \
             self.deriv_path.copy().update(datatype=None, extension=None).basename
@@ -889,11 +895,10 @@ class process():
             #spectral_image_path = os.path.join(outfolder, 'Spectra_'+
             #                                    labels[label_idx].name + '.png')   
             spectral_image_path = None  ## supress output of spectra .png files for every region
-    
-            try:
-                tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
+            
+            tmp_fmodel = calc_spec_peak(freq_bins, current_psd, 
                                 out_image_path=spectral_image_path)
-                
+            try:
                 # work around for when fooof identifies multiple alpha peaks - set to np.nan
                 potential_alpha_idx = np.where((8.0 <= tmp_fmodel.peak_params[:,0] ) & \
                                         (tmp_fmodel.peak_params[:,0] <= 12.0 ) )[0]
@@ -902,8 +907,12 @@ class process():
                 else:
                     alpha_peak[label_idx] = tmp_fmodel.peak_params[potential_alpha_idx[0]][0]
                     print('label_idx: %d, alpha_peak: %f' % (label_idx, alpha_peak[label_idx]))
+
             except:
                 alpha_peak[label_idx] = np.nan  # case where no alpha peak is identified - set to np.nan
+            
+            offset[label_idx] = tmp_fmodel.aperiodic_params[0]
+            exponent[label_idx] = tmp_fmodel.aperiodic_params[1]
             
         #Save the label spectrum to assemble the relative power
         freq_bin_names=[str(binval) for binval in freq_bins]
@@ -931,6 +940,8 @@ class process():
         output_dframe = pd.DataFrame(band_means, columns=bands_str, 
                                      index=label_names)
         output_dframe['AlphaPeak'] = alpha_peak
+        output_dframe['AperiodicOffset'] = offset
+        output_dframe['AperiodicExponent'] = exponent
         output_dframe.to_csv(self.fnames['power'], sep='\t')  
 
     @log    
@@ -1600,6 +1611,7 @@ if __name__=='__main__':
                     process_subj.set_ica_comps_manual()
                     process_subj.do_preproc()
                     process_subj.do_clean_ica()
+                    process_subj.do_proc_epochs()
                     process_subj.proc_mri()
                     process_subj.do_beamformer()
                     process_subj.do_make_aparc_sub()
