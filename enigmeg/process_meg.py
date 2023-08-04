@@ -1356,46 +1356,59 @@ def parse_manual_ica_qa(self):
 
 #%%    
 if __name__=='__main__':
-    import argparse
-    
+    import argparse  
     parser = argparse.ArgumentParser()
-    parser.add_argument('-bids_root',
+    standardargs = parser.add_argument_group('Standard Inputs')
+    standardargs.add_argument('-bids_root',
                         help='''Top level directory of the bids data'''
                         )
 
-    parser.add_argument('-subject',
+    standardargs.add_argument('-subject',
                         help='''BIDS ID of subject to process''',
                         default=None
                         )
-    parser.add_argument('-subjects_dir',
+    standardargs.add_argument('-subjects_dir',
                         help='''Freesurfer subjects directory, only specify if not \
                         bids_root/derivatives/freesurfer/subjects'''
                         )
-    parser.add_argument('-fs_subject',
+    standardargs.add_argument('-fs_subject',
                         help='''Freefurfer subject ID if different from BIDS ID'''
                         )
-    parser.add_argument('-run',
+    standardargs.add_argument('-run',
                         help='''Run number.  \nNOTE: 01 is different from 1''',
                         default='1'
                         )
-    parser.add_argument('-session',
+    standardargs.add_argument('-session',
                         default=None,
                         )
-    parser.add_argument('-mains',
+    standardargs.add_argument('-mains',
                         help='Electric mains frequency  (50 or 60)',
                         default=60.0,
                         )
-    parser.add_argument('-rest_tag',
+    standardargs.add_argument('-rest_tag',
                         help='Override in case task name is other than rest\
                             for example - resteyesopen',
                         default='rest'
                         )
-    parser.add_argument('-emptyroom_tag',
+    standardargs.add_argument('-emptyroom_tag',
                         help='Override in case emptryoom is other than \
                             emptyroom.  In case of no emptyroom, set as None on cmdline',
                         default='emptyroom'
                         )
-    parser.add_argument('-fs_ave_fids',
+    standardargs.add_argument('-n_jobs',
+                        help='''number of jobs to run concurrently for 
+                        multithreaded operations''',
+                        default=1
+                        )
+    csvargs = parser.add_argument_group('Inputs from a CSV')
+    csvargs.add_argument('-proc_fromcsv',
+                        help='''Loop over all subjects in the bids_root
+                        and process. Requires CSV file with processing manifest''',
+                        default=None
+                        )
+    
+    altargs = parser.add_argument_group('Alternative Inputs')
+    altargs.add_argument('-fs_ave_fids',
                         help='''If no fiducials have been localized to the mri
                         manually, this provides a coarse fit from the ave brain
                         which is fine tuned with the headshape.  This is less
@@ -1403,31 +1416,23 @@ if __name__=='__main__':
                         action='store_true',
                         default=False
                         )
-    parser.add_argument('-proc_fromcsv',
-                        help='''Loop over all subjects in the bids_root
-                        and process. Requires CSV file with processing manifest''',
-                        default=None
-                        )
-    parser.add_argument('-n_jobs',
-                        help='''number of jobs to run concurrently for 
-                        multithreaded operations''',
-                        default=1
-                        )
-    parser.add_argument('-ica_manual_qa_prep',
-                        help='''if flag is present, stop after ICA for manual QA''',
-                        action='store_true',
-                        default=0
-                        )
-    parser.add_argument('-process_manual_ica_qa',
-                        help='''If flag is present, pick up analysis after performing manual ICA QA''',
-                        action='store_true',
-                        default=0
-                        )
-    parser.add_argument('-do_dics',
+    altargs.add_argument('-do_dics',
                         help='''If flag is present, do a DICS beamformer. Otherwise, do lcmv. ''',
                         action='store_true',
                         default=0
                         )
+    qaargs = parser.add_argument_group('QA Inputs')
+    qaargs.add_argument('-ica_manual_qa_prep',
+                        help='''if flag is present, stop after ICA for manual QA''',
+                        action='store_true',
+                        default=0
+                        )
+    qaargs.add_argument('-process_manual_ica_qa',
+                        help='''If flag is present, pick up analysis after performing manual ICA QA''',
+                        action='store_true',
+                        default=0
+                        )
+
     parser.add_argument('-remove_old',
                         help='''If flag is present, remove any files from a prior run (excepting freesurfer ddata). ''',
                         action='store_true',
