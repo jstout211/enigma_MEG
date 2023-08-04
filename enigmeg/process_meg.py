@@ -559,7 +559,6 @@ class process():
                         '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
     @log           
     def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
-        import tensorflow_addons as tfa #Required for loading. tfa f1_score embedded in model
         from scipy.io import loadmat
         model_path = op.join(MEGnet.__path__[0] ,  'model_v2')
         # This is set to use CPU in initial import
@@ -958,16 +957,16 @@ class process():
         # outputs eTIV, lh.orig.nofix holes, rh.orig.nofix holes, and average holes 
         '''
      
-        out = subprocess.get_output(f'mri_segstats --seg {self.subjects_dir}/sub-{self.subject}/mri/aseg.mgz --subject sub-{self.subject} --etiv-only')
+        out = subprocess.getoutput(f'mri_segstats --seg {self.subjects_dir}/sub-{self.subject}/mri/aseg.mgz --subject sub-{self.subject} --etiv-only')
         pattern = r"atlas_icv \(eTIV\) = (\d+) mm\^3"
         tiv = re.search(pattern,out).group(1)
-        out = subprocess.get_output(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/lh.orig.nofix')
+        out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/lh.orig.nofix')
         pattern = r"index = (\d+)"
         lh_holes = re.search(pattern,out).group(1)
-        out = subprocess.get_output(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/rh.orig.nofix')
+        out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/rh.orig.nofix')
         pattern = r"index = (\d+)"
         rh_holes = re.search(pattern,out).group(1)               
-        logstring = 'eTIV: ' + str(tiv) + 'lh_holes: ' + str(lh_holes) + 'rh_holes: ' + str(rh_holes) + 'avg_holes: ' + str((lh_holes+rh_holes)/2)
+        logstring = 'eTIV: ' + str(tiv) + ' lh_holes: ' + str(lh_holes) + ' rh_holes: ' + str(rh_holes) + ' avg_holes: ' + str((int(lh_holes)+int(rh_holes))/2)
         logger.info(logstring)
         
 # =============================================================================
@@ -1504,10 +1503,10 @@ if __name__=='__main__':
         if args.remove_old:
             print('Removing files from prior runs')
             logfilename = args.subject + '_ses-' + str(args.session) + '_log.txt'
-            subprocess.call['rm', os.path.join(log_dir, logfilename)]
+            subprocess.call(['rm', os.path.join(log_dir, logfilename)])
             subject_enigmadir = 'sub-' + args.subject
             enigmadir = os.path.join(bids_root,'derivatives/ENIGMA_MEG')
-            subprocess.call['rm -r', os.path.join(enigmadir, subject_enigmadir)]
+            subprocess.call(['rm','-r', os.path.join(enigmadir, subject_enigmadir)])
             
         if args.proc_fromcsv != None:
             raise ValueError("You can't specify both a subject id and a csv file, sorry")
@@ -1604,10 +1603,10 @@ if __name__=='__main__':
             if args.remove_old:
                 print('Removing files from prior runs')
                 logfilename = subject + '_ses-' + str(session) + '_log.txt'
-                subprocess.call['rm', os.path.join(log_dir, logfilename)]
+                subprocess.call(['rm', os.path.join(log_dir, logfilename)])
                 subject_enigmadir = 'sub-' + subject
                 enigmadir = os.path.join(bids_root,'derivatives/ENIGMA_MEG')
-                subprocess.call['rm -r', os.path.join(enigmadir, subject_enigmadir)]
+                subprocess.call(['rm','-r', os.path.join(enigmadir, subject_enigmadir)])
 
             if row['mripath'] == None:
                 logger.info('No MRI, cannot process any further')
