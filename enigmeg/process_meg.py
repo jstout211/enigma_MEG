@@ -4,6 +4,7 @@
 
 @author: Jeff Stout and Allison Nugent
 """
+
 import os
 import os.path as op
 import sys
@@ -29,7 +30,9 @@ import MEGnet
 from MEGnet.prep_inputs.ICA import main as ICA
 from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
 from scipy.stats import zscore
+
 # Set tensorflow to use CPU
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from tensorflow import keras
