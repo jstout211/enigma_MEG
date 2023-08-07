@@ -47,7 +47,8 @@ mt_bandwidth = 2 # bandwidth for multitaper
 n_bins = 177
 
 # parameters for rejecting bad epochs
-reject_dict = dict(mag=5000e-15, grad=5000e-13)
+magthresh = 5000e-15
+gradthresh = 5000e-13
 std_thresh = 15
 
 logger=logging.getLogger()
@@ -620,6 +621,16 @@ class process():
         logstring = 'Original number of epochs: ' + str(len(evts))
         logger.info(logstring)
         tmax = self.proc_vars['epoch_len'] - 1/self.proc_vars['sfreq']
+        tempraw = self.raw_rest.copy()
+        try:
+            tempraw.pick(['grad'])
+            try: 
+                tempraw.pick(['mag'])
+                reject_dict = dict(mag=magthresh, grad=gradthresh)
+            except:
+                reject_dict = dict(grad=gradthresh)
+        except:
+            reject_dict = dict(mag=magthresh)
         epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, preload=True, baseline=None, tmin=0, tmax=tmax)
         #epochs = mne.make_fixed_length_epochs(raw_inst, 
         #                                      duration=self.proc_vars['epoch_len'], 
