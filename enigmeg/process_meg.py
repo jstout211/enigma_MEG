@@ -615,21 +615,19 @@ class process():
     def _proc_epochs(self,          # divide the rest data into epochs
                      raw_inst=None,
                      deriv_path=None):
-        '''Create and save epochs
+        '''Create and save epochs'
         Create and save cross-spectral density'''
         evts = mne.make_fixed_length_events(raw_inst, duration=self.proc_vars['epoch_len'])
         logstring = 'Original number of epochs: ' + str(len(evts))
         logger.info(logstring)
         tmax = self.proc_vars['epoch_len'] - 1/self.proc_vars['sfreq']
-        tempraw = self.raw_rest.copy()
-        try:
-            tempraw.pick(['grad'])
-            try: 
-                tempraw.pick(['mag'])
+        chtypes=self.raw_rest.get_channel_types()
+        if 'grad' in chtypes:
+            if 'mag' in chtypes: 
                 reject_dict = dict(mag=magthresh, grad=gradthresh)
-            except:
+            else:
                 reject_dict = dict(grad=gradthresh)
-        except:
+        else:
             reject_dict = dict(mag=magthresh)
         epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, preload=True, baseline=None, tmin=0, tmax=tmax)
         #epochs = mne.make_fixed_length_epochs(raw_inst, 
