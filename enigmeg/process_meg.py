@@ -947,7 +947,7 @@ class process():
         band_means = np.zeros([len(labels), len(bands)]) 
         #Loop over all bands, select the indexes assocaited with the band and average    
         for mean_band, band_idx in enumerate(band_idxs):
-            band_means[:, mean_band] = relative_power[:, band_idx].mean(axis=1)    
+            band_means[:, mean_band] = relative_power[:, band_idx].sum(axis=1)    
     
         bands_str = [str(i) for i in bands]
         label_names = [i.name for i in labels]
