@@ -519,7 +519,7 @@ class process():
         # mark bad/flat channels as such in datasets
         self.bad_channels = all_bad
         self.raw_rest.drop_channels(all_bad)
-        if hasattr(self, 'raw_eroom'):
+        if self.raw_eroom  != None:
             self.raw_eroom.drop_channels(all_bad)
         
         print('bad or flat channels')
