@@ -1147,9 +1147,9 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         flat_idx_grads = grads[np.where(stdraw_grads < stdraw_trimmedmean_grads/1000)[0]]
         flats = []
         for flat in flat_idx_mags:
-            flats.append(raw_check.info['ch_names'][int(flat_idx_mags)])
+            flats.append(raw_check.info['ch_names'][int(flat)])
         for flat in flat_idx_grads:
-            flats.append(raw_check.info['ch_names'][int(flat_idx_grads)])
+            flats.append(raw_check.info['ch_names'][int(flat)])
         
     # ignore references and use 'meg' coordinate frame for CTF and KIT
     
@@ -1163,14 +1163,14 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         # since other vendors don't mix grads and mags, we only need to do this for
         # a single channel type
         
-        megs = mne.pick_types(raw_check.info, meg=True)
+        megs = mne.pick_types(raw_check.info, meg=True,ref_meg=False)
         # get the standard deviation for each channel, and the trimmed mean of the stds
         stdraw_megs = np.std(raw_check._data[megs,:],axis=1)
         stdraw_trimmedmean_megs = sp.stats.trim_mean(stdraw_megs,0.1)
         flat_idx_megs = megs[np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]]
         flats = []
         for flat in flat_idx_megs:
-            flats.append(raw_check.info['ch_names'][flat_idx_mags]) 
+            flats.append(raw_check.info['ch_names'][flat]) 
     
     else: 
         auto_noisy_chs, auto_flat_chs, auto_scores = find_bad_channels_maxwell(
@@ -1181,14 +1181,14 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         # since other vendors don't mix grads and mags, we only need to do this for
         # a single channel type
     
-        megs = mne.pick_types(raw_check.info, meg=True)
+        megs = mne.pick_types(raw_check.info, meg=True,ref_meg=False)
         # get the standard deviation for each channel, and the trimmed mean of the stds
         stdraw_megs = np.std(raw_check._data[megs,:],axis=1)
         stdraw_trimmedmean_megs = sp.stats.trim_mean(stdraw_megs,0.1)
         flat_idx_megs = megs[np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]]
         flats = []
         for flat in flat_idx_megs:
-            flats.append(raw_check.info['ch_names'][flat_idx_mags]) 
+            flats.append(raw_check.info['ch_names'][flat]) 
     
     auto_flat_chs = auto_flat_chs + flats
     auto_flat_chs = list(set(auto_flat_chs))
