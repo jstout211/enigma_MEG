@@ -493,8 +493,7 @@ class process():
             if self.raw_rest.compensation_grade != 3:
                 logging.info('Applying 3rd order gradient to rest data')
                 self.raw_rest.apply_gradient_compensation(3)
-            if hasattr(self, 'raw_eroom'):
-                if self.raw_eroom != None: 
+            if self.raw_eroom != None: 
                     if self.raw_eroom.compensation_grade != 3:
                         logging.info('Applying 3rd order gradient to emptyroom data')
                         self.raw_eroom.apply_gradient_compensation(3)
@@ -519,8 +518,8 @@ class process():
         # mark bad/flat channels as such in datasets
         self.bad_channels = all_bad
         self.raw_rest.drop_channels(all_bad)
-        if hasattr(self, 'raw_eroom'):
-            self.raw_eroom.drop_channels(all_bad)
+        if self.raw_eroom != None: 
+                self.raw_eroom.drop_channels(all_bad)
         
         print('bad or flat channels')
         print(all_bad)           
