@@ -520,7 +520,6 @@ class process():
         self.raw_rest.drop_channels(all_bad)
         if self.raw_eroom != None: 
                 self.raw_eroom.drop_channels(all_bad)
-        
         print('bad or flat channels')
         print(all_bad)           
     
