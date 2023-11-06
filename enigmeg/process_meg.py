@@ -598,8 +598,12 @@ class process():
         ica=mne.preprocessing.read_ica(op.join(self.fnames.ica))
         ica.exclude = self.ica_comps_toremove #meg_rest_raw.icacomps
         self.load_data()
-        fig=ica.plot_overlay(self.raw_rest, exclude=self.ica_comps_toremove)
-        fig.savefig(figname_icaoverlay)
+        try:
+            fig=ica.plot_overlay(self.raw_rest, exclude=self.ica_comps_toremove)
+            fig.savefig(figname_icaoverlay)
+        except:
+            #Hack to prevent issues with headless servers
+            logger.warning('Could not produce ICA images - possibly a display issue')
         ica.apply(self.raw_rest)
         
     @log
