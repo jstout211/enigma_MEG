@@ -539,6 +539,25 @@ class process():
                       overwrite=True)
     
     @log
+    def _movement_comp(self,
+                       raw_inst=None,
+                       deriv_path=None
+                       ):
+        '''
+        Perform movement correction - currently restricted to MEGIN data
+        '''
+        chpi_amplitudes = mne.chpi.compute_chpi_amplitudes(raw_inst)
+        chpi_locs = mne.chpi.compute_chpi_locs(raw_inst.info, chpi_amplitudes)
+        head_pos = mne.chpi.compute_head_pos(raw_inst.info, chpi_locs,verbose=False)
+        raw_tsss = maxwell_filter(raw_inst, head_pos=head_pos,
+                                 cross_talk=self.crosstalk_fname,
+                                 calibration=self.cal_fname, 
+                                 st_duration=10.0)
+        raw_tsss = mne.chpi.filter_chpi(raw_tsss)
+        raw_tsss.save(deriv_path.copy().update(processing='mcorr', extension='.fif',
+                                               overwrite=True))
+    
+    @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
         ica_basename = self.meg_rest_raw.basename + '_ica'
         bad_channels = self.bad_channels
@@ -603,7 +622,7 @@ class process():
             fig.savefig(figname_icaoverlay)
         except:
             #Hack to prevent issues with headless servers
-            logger.warning('Could not produce ICA images - possibly a display issue')
+            logger.warning('Could not produce ICA images - possibly a server display issue')
         ica.apply(self.raw_rest)
         
     @log
