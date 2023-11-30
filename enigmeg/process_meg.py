@@ -30,6 +30,7 @@ import MEGnet
 from MEGnet.prep_inputs.ICA import main as ICA
 from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
 from scipy.stats import zscore
+from mne.preprocessing import maxwell_filter
 
 # Set tensorflow to use CPU
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
@@ -554,8 +555,8 @@ class process():
                                  calibration=self.cal_fname, 
                                  st_duration=10.0)
         raw_tsss = mne.chpi.filter_chpi(raw_tsss)
-        raw_tsss.save(deriv_path.copy().update(processing='mcorr', extension='.fif',
-                                               overwrite=True))
+        raw_tsss.save(deriv_path.copy().update(processing='mcorr', extension='.fif'),
+                                               overwrite=True)
     
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
