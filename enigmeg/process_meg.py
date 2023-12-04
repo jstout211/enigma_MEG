@@ -109,7 +109,7 @@ class process():
             fs_ave_fids=False, 
             check_paths=True,
             do_dics=False,
-            csv_info=None
+            csv_info=None,
             ):
         
 # =============================================================================
@@ -158,7 +158,9 @@ class process():
         else:
             self._use_fsave_coreg=False
         
-        try: 
+        try:
+            #The commandline args have been assigned into os.environ['n_jobs']
+            #so it will be used here if set
             self._n_jobs = int(os.environ['n_jobs'])
         except:
             self._n_jobs = 1
@@ -230,8 +232,8 @@ class process():
             
         self.anat_vars=munch.Munch()
         self.anat_vars.fsdict = get_fs_filedict(self.subject,self.bids_root)
-        self.anat_vars.process_list = compile_fs_process_list(self)     
-
+        self.anat_vars.process_list = compile_fs_process_list(self)  
+        
         self.check_for_files()         
 
             
@@ -525,7 +527,18 @@ class process():
         print(all_bad) 
         
         # Movement correction for Elekta systems
-        if self.vendor[0] == '306m':
+        if (self.vendor[0] == '306m') | (self.vendor[0] == '122m'):
+            # Get the calibration files - check global variable to see if they 
+            # were passed on the commandline
+            if 'megin_cal_files' in globals().keys():
+                ct_sparse_path, sss_cal_path = find_cal_files(args=megin_cal_files, 
+                                                              bids_path=None)
+            else:
+                ct_sparse_path, sss_cal_path = find_cal_files(args=None, 
+                                                              bids_path=proc.bids_path)
+            # Run the movement correction on the dataset
+            self.ct_sparse = ct_sparse_path
+            self.sss_cal = sss_cal_path
             self._movement_comp()
     
                    
@@ -555,8 +568,8 @@ class process():
         chpi_locs = mne.chpi.compute_chpi_locs(raw_inst.info, chpi_amplitudes)
         head_pos = mne.chpi.compute_head_pos(raw_inst.info, chpi_locs,verbose=False)
         raw_tsss = maxwell_filter(raw_inst, head_pos=head_pos,
-                                 cross_talk=self.crosstalk_fname,
-                                 calibration=self.cal_fname, 
+                                 cross_talk=self.ct_sparse,
+                                 calibration=self.sss_cal, 
                                  st_duration=10.0)
         raw_tsss = mne.chpi.filter_chpi(raw_tsss)
         raw_tsss.save(deriv_path.copy().update(processing='mcorr', extension='.fif'),
@@ -1247,7 +1260,7 @@ def write_aparc_sub(subjid=None, subjects_dir=None):    # write the parcel annot
                               parc='aparc_sub', subjects_dir=subjects_dir, 
                               overwrite=True)
     
-def find_sss_files(args=None, bids_path=None):
+def find_cal_files(args=None, bids_path=None):
     '''
     The SSS files (ct_sparse.fif and sss_cal.dat) can be provided in three different
     ways in order of precedence:
@@ -1271,14 +1284,15 @@ def find_sss_files(args=None, bids_path=None):
 
     '''
     # 1) Commandline options
-    if (args.ct_sparse != None) and (args.sss_cal != None):
-        assert args.ct_sparse[-3:] == 'fif'
-        assert args.sss_cal[-3:] == 'dat'
-        return args.ct_sparse, args.sss_cal
+    if hasattr(args,'ct_sparse') & hasattr(args, 'sss_cal'):
+        if (args.ct_sparse != None) & (args.sss_cal != None):
+            assert args.ct_sparse[-3:] == 'fif'
+            assert args.sss_cal[-3:] == 'dat'
+            return args.ct_sparse, args.sss_cal
     
     # 2) BIDS compliant parsing
-    crosstalk_bids_path = bids_path.copy().update(acq='crosstalk')
-    cal_bids_path = bids_path.copy().update(acq='calibration')
+    crosstalk_bids_path = bids_path.copy().update(acquisition='crosstalk')
+    cal_bids_path = bids_path.copy().update(acquisition='calibration', extension='.dat')
     if op.exists(crosstalk_bids_path.fpath) & op.exists(cal_bids_path.fpath):
         return crosstalk_bids_path.fpath, cal_bids_path.fpath
     
@@ -1355,7 +1369,7 @@ def process_subject(subject, args):
             run=args.run,
             t1_override=None,
             fs_ave_fids=args.fs_ave_fids,
-            do_dics=args.do_dics)           
+            do_dics=args.do_dics)
     proc.do_proc_allsteps()
     
 def process_subject_up_to_icaqa(subject, args):
@@ -1514,13 +1528,15 @@ if __name__=='__main__':
                          help='''(Elekta/MEGIN datasets) This is the ct_sparse.fif
                          file associated with the MEG system.  This is an override if
                          the file cannot be found in the sub/ses/meg BIDS directory or at the 
-                         top level of the bids tree.'''
+                         top level of the bids tree.''', 
+                         default=None
                          )
     altargs.add_argument('-sss_cal',
                          help='''(Elekta/MEGIN datasets) This is the sss_cal.dat
                          file associated with the MEG system.  This is an override if
                          the file cannot be found in the sub/ses/meg BIDS directory or at the 
-                         top level of the bids tree.'''
+                         top level of the bids tree.''', 
+                         default=None
                          )
     qaargs = parser.add_argument_group('QA Inputs')
     qaargs.add_argument('-ica_manual_qa_prep',
@@ -1598,7 +1614,13 @@ if __name__=='__main__':
         os.makedirs(os.path.join(bids_root,'derivatives/ENIGMA_MEG'))
     if not os.path.isdir(os.path.join(bids_root,'derivatives/ENIGMA_MEG/logs')):
         os.makedirs(os.path.join(bids_root,'derivatives/ENIGMA_MEG/logs'))
-        
+    
+    # megin calibration files
+    if (args.sss_cal != None) & (args.ct_sparse != None):
+        global megin_cal_files
+        megin_cal_files=munch.Munch(dict(sss_cal=args.sss_cal,
+                                         ct_sparse=args.ct_sparse))
+    
     # single subject vs. multiple subject processing.     
     
     if args.subject:    
