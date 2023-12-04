@@ -522,7 +522,11 @@ class process():
         if self.raw_eroom != None: 
                 self.raw_eroom.drop_channels(all_bad)
         print('bad or flat channels')
-        print(all_bad)           
+        print(all_bad) 
+        
+        # Movement correction for Elekta systems
+        if self.vendor[0] == '306m':
+            self._movement_comp()
     
                    
 # =============================================================================
@@ -541,12 +545,12 @@ class process():
     
     @log
     def _movement_comp(self,
-                       raw_inst=None,
-                       deriv_path=None
                        ):
         '''
         Perform movement correction - currently restricted to MEGIN data
         '''
+        deriv_path = self.deriv_path
+        raw_inst = self.raw_rest
         chpi_amplitudes = mne.chpi.compute_chpi_amplitudes(raw_inst)
         chpi_locs = mne.chpi.compute_chpi_locs(raw_inst.info, chpi_amplitudes)
         head_pos = mne.chpi.compute_head_pos(raw_inst.info, chpi_locs,verbose=False)
@@ -557,13 +561,15 @@ class process():
         raw_tsss = mne.chpi.filter_chpi(raw_tsss)
         raw_tsss.save(deriv_path.copy().update(processing='mcorr', extension='.fif'),
                                                overwrite=True)
+        self.raw_rest=raw_tsss
     
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
         ica_basename = self.meg_rest_raw.basename + '_ica'
         bad_channels = self.bad_channels
-        ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], save_preproc=True, save_ica=True, 
-        results_dir=self.deriv_path.directory, outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
+        ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], 
+            save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
+            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
         self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
@@ -1240,6 +1246,55 @@ def write_aparc_sub(subjid=None, subjects_dir=None):    # write the parcel annot
     mne.write_labels_to_annot(subject_labels, subject=subjid, 
                               parc='aparc_sub', subjects_dir=subjects_dir, 
                               overwrite=True)
+    
+def find_sss_files(args=None, bids_path=None):
+    '''
+    The SSS files (ct_sparse.fif and sss_cal.dat) can be provided in three different
+    ways in order of precedence:
+        1) Commandline option in args
+        2) BIDS subject/sess/meg folder with the acq tag
+            sub-01_acq-crosstalk_meg.fif 
+            sub-01_acq-calibration_meg.dat 
+        3) BIDS root folder
+
+    Parameters
+    ----------
+    args : argparse args object, optional
+        Args from the commandline input. The default is None.
+    bids_path : mne_bids.BIDSPath , optional
+        Subject BIDSPath. The default is None.
+
+    Returns
+    -------
+    ct_sparse_path : str
+    sss_cal_path : str
+
+    '''
+    # 1) Commandline options
+    if (args.ct_sparse != None) and (args.sss_cal != None):
+        assert args.ct_sparse[-3:] == 'fif'
+        assert args.sss_cal[-3:] == 'dat'
+        return args.ct_sparse, args.sss_cal
+    
+    # 2) BIDS compliant parsing
+    crosstalk_bids_path = bids_path.copy().update(acq='crosstalk')
+    cal_bids_path = bids_path.copy().update(acq='calibration')
+    if op.exists(crosstalk_bids_path.fpath) & op.exists(cal_bids_path.fpath):
+        return crosstalk_bids_path.fpath, cal_bids_path.fpath
+    
+    # 3) Files located at the bids_root
+    bids_root=bids_path.root
+    ct_sparse_path = op.join(bids_root, 'ct_sparse.fif')
+    sss_cal_path = op.join(bids_root, 'sss_cal.dat')
+    if (op.exists(ct_sparse_path)) & (op.exists(sss_cal_path)):
+        return ct_sparse_path, sss_cal_path
+    
+    # 4) Could not find files
+    raise(ValueError('''Could not find the ct_sparse and sss_cal files, please
+                     provide these as a commandline alt options'''))
+        
+        
+    
 
 # hidden testing functions
 def load_test_data(**kwargs):
@@ -1455,6 +1510,18 @@ if __name__=='__main__':
                         action='store_true',
                         default=0
                         )
+    altargs.add_argument('-ct_sparse', 
+                         help='''(Elekta/MEGIN datasets) This is the ct_sparse.fif
+                         file associated with the MEG system.  This is an override if
+                         the file cannot be found in the sub/ses/meg BIDS directory or at the 
+                         top level of the bids tree.'''
+                         )
+    altargs.add_argument('-sss_cal',
+                         help='''(Elekta/MEGIN datasets) This is the sss_cal.dat
+                         file associated with the MEG system.  This is an override if
+                         the file cannot be found in the sub/ses/meg BIDS directory or at the 
+                         top level of the bids tree.'''
+                         )
     qaargs = parser.add_argument_group('QA Inputs')
     qaargs.add_argument('-ica_manual_qa_prep',
                         help='''if flag is present, stop after ICA for manual QA''',
@@ -1468,7 +1535,7 @@ if __name__=='__main__':
                         )
 
     parser.add_argument('-remove_old',
-                        help='''If flag is present, remove any files from a prior run (excepting freesurfer ddata). ''',
+                        help='''If flag is present, remove any files from a prior run (excepting freesurfer data). ''',
                         action='store_true',
                         default=0
                         )
