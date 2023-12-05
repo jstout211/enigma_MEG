@@ -449,6 +449,9 @@ class process():
         if (not hasattr(self, 'raw_eroom')) and (self.meg_er_raw != None):
             self.raw_eroom = load_data(self.meg_er_raw.fpath) 
             self.raw_eroom.pick_types(meg=True, eeg=False)
+        # For subsequent reference, if raw_room not provided, set to None
+        if (not hasattr(self, 'raw_eroom')):
+            self.raw_eroom=None
         # figure out the MEG system vendor, note that this may be different from 
         # datatype if the datatype is .fif
         self.vendor = mne.channels.channels._get_meg_system(self.raw_rest.info)
