@@ -20,7 +20,7 @@ setuptools.setup(
     ],
     #python_requires='<3.9',
     install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui',
-                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids','MEGnet @ git+https://github.com/nih-megcore/MegNET_2020.git'], #'pyvista', 'pyqt5','pyvistaqt',
+                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids','MEGnet @ git+https://github.com/nih-megcore/MegNET_2020.git', 'pyctf-lite @ git+https://github.com/nih-megcore/pyctf-lite.git' ], #'pyvista', 'pyqt5','pyvistaqt',
     extras_require={"testing":['datalad','pytest']},
     scripts=['enigmeg/process_meg.py', 
              'enigmeg/process_anatomical.py',
