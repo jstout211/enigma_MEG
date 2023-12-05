@@ -510,9 +510,12 @@ class process():
         else:
             er_bad = []
             er_flat =[]
-        if self.raw_eroom != None:
-            all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
-                rest_bad + rest_flat + er_bad + er_flat
+        if hasattr(self, 'raw_eroom'):
+            if self.raw_eroom != None:
+                all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
+                    rest_bad + rest_flat + er_bad + er_flat
+            else:
+                all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat #This may be redundant to below
         else:
             all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat 
         # remove duplicates
