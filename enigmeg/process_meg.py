@@ -541,7 +541,7 @@ class process():
                                                               bids_path=None)
             else:
                 ct_sparse_path, sss_cal_path = find_cal_files(args=None, 
-                                                              bids_path=proc.bids_path)
+                                                              bids_path=self.bids_path)
             # Run the movement correction on the dataset
             self.ct_sparse = ct_sparse_path
             self.sss_cal = sss_cal_path
