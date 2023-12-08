@@ -533,7 +533,7 @@ class process():
         print(all_bad) 
         
         # Movement correction for Elekta systems
-        if (self.vendor[0] == '306m') | (self.vendor[0] == '122m'):
+        if ((self.vendor[0] == '306m') | (self.vendor[0] == '122m')):
             # Get the calibration files - check global variable to see if they 
             # were passed on the commandline
             if 'megin_cal_files' in globals().keys():
@@ -542,10 +542,14 @@ class process():
             else:
                 ct_sparse_path, sss_cal_path = find_cal_files(args=None, 
                                                               bids_path=self.bids_path)
-            # Run the movement correction on the dataset
             self.ct_sparse = ct_sparse_path
-            self.sss_cal = sss_cal_path
-            self._movement_comp()
+            self.sss_cal = sss_cal_path         
+            
+            # Check for and run the movement correction on the dataset
+            chpi_info = mne.chpi.get_chpi_info(self.raw_rest.info)
+            if hasattr(chpi_info[0], '__len__'):
+                if len(chpi_info[0]) > 0:
+                    self._movement_comp()
     
                    
 # =============================================================================
