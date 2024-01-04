@@ -170,7 +170,7 @@ for idx,row in dframe.iterrows():
                 fs_subject=row.subjid,
                 fs_subjects_dir=row.subjects_dir
                 )
-            logger.info(f'Calc-ed landmarks')
+            logger.info('Calc-ed landmarks')
             
             # Write regular
             t1w_bids_path = write_anat(
@@ -183,5 +183,20 @@ for idx,row in dframe.iterrows():
             logger.info(f'Successful MRI BIDS: {t1w_bids_path.fpath}')
         except BaseException as e:
             logger.exception(str(e))
+            
+# =============================================================================
+# Link freesurfer data
+# =============================================================================
+bids_subjects_dir = op.join(bids_dir, 'derivatives', 'freesurfer','subjects')
+if not(op.join(bids_subjects_dir)):
+    os.makedirs(bids_subjects_dir)
+
+for idx, row in dframe.iterrows():
+    if row.session == '1':
+        out_slink = op.join(bids_subjects_dir, row.subjid)
+        if not(op.exists(out_slink)):
+            os.symlink(row.subjects_dir, out_slink)
+    else:
+        continue
             
 
