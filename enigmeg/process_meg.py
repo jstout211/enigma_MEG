@@ -1094,7 +1094,7 @@ def compile_fs_process_list(process):       # function to determine what freesur
         process_steps.append('recon-all -autorecon1 -s {}'.format(fs_subject))
     if not(process.anat_vars.fsdict['lh_pial']):
         process_steps.append('recon-all -autorecon2 -careg -s {}'.format(fs_subject))
-    if not(process.anat_vars.fsdict['lh_dkaparc']):
+    if not(process.anat_vars.fsdict['lh_dkaparc']) and not(process.anat_vars.fsdict['lh_dkaparc_alt']):
         process_steps.append('recon-all -autorecon3 -s {}'.format(fs_subject))
     return process_steps   
         
@@ -1109,6 +1109,7 @@ def get_fs_filedict(subject, bids_root):    # make a dictionary of freesurfer fi
     fs_dict['lh_pial'] = f'sub-{subject}/surf/lh.pial'
     fs_dict['rh_pial'] = f'sub-{subject}/surf/rh.pial'
     fs_dict['lh_dkaparc'] = f'sub-{subject}/label/lh.aparc.DKTatlas.annot'
+    fs_dict['lh_dkaparc_alt'] = f'sub-{subject}/label/lh.aparc.annot'
     fs_dict['rh_dkaparc'] = f'sub-{subject}/label/rh.aparc.DKTatlas.annot'
     
     # FS - post process files
