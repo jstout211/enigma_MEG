@@ -19,7 +19,7 @@ logger=logging.getLogger()
 logdir  = op.join(os.getcwd(), 'logdir')
 if not op.exists(logdir):
     os.mkdir(logdir)
-topdir='/fast/HCPPITT/sourcedata'
+topdir='/data/EnigmaMeg/BIDS/UPITT_Age_HCP/sourcedata'
 os.chdir(topdir)
 
 def get_subj_logger(subjid, session, log_dir=None):
@@ -81,6 +81,7 @@ def do_auto_coreg(raw_fname, subject, subjects_dir):
     
 
 dsets = glob.glob(op.join(topdir, 'HCP*','unprocessed','MEG','*','*raw.fif'))
+dsets += glob.glob(op.join(topdir, 'HCP*', 'unprocessed','MEG', 'EMPTY', '*.fif'))
 subjids = [i.split('sourcedata')[-1].split('/')[1] for i in dsets]
 dframe = pd.DataFrame(zip(dsets,subjids), columns=['fname','subjid'])
 
@@ -124,18 +125,15 @@ for idx,row in dframe.iterrows():
 # MEG BIDS
 # =============================================================================
 
-bids_dir = op.join(topdir, 'BIDS')
+bids_dir = op.join(op.dirname(topdir), 'BIDS')
 for idx,row in dframe.iterrows():
     logger = get_subj_logger(row.subjid, row.session, log_dir=logdir)
     try:
         logger.info(f'Starting MEG BIDS')
-        trans_fname = op.join(op.dirname(op.dirname(row.fname)), f'{row.subjid}_trans.fif')
-        trans = mne.read_trans(trans_fname)
         raw = mne.io.read_raw_fif(row.fname)
         raw.info['line_freq'] = 60 
         ses = row.session
-        run = row.run
-        run = str(run) 
+        run = str(row.run)
         if len(run)==1: run='0'+run
         bids_path = BIDSPath(subject=row.subjid, session=ses, task=row.task,
                               run=run, root=bids_dir, suffix='meg')
@@ -157,7 +155,7 @@ for idx,row in dframe.iterrows():
     else:
         try:
             raw = mne.io.read_raw_fif(row.fname)
-            trans_fname = row.trans_fname #op.join(op.dirname(op.dirname(row.fname)), f'{row.subjid}_trans.fif')
+            trans_fname = row.trans_fname 
             trans = mne.read_trans(trans_fname)
             
             t1w_bids_path = \
@@ -192,11 +190,17 @@ if not(op.join(bids_subjects_dir)):
     os.makedirs(bids_subjects_dir)
 
 for idx, row in dframe.iterrows():
+    logger = get_subj_logger(row.subjid, session=row.session, log_dir=logdir)
+    print(row.subjid, row.session)
     if row.session == '1':
-        out_slink = op.join(bids_subjects_dir, row.subjid)
-        if not(op.exists(out_slink)):
-            os.symlink(row.subjects_dir, out_slink)
+        try:
+            out_slink = op.join(bids_subjects_dir,'sub-'+row.subjid)
+            if not(op.exists(out_slink)):
+                os.symlink(op.join(row.subjects_dir, row.subjid), out_slink)
+        except BaseException as e:
+            logger.exception('Could not link the subject freesurfer folder: {str(e)}')
     else:
+        logger.warning('Freesurfer linking was skipped - mostly due to session = {row.session}')
         continue
             
 
