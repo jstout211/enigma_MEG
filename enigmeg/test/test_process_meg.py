@@ -10,6 +10,9 @@ import glob
 import mne
 from enigmeg import process_meg
 import subprocess
+import pandas as pd
+import pytest
+import numpy as np
 
 os.environ['n_jobs']='1'
 
@@ -17,6 +20,7 @@ os.environ['n_jobs']='1'
 
 download_path = os.path.expanduser('~')
 openneuro_dset='ds004215'
+bids_root=op.join(download_path, openneuro_dset)
 
 
 # =============================================================================
@@ -24,7 +28,7 @@ openneuro_dset='ds004215'
 # =============================================================================
 def test_load():
     proc = process_meg.process(subject='ON02747',
-                        bids_root=op.join(download_path, openneuro_dset),
+                        bids_root=bids_root,
                         session='01',
                         run='01',
                         emptyroom_tagname='noise', 
@@ -100,5 +104,39 @@ def test_label_psds():
     
 def test_do_spectral_param():
     assert proc.do_spectral_parameterization() == None
-    #assert op.exists(proc.fnames.spectra_csv) 
+    assert op.exists(proc.fnames.spectra_csv) 
+
+#%%  Test CSV input
+
+
+def test_parse_bids(tmp_path):
+    test_id = 'ON02747'
+    d = tmp_path / "parse_bids"
+    d.mkdir()
+    out_root = d/'tmp_parse_bids'
+    out_root.mkdir()
+    os.chdir(out_root)
+    cmd_ = f'parse_bids.py -bids_root {bids_root} -rest_tag rest -emptyroom_tag noise'
+    subprocess.call(cmd_.split())
+    csv_file = out_root / 'ParsedBIDS_dataframe.csv'
+    assert op.exists(csv_file)
+    dframe = pd.read_csv(csv_file)
+    idx = dframe[dframe['sub']==test_id].index
+    row = dframe.loc[idx]
+    assert np.all(row.ses==1)  
+    assert np.all(row.run==1)
+    eroom_gt = op.join(bids_root, 'sub-'+test_id, 'ses-01','meg',f'sub-{test_id}_ses-01_task-noise_run-01_meg.ds')
+    assert np.all(row.eroom == eroom_gt) 
+    assert np.all(row.type == '.ds')
+    meg_gt = op.join(bids_root, 'sub-'+test_id, 'ses-01','meg',f'sub-{test_id}_ses-01_task-rest_run-01_meg.ds')
+    assert np.all(row.path == meg_gt)
+    mri_gt = op.join(bids_root, 'sub-'+test_id, 'ses-01','anat',f'sub-{test_id}_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz')
+    assert np.all(row.mripath == mri_gt)
+
+
+
+# def test_csv_procmeg(tmp_path):
+    
+#     tmp_ = 'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv ParsedBIDS_dataframe.csv'
+    
 
