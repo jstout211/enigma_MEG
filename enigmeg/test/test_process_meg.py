@@ -11,6 +11,7 @@ import mne
 from enigmeg import process_meg
 import subprocess
 import pandas as pd
+pd.set_option('display.max_colwidth', 255)
 import pytest
 import numpy as np
 
