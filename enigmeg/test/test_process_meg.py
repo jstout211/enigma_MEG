@@ -108,9 +108,9 @@ def test_do_spectral_param():
     assert op.exists(proc.fnames.spectra_csv) 
 
 #%%  Test CSV input
+test_id = 'ON02747'
 
 def test_parse_bids(tmp_path):
-    test_id = 'ON02747'
     d = tmp_path / "parse_bids"
     d.mkdir()
     out_root = d/'tmp_parse_bids'
@@ -140,9 +140,12 @@ def test_parse_bids(tmp_path):
 
 def test_csv_procmeg(tmp_path):
     csv_file = tmp_path / "parse_bids" / "tmp_parse_bids" / "ParsedBIDS_dataframe.csv"
-    cmd_ = 'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file}'
+    dframe = pd.read_csv(csv_file)
+    idx = dframe[dframe['sub']==test_id].index
+    dframe = dframe.loc[idx].reset_index(drop=True)
+    dframe.to_csv(csv_file)
+    cmd_ = f'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file}'
     subprocess.call(cmd_.split())
     
     
 
-tmp_ = '/home/jstout/ds004215/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_rec-SCIC_T1w.nii.gz'
