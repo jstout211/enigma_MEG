@@ -80,7 +80,8 @@ if __name__=='__main__':
     
     subject_list = get_subdirectories(bids_root, 'sub-')
     
-    allsubj_df = pd.DataFrame(columns=['sub','ses','run','type','path','mripath','eroom'])
+    allsubj_df = pd.DataFrame(columns=['sub','ses','run','type','path','mripath','eroom'], 
+                              dtype=str)
 
     for subject in subject_list:
     
