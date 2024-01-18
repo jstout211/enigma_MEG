@@ -14,6 +14,7 @@ import pandas as pd
 pd.set_option('display.max_colwidth', 255)
 import pytest
 import numpy as np
+from pathlib import Path
 
 os.environ['n_jobs']='1'
 
@@ -22,7 +23,7 @@ os.environ['n_jobs']='1'
 download_path = os.path.expanduser('~')
 openneuro_dset='ds004215'
 bids_root=op.join(download_path, openneuro_dset)
-
+test_id = 'ON02747'
 
 # =============================================================================
 # Build object instance
@@ -108,7 +109,7 @@ def test_do_spectral_param():
     assert op.exists(proc.fnames.spectra_csv) 
 
 #%%  Test CSV input
-test_id = 'ON02747'
+
 
 def test_parse_bids(tmp_path):
     d = tmp_path / "parse_bids"
@@ -155,7 +156,7 @@ def test_csv_procmeg(tmp_path):
     dframe = dframe.loc[idx].reset_index(drop=True)
     dframe.to_csv(csv_file, index=False)
     cmd_ = f'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file}'
-    tmp_ = subprocess.run(cmd_.split(), check=True)
+    assert subprocess.run(cmd_.split(), check=True)
     
 
 # =============================================================================

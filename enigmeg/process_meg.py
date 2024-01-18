@@ -224,11 +224,9 @@ class process():
                                                           session=None,
                                                           check=False)
         
-        if check_paths==True:
-            self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
-            self.check_paths()
-        elif csv_info is not None:
-            self.fnames=self.initialize_fromcsv(csv_info)
+        self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
+        self.check_paths()
+
             
         self.anat_vars=munch.Munch()
         self.anat_vars.fsdict = get_fs_filedict(self.subject,self.bids_root)
@@ -236,121 +234,6 @@ class process():
         
         self.check_for_files()         
 
-            
-    # This function initializes the bids path structures for the case where the paths have
-    # been defined in a csv file, produced by parsing the BIDS tree. Note that the BidsPath
-    # objects are specified separately for the MEG, eroom, and anat
-            
-    def initialize_fromcsv(self, csv_info):
-        megpath=csv_info['path']            # get the filenames from the submitted csv row
-        mripath=csv_info['mripath']
-        eroompath=csv_info['eroom']
-        datatype=csv_info['type']
-        
-        _tmp=munch.Munch()                  # initialize a temporary variable
-        
-        # extract the entities for the MEG and update the relevant BIDS path objectss
-        entities = mne_bids.get_entities_from_fname(megpath)
-        
-        self.bids_path.update(
-            session=entities['session'])
-        self.deriv_path.update(
-            session=entities['session'],
-            extension=datatype)
-        self.rest_derivpath.update(
-            session=entities['session'],
-            task=entities['task'],
-            run=entities['run'],
-            suffix='meg',
-            extension='.fif')
-        self.meg_rest_raw.update(
-            session=entities['session'],
-            task=entities['task'],
-            run=entities['run'],
-            suffix='meg',
-            extension=datatype)
-        self.QA_dir = BIDSPath(root=self.QA_dir,subject=subject, session=session)
-
-        
-        # if there's an emptyroom path provided, extract the entities from the filepath
-        # and update the BIDS path objects
-        
-        if eroompath != None:
-            entities = mne_bids.get_entities_from_fname(eroompath)
-            self.eroom_derivpath.update(
-                session=entities['session'],
-                task=entities['task'],
-                run=entities['run'],
-                suffix='meg',
-                extension='.fif')
-            self.meg_er_raw.update(
-                session=entities['session'],
-                task=entities['task'],
-                run=entities['run'],
-                suffix='meg',
-                extension=datatype)
-            
-        # Finally, extract the entities from the anatomical filename and update the 
-        # BIDS path object
-        
-        entities = mne_bids.get_entities_from_fname(mripath)
-        self.anat_bidspath.update(
-                session=entities['session'],
-                run=entities['run'])
-
-        # check if the anatomical is .nii or .nii.gz
-        
-        _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii')
-        if not os.path.exists(_tmp['anat'].fpath):
-            _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii.gz')
-
-        # populate the temporary dictionary _tmp with all the filenames
-        
-        _tmp['raw_rest']=self.meg_rest_raw
-        if eroompath!=None:
-            _tmp['raw_eroom']=self.meg_er_raw
-        
-        rest_deriv = self.rest_derivpath.copy().update(extension='.fif')
-        if eroompath!=None:
-            eroom_deriv = self.eroom_derivpath.copy().update(extension='.fif')
-  
-        _tmp['rest_filt']=rest_deriv.copy().update(processing='filt')
-        if eroompath!=None:
-            _tmp['eroom_filt']=eroom_deriv.copy().update(processing='filt')
-        
-        _tmp['rest_epo']=rest_deriv.copy().update(suffix='epo')
-        if eroompath!=None:
-            _tmp['eroom_epo']=eroom_deriv.copy().update(suffix='epo')
-        
-        _tmp['rest_csd']=rest_deriv.copy().update(suffix='csd', extension='.h5')
-        if eroompath!=None:
-            _tmp['eroom_csd']=eroom_deriv.copy().update(suffix='csd', extension='.h5')
-             
-        _tmp['rest_fwd']=rest_deriv.copy().update(suffix='fwd') 
-        _tmp['rest_trans']=rest_deriv.copy().update(suffix='trans')
-        _tmp['bem'] = self.deriv_path.copy().update(suffix='bem', extension='.fif')
-        _tmp['src'] = self.deriv_path.copy().update(suffix='src', extension='.fif')
-        if self.do_dics:
-            _tmp['dics'] = self.deriv_path.copy().update(suffix='dics', 
-                                                     run=self.meg_rest_raw.run,
-                                                     extension='.h5')
-        else:
-            _tmp['lcmv'] = self.deriv_path.copy().update(suffix='lcmv',
-                                                     run=self.meg_rest_raw.run,
-                                                     extension='h5')
-        self.fooof_dir = self.deriv_path.directory / \
-            self.deriv_path.copy().update(datatype=None, extension=None).basename
-        
-        # Cast all bids paths to paths and save as dictionary
-        path_dict = {key:str(i.fpath) for key,i in _tmp.items()}
-        
-        # Additional non-bids path files
-        path_dict['parc'] = op.join(self.subjects_dir, 'morph-maps', 
-                               f'sub-{self.subject}-fsaverage-morph.fif') 
-        return munch.Munch(path_dict)
-    
-    # This function initializes all the filenames if a single subject has been requested
-    # rather than a csv from a parsed BIDS tree
     
     def initialize_fnames(self, rest_tagname, emptyroom_tagname):
         '''Use the bids paths to generate output names'''
@@ -590,7 +473,7 @@ class process():
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
         ica_basename = self.meg_rest_raw.basename + '_ica'
         bad_channels = self.bad_channels
-        ICA(self.fnames['raw_rest'],mains_freq=self.proc_vars['mains'], 
+        ICA(self.fnames['raw_rest'],mains_freq=float(self.proc_vars['mains']), 
             save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
             outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
         self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
@@ -1498,6 +1381,7 @@ if __name__=='__main__':
     standardargs.add_argument('-mains',
                         help='Electric mains frequency  (50 or 60)',
                         default=60.0,
+                        type=float
                         )
     standardargs.add_argument('-rest_tag',
                         help='Override in case task name is other than rest\
@@ -1738,7 +1622,7 @@ if __name__=='__main__':
             session=str(row['ses'])
             logger = get_subj_logger(subject, session, log_dir)
             logger.info(f'processing subject {subject} session {session}')
-            
+                        
             if args.remove_old:
                 print('Removing files from prior runs')
                 logfilename = subject + '_ses-' + str(session) + '_log.txt'
@@ -1751,21 +1635,23 @@ if __name__=='__main__':
                 logger.info('No MRI, cannot process any further')
                 print("Can't process subject %s, no MRI found" % args.subject)
             
-            else:             
+            else:
+                rest_ent = mne_bids.get_entities_from_fname(row.path)
+                er_ent = mne_bids.get_entities_from_fname(row.eroom)
                 process_subj = process(subject = subject,
                                        bids_root = bids_root,
                                        deriv_root = None,
                                        subjects_dir = args.subjects_dir,
-                                       rest_tagname = None,
-                                       emptyroom_tagname = None,
-                                       session = session,
-                                       mains = args.mains,
-                                       run = str(row['run']),
+                                       rest_tagname = rest_ent['task'],
+                                       emptyroom_tagname = er_ent['task'],
+                                       session = row['ses'],
+                                       mains = float(args.mains),
+                                       run = row['run'],
                                        t1_override = None,
                                        fs_ave_fids = False,
                                        check_paths = False,
-                                       do_dics = args.do_dics,
-                                       csv_info=row)
+                                       do_dics = args.do_dics
+                                       )
                 
                 process_subj.load_data()
                 
