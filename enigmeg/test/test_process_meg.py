@@ -120,11 +120,11 @@ def test_parse_bids(tmp_path):
     subprocess.call(cmd_.split())
     csv_file = out_root / 'ParsedBIDS_dataframe.csv'
     assert op.exists(csv_file)
-    dframe = pd.read_csv(csv_file)
+    dframe = pd.read_csv(csv_file, dtype=str)
     idx = dframe[dframe['sub']==test_id].index
     row = dframe.loc[idx]
-    assert np.all(row.ses==1)  
-    assert np.all(row.run==1)
+    assert np.all(row.ses=='01')  
+    assert np.all(row.run=='01')
     eroom_gt = op.join(bids_root, 'sub-'+test_id, 'ses-01','meg',f'sub-{test_id}_ses-01_task-noise_run-01_meg.ds')
     assert np.all(row.eroom == eroom_gt) 
     assert np.all(row.type == '.ds')
