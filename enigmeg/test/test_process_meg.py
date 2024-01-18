@@ -117,7 +117,7 @@ def test_parse_bids(tmp_path):
     out_root.mkdir()
     os.chdir(out_root)
     cmd_ = f'parse_bids.py -bids_root {bids_root} -rest_tag rest -emptyroom_tag noise'
-    subprocess.call(cmd_.split())
+    subprocess.run(cmd_.split(), check=True)
     csv_file = out_root / 'ParsedBIDS_dataframe.csv'
     assert op.exists(csv_file)
     dframe = pd.read_csv(csv_file, dtype=str)
@@ -139,13 +139,38 @@ def test_parse_bids(tmp_path):
 
 
 def test_csv_procmeg(tmp_path):
-    csv_file = tmp_path / "parse_bids" / "tmp_parse_bids" / "ParsedBIDS_dataframe.csv"
-    dframe = pd.read_csv(csv_file)
+    #Need to make this a session scoped tmp_path - so the setup doesnt need to be redone
+    d = tmp_path / "parse_bids"
+    d.mkdir()
+    out_root = d / 'tmp_parse_bids'
+    out_root.mkdir()
+    os.chdir(out_root)    
+    cmd_ = f'parse_bids.py -bids_root {bids_root} -rest_tag rest -emptyroom_tag noise'
+    subprocess.run(cmd_.split(), check=True)
+    
+    csv_file = out_root / 'ParsedBIDS_dataframe.csv'
+    # csv_file = tmp_path / "parse_bids" / "tmp_parse_bids" / "ParsedBIDS_dataframe.csv"
+    dframe = pd.read_csv(csv_file, dtype=str)
     idx = dframe[dframe['sub']==test_id].index
     dframe = dframe.loc[idx].reset_index(drop=True)
-    dframe.to_csv(csv_file)
+    dframe.to_csv(csv_file, index=False)
     cmd_ = f'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file}'
-    subprocess.call(cmd_.split())
+    tmp_ = subprocess.run(cmd_.split(), check=True)
+    
+
+# =============================================================================
+# 
+# =============================================================================
+# import shlex
+# import argparse
+# class make_args(argparse.Namespace):
+#     def __init__(self):
+#         self.n_jobs=1
+#         self.mains=60.0
+#         self.proc_fromcsv=None
+    
+# args = make_args()
+# -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file}    
     
     
 
