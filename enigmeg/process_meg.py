@@ -902,7 +902,7 @@ class process():
         -------
         # outputs eTIV, lh.orig.nofix holes, rh.orig.nofix holes, and average holes 
         '''
-     
+        os.environ['SUBJECTS_DIR'] = self.subjects_dir
         out = subprocess.getoutput(f'mri_segstats --seg {self.subjects_dir}/sub-{self.subject}/mri/aseg.mgz --subject sub-{self.subject} --etiv-only')
         pattern = r"atlas_icv \(eTIV\) = (\d+) mm\^3"
         tiv = re.search(pattern,out).group(1)
