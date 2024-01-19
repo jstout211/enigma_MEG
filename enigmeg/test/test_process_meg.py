@@ -72,10 +72,10 @@ def test_mriproc():
     assert op.exists(proc.fnames.rest_fwd)
     assert op.exists(proc.fnames.src)
 
-#Fails because of SSL error
-#def test_aparc():
-#    proc.do_make_aparc_sub()
-#    assert op.exists(proc.fnames.parc)
+
+def test_aparc():
+    proc.do_make_aparc_sub()
+    assert op.exists(proc.fnames.parc)
                       
 def test_beamformer():
     if op.exists(proc.fnames.lcmv):
