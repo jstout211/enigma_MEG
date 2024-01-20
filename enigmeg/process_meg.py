@@ -908,11 +908,20 @@ class process():
         tiv = re.search(pattern,out).group(1)
         out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/lh.orig.nofix')
         pattern = r"index = (\d+)"
-        lh_holes = re.search(pattern,out).group(1)
+        lh_tmp = re.search(pattern,out)
+        if hasattr(lh_tmp, 'group'):
+            lh_holes = lh_tmp.group(1)
+        else:
+            lh_holes = '0'
         out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/rh.orig.nofix')
         pattern = r"index = (\d+)"
-        rh_holes = re.search(pattern,out).group(1)               
+        rh_tmp = re.search(pattern,out)
+        if hasattr(rh_tmp, 'group'):
+            rh_holes = rh_tmp.group(1)
+        else:
+            rh_holes = '0'
         logstring = 'eTIV: ' + str(tiv) + ' lh_holes: ' + str(lh_holes) + ' rh_holes: ' + str(rh_holes) + ' avg_holes: ' + str((int(lh_holes)+int(rh_holes))/2)
+        print(logstring)
         logger.info(logstring)
         
 # =============================================================================
