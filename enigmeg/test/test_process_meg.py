@@ -106,7 +106,7 @@ def test_label_psds():
     
 def test_do_spectral_param():
     assert proc.do_spectral_parameterization() == None
-    assert op.exists(proc.fnames.spectra_csv) 
+    assert op.exists(proc.fnames.spectra) 
 
 #%%  Test CSV input
 
@@ -150,7 +150,6 @@ def test_csv_procmeg(tmp_path):
     subprocess.run(cmd_.split(), check=True)
     
     csv_file = out_root / 'ParsedBIDS_dataframe.csv'
-    # csv_file = tmp_path / "parse_bids" / "tmp_parse_bids" / "ParsedBIDS_dataframe.csv"
     dframe = pd.read_csv(csv_file, dtype=str)
     idx = dframe[dframe['sub']==test_id].index
     dframe = dframe.loc[idx].reset_index(drop=True)
