@@ -475,7 +475,8 @@ class process():
         bad_channels = self.bad_channels
         ICA(self.fnames['raw_rest'],mains_freq=float(self.proc_vars['mains']), 
             save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
-            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
+            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels, 
+            create_outdir=False)  
         self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
