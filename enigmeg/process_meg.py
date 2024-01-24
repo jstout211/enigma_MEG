@@ -472,7 +472,7 @@ class process():
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
         ica_basename = self.meg_rest_raw.basename + '_ica'
-        bad_channels = self.bad_channels
+        bad_channels = [i for i in self.bad_channels if i in self.raw_rest.info['ch_names']] #Prevent drop channels from erroring
         ICA(self.raw_rest,mains_freq=float(self.proc_vars['mains']), 
             save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
             outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels, 
