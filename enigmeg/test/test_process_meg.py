@@ -61,6 +61,8 @@ def test_create_epochs():
     #assert op.exists(proc.fnames.eroom_csd) #add for dics call
 
 def test_icaclean():
+    if not hasattr(proc, 'bad_channels'):
+        test_vendor_prep()
     assert proc.do_ica() == None
     assert proc.do_classify_ica() == None
 
