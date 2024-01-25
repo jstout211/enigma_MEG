@@ -303,8 +303,8 @@ class process():
         outfolder = self.deriv_path.directory / \
             self.deriv_path.copy().update(datatype=None, extension=None).basename
             
-        path_dict['spectra'] = str(outfolder) + '_label_spectra.csv'
-        path_dict['power'] = str(outfolder) + '_band_rel_power.csv'
+        path_dict['spectra'] = str(outfolder) + f'_label_task-{rest_tagname}_run-{self.run}_spectra.csv'
+        path_dict['power'] = str(outfolder) + f'_band_task-{rest_tagname}_run-{self.run}_rel_power.csv'
         
         return munch.Munch(path_dict)
 
