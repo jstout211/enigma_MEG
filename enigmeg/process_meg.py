@@ -56,7 +56,7 @@ logger=logging.getLogger()
 
 # Function to retrieve the subject/session specific logger
 
-def get_subj_logger(subjid, session, log_dir=None):
+def get_subj_logger(subjid, session, task, run, log_dir=None):
      '''Return the subject specific logger.
      This is particularly useful in the multiprocessing where logging is not
      necessarily in order'''
@@ -68,7 +68,7 @@ def get_subj_logger(subjid, session, log_dir=None):
          if logging.FileHandler in tmp_:
              return subj_logger
      else: # first time requested, add the file handler
-         fileHandle = logging.FileHandler(f'{log_dir}/{subjid}_ses-{session}_log.txt')
+         fileHandle = logging.FileHandler(f'{log_dir}/{subjid}_ses-{session}_task-{task}_run-{run}_log.txt')
          fileHandle.setLevel(logging.INFO)
          fileHandle.setFormatter(logging.Formatter(fmt)) 
          subj_logger.addHandler(fileHandle)
@@ -1259,7 +1259,7 @@ def get_freq_idx(bands, freq_bins):
 # =============================================================================
 
 def process_subject(subject, args):
-    logger = get_subj_logger(subject, args.session, log_dir)
+    logger = get_subj_logger(subject, args.session, args.rest_tag, args.run, log_dir)
     logger.info('Initializing structure')
     proc = process(subject=subject, 
             bids_root=args.bids_root, 
@@ -1276,7 +1276,7 @@ def process_subject(subject, args):
     proc.do_proc_allsteps()
     
 def process_subject_up_to_icaqa(subject, args):
-    logger = get_subj_logger(subject, args.session, log_dir)
+    logger = get_subj_logger(subject, args.session, args.rest_tag, args.run, log_dir)
     logger.info('Initializing structure')
     proc = process(subject=subject, 
             bids_root=args.bids_root, 
@@ -1297,7 +1297,7 @@ def process_subject_up_to_icaqa(subject, args):
     proc.prep_ica_qa()    
     
 def process_subject_after_icaqa(subject, args):
-    logger = get_subj_logger(subject, args.session, log_dir)
+    logger = get_subj_logger(subject, args.session,args.rest_tag, args.run, log_dir)
     logger.info('Initializing structure')
     proc = process(subject=subject, 
             bids_root=args.bids_root, 
@@ -1360,7 +1360,7 @@ def parse_manual_ica_qa(self):
                     newdict[subjrun] = [] # if compoenent is good
     return newdict
 
-#%%    
+#%%  Argparse
 if __name__=='__main__':
     import argparse  
     parser = argparse.ArgumentParser()
@@ -1578,7 +1578,7 @@ if __name__=='__main__':
             # now that we've set up the symbolic links, we can now use the default subjects directory
             args.subjects_dir = default_dir
       
-        logger = get_subj_logger(args.subject, args.session, log_dir)
+        logger = get_subj_logger(args.subject, args.session,args.rest_tag, args.run, log_dir)
         logger.info(f'processing subject {args.subject} session {args.session}')
         
         if args.ica_manual_qa_prep:
@@ -1629,7 +1629,7 @@ if __name__=='__main__':
             subject = subject.replace('sub-','')
             
             session=str(row['ses'])
-            logger = get_subj_logger(subject, session, log_dir)
+            logger = get_subj_logger(subject, session, args.rest_tag, args.run, log_dir)
             logger.info(f'processing subject {subject} session {session}')
                         
             if args.remove_old:
