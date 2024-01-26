@@ -545,7 +545,7 @@ class process():
         self._preproc(raw_inst=self.raw_rest, deriv_path=self.rest_derivpath)
         if self.raw_eroom != None:
             self._preproc(raw_inst=self.raw_eroom, deriv_path=self.eroom_derivpath)
-    
+
     @log
     def _proc_epochs(self,          # divide the rest data into epochs
                      raw_inst=None,
@@ -733,12 +733,15 @@ class process():
             forward = mne.read_forward_solution(self.fnames.rest_fwd)
             epochs = mne.read_epochs(self.fnames.rest_epo)
             fname_lcmv = self.fnames.lcmv #Pre-assign output name
-            
+        
+        epo_rank = mne.compute_rank(epochs)          # compute rank of rest dataset
+        
         # If emptyroom present - use in beamformer
+
         if self.meg_er_raw != None:
 
             noise_rank = mne.compute_rank(self.raw_eroom)
-            epo_rank = mne.compute_rank(epochs)
+            
             if 'mag' in epo_rank:
                 if epo_rank['mag'] < noise_rank['mag']:
                     noise_rank['mag']=epo_rank['mag']
@@ -756,13 +759,16 @@ class process():
                 noise_cov = mne.read_cov(self.fnames.eroom_cov)
                 filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, noise_cov=noise_cov,  pick_ori='max-power',
                     weight_norm='unit-noise-gain', rank=noise_rank)
+        if self.meg_er_raw == None and self.vendor[0] == '306m':
+            noise_cov = mne.make_ad_hoc_cov(epochs.info)
+            filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, noise_cov=noise_cov,
+                        pick_ori='max-power', weight_norm='unit-noise-gain', rank=epo_rank)
         else:
             #Build beamformer without emptyroom noise
-            epo_rank = mne.compute_rank(epochs)
-                
             if self.do_dics:
                 filters=mne.beamformer.make_dics(epochs.info, forward, dat_csd, reg=0.05,pick_ori='max-power',
                     inversion='matrix', weight_norm='unit-noise-gain', rank=epo_rank)
+            
             else:
                 filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05,
                             pick_ori='max-power', weight_norm='unit-noise-gain', rank=epo_rank)
