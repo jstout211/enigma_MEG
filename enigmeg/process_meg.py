@@ -460,6 +460,7 @@ class process():
         chpi_amplitudes = mne.chpi.compute_chpi_amplitudes(raw_inst)
         chpi_locs = mne.chpi.compute_chpi_locs(raw_inst.info, chpi_amplitudes)
         head_pos = mne.chpi.compute_head_pos(raw_inst.info, chpi_locs,verbose=False)
+        np.save(str(deriv_path.fpath)[:-4]+'_headpos.npy', head_pos)
         raw_tsss = maxwell_filter(raw_inst, head_pos=head_pos,
                                  cross_talk=self.ct_sparse,
                                  calibration=self.sss_cal, 
