@@ -19,8 +19,6 @@ def gen_coreg_pngs(subjstruct):
     from mne.viz import set_3d_view
     
     subjid = subjstruct.subject
-    session = subjstruct.meg_rest_raw.session
-    run = subjstruct.meg_rest_raw.run
     
     print(subjstruct.meg_rest_raw.fpath)
     subjstruct.raw_rest = load_data(subjstruct.meg_rest_raw.fpath)
@@ -51,9 +49,18 @@ def gen_coreg_pngs(subjstruct):
     ax[2].imshow(img3)
     tmp=ax[2].axis('off')
    
-    png_path=subjstruct.QA_dir
+    figname_basename = subjstruct.deriv_path.update(
+        root=subjstruct.bids_root,
+        task = subjstruct.meg_rest_raw.task,
+        datatype = 'meg',
+        subject=subjstruct.subject,
+        session=subjstruct.meg_rest_raw.session,
+        run=subjstruct.meg_rest_raw.run,
+        suffix = 'coreg',
+        extension='.png'
+        ).basename
 
-    figname = op.join(png_path, 'sub-' + subjid + '_ses-' + session + 'task-rest_run-' + run + '_coreg.png')
+    figname = op.join(subjstruct.QA_dir.directory, figname_basename)
     
     fig.savefig(figname, dpi=300,bbox_inches='tight')
     plt.close(fig)
@@ -61,24 +68,28 @@ def gen_coreg_pngs(subjstruct):
 def gen_bem_pngs(subjstruct):
     
     from mne.viz import plot_bem
-  
+    
     subjid = subjstruct.subject
-    session = subjstruct.meg_rest_raw.session
-    run = subjstruct.meg_rest_raw.run
-    
-    enigma_root = op.join(subjstruct.deriv_root, 'ENIGMA_MEG')
-    enigma_subj_path = op.join(enigma_root, 'sub-' + subjid)
-    src_path = subjstruct.fnames['src']
-    src = mne.read_source_spaces(src_path, subjstruct.subjects_dir)
-        
-    png_path=png_path=subjstruct.QA_dir
-
-    figname_bem = op.join(png_path, 'sub-' + subjid + '_ses-' + session + 'task-rest_run-' + run + '_bem.png')
-    
+      
     fig=plot_bem(subject='sub-'+subjid, subjects_dir=subjstruct.subjects_dir, brain_surfaces='white', 
              slices=[50, 100, 150, 200], show=False, show_indices=True, mri='T1.mgz', show_orientation=True)
-    fig.savefig(figname_bem)
+  
+    figname_basename = subjstruct.deriv_path.update(
+        root=subjstruct.bids_root,
+        task = subjstruct.meg_rest_raw.task,
+        datatype = 'meg',
+        subject=subjstruct.subject,
+        session=subjstruct.meg_rest_raw.session,
+        run=subjstruct.meg_rest_raw.run,
+        suffix = 'bem',
+        extension='.png'
+        ).basename
 
+    figname = op.join(subjstruct.QA_dir.directory, figname_basename)
+    
+    fig.savefig(figname)
+    plt.close(fig)
+    
 def gen_src_pngs(subjstruct):
     
     from mne.viz._brain.view import views_dicts
@@ -87,17 +98,21 @@ def gen_src_pngs(subjstruct):
     import matplotlib.image as img
     
     subjid = subjstruct.subject
-    session = subjstruct.meg_rest_raw.session
-    run = subjstruct.meg_rest_raw.run
     
-    enigma_root = op.join(subjstruct.deriv_root, 'ENIGMA_MEG')
-    enigma_subj_path = op.join(enigma_root, 'sub-' + subjid)
     src_path = src_path = subjstruct.fnames['src']
     src = mne.read_source_spaces(src_path, subjstruct.subjects_dir)
 
-    png_path=png_path=subjstruct.QA_dir
+    figname_basename = subjstruct.deriv_path.update(
+       root=subjstruct.bids_root,
+       task = subjstruct.meg_rest_raw.task,
+       subject=subjstruct.subject,
+       session=subjstruct.meg_rest_raw.session,
+       run=subjstruct.meg_rest_raw.run,
+       suffix = 'src',
+       extension='.png'
+       ).basename
 
-    figname_src = op.join(png_path, 'sub-' + subjid + '_ses-' + session + 'task-rest_run-' + run + '_src.png')
+    figname = op.join(subjstruct.QA_dir.directory, figname_basename)
 
     fig=src.plot(subjects_dir=subjstruct.subjects_dir)
     set_3d_view(fig,**views_dicts['both']['frontal'])
@@ -119,7 +134,7 @@ def gen_src_pngs(subjstruct):
     tmp=ax[1].axis('off')
     ax[2].imshow(img3)
     tmp=ax[2].axis('off')
-    fig.savefig(figname_src, dpi=300,bbox_inches='tight')
+    fig.savefig(figname, dpi=300,bbox_inches='tight')
     plt.close(fig)
 
 def gen_surf_pngs(subjstruct):
@@ -127,16 +142,22 @@ def gen_surf_pngs(subjstruct):
     Brain = mne.viz.get_brain_class()
     
     subjid = subjstruct.subject
-    session = subjstruct.meg_rest_raw.session
-    run = subjstruct.meg_rest_raw.run
     
-    png_path=png_path=subjstruct.QA_dir
+    figname_basename = subjstruct.deriv_path.update(
+       root=subjstruct.bids_root,
+       task = subjstruct.meg_rest_raw.task,
+       datatype = 'meg',
+       subject=subjstruct.subject,
+       session=subjstruct.meg_rest_raw.session,
+       run=subjstruct.meg_rest_raw.run,
+       suffix = 'surf',
+       extension='.png'
+       ).basename
+
+    figname = op.join(subjstruct.QA_dir.directory, figname_basename)
     
-    figname_surf = op.join(png_path, 'sub-' + subjid + '_ses-' + session + 'task-rest_run-' + run + '_surf.png')
-    
-    labels = mne.read_labels_from_annot('sub-'+subjid, subjects_dir=subjstruct.subjects_dir,
-                                        parc='aparc', hemi='both',surf_name='white')
-    
+    #labels = mne.read_labels_from_annot('sub-'+subjid, subjects_dir=subjstruct.subjects_dir,
+    #                                   parc='aparc', hemi='both',surf_name='white'   
     
     brain = Brain('sub-'+subjid, 'lh','pial',subjects_dir=subjstruct.subjects_dir,cortex='classic',
                   background='white', views='lateral')
@@ -195,24 +216,29 @@ def gen_surf_pngs(subjstruct):
     ax[1][3].imshow(img8)
     tmp=ax[1][3].axis('off')
     plt.tight_layout()
-    fig.savefig(figname_surf, dpi=300, bbox_inches='tight')
+    fig.savefig(figname, dpi=300, bbox_inches='tight')
     plt.close(fig)
     
 def gen_epo_pngs(subjstruct):
-    
-    subjid = subjstruct.subject
-    session = subjstruct.meg_rest_raw.session
-    run = subjstruct.meg_rest_raw.run
-    
-    png_path=png_path=subjstruct.QA_dir
-    
-    figname_epo_psd = op.join(png_path, 'sub-' + subjid + '_ses-' + session + 'task-rest_run-' + run + '_spectra.png')
-    
+      
+    figname_basename = subjstruct.deriv_path.update(
+       root=subjstruct.bids_root,
+       task = subjstruct.meg_rest_raw.task,
+       datatype = 'meg',
+       subject=subjstruct.subject,
+       session=subjstruct.meg_rest_raw.session,
+       run=subjstruct.meg_rest_raw.run,
+       suffix = 'spectra',
+       extension='.png'
+       ).basename
+
+    figname = op.join(subjstruct.QA_dir.directory, figname_basename)
+   
     epo_path = subjstruct.rest_derivpath.copy().update(suffix='epo', extension='.fif')
     epochs = mne.read_epochs(epo_path)
     
     fig = epochs.compute_psd(fmin=subjstruct.proc_vars['fmin'],fmax=subjstruct.proc_vars['fmax']).plot(picks='meg')
-    fig.savefig(figname_epo_psd, dpi=300, bbox_inches='tight')
+    fig.savefig(figname, dpi=300, bbox_inches='tight')
 
 def gen_fooof_pngs(subjstruct):
     
@@ -221,11 +247,8 @@ def gen_fooof_pngs(subjstruct):
     import numpy as np
     
     subjid = subjstruct.subject
-    session = subjstruct.meg_rest_raw.session
-    run = subjstruct.meg_rest_raw.run
-    
-    fooof_dir = subjstruct.fooof_dir
-    fooof_results = op.join(fooof_dir, 'Band_rel_power.csv')
+     
+    fooof_results = subjstruct.fnames['power']
     fooof_dframe = pd.read_csv(fooof_results, delimiter='\t')  
     fooof_dframe = fooof_dframe.rename(columns={'Unnamed: 0':'Parcel'})
     
@@ -290,9 +313,18 @@ def gen_fooof_pngs(subjstruct):
     img4=brain.screenshot()
     brain.close()
     
-    png_path=subjstruct.QA_dir
+    figname_basename = subjstruct.deriv_path.update(
+       root=subjstruct.bids_root,
+       task = subjstruct.meg_rest_raw.task,
+       datatype = 'meg',
+       subject=subjstruct.subject,
+       session=subjstruct.meg_rest_raw.session,
+       run=subjstruct.meg_rest_raw.run,
+       suffix = 'alpha',
+       extension='.png'
+       ).basename
 
-    figname_alpha = op.join(png_path, 'sub-' + subjid + '_ses-' + session + 'task-rest_run-' + run + '_beamformer.png')
+    figname = op.join(subjstruct.QA_dir.directory, figname_basename)
     
     fig, ax = plt.subplots(2,2)
     ax[0][0].imshow(img1)
@@ -305,6 +337,6 @@ def gen_fooof_pngs(subjstruct):
     tmp=ax[1][1].axis('off')
     plt.tight_layout()
     #plt.show()
-    fig.savefig(figname_alpha, dpi=300,bbox_inches='tight')
-    print('figname_alpha: %s' % figname_alpha)
+    fig.savefig(figname, dpi=300,bbox_inches='tight')
+    print('figname_alpha: %s' % figname)
     plt.close(fig)

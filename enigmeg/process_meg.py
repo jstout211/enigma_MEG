@@ -135,7 +135,6 @@ class process():
             'ENIGMA_MEG'
             )
         
-        
         if subjects_dir is None:    # Freesurfer subjects directory
             self.subjects_dir = op.join(
                 self.deriv_root,
@@ -187,9 +186,15 @@ class process():
             )
         
         # QA output directory
-        self.QA_dir = self.deriv_path.copy().update(datatype=None, extension=None, 
-                                                    suffix=None).basename
-        os.makedirs(self.QA_dir, exist_ok=True)
+        QA_root = op.join( # enigma output directory
+            self.deriv_root,
+            'ENIGMA_MEG_QA'
+            )
+        self.QA_dir = self.deriv_path.copy().update(root=QA_root,
+                                            datatype='meg', 
+                                            extension=None, 
+                                            suffix='QA')
+        os.makedirs(self.QA_dir.directory, exist_ok=True)
         
         if not op.exists(self.deriv_path.directory): 
             self.deriv_path.directory.mkdir(parents=True)
@@ -1592,13 +1597,13 @@ if __name__=='__main__':
         
         if args.ica_manual_qa_prep:
             
-            qa_dir = f'{bids_root}/derivatives/ENIGMA_MEG_QA'
-            if not os.path.isdir(qa_dir):
-                os.makedirs(qa_dir)
-            if not os.path.isdir(os.path.join(qa_dir,'sub-'+args.subject)):
-                os.makedirs(os.path.join(qa_dir,'sub-'+args.subject))
-            if not os.path.isdir(os.path.join(qa_dir,'sub-'+args.subject+'/ses-'+args.session)):
-                os.makedirs(os.path.join(qa_dir,'sub-'+args.subject+'/ses-'+args.session))
+            ica_qa_dir = f'{bids_root}/derivatives/ENIGMA_MEG_QA'
+            if not os.path.isdir(ica_qa_dir):
+                os.makedirs(ica_qa_dir)
+            if not os.path.isdir(os.path.join(ica_qa_dir,'sub-'+args.subject)):
+                os.makedirs(os.path.join(ica_qa_dir,'sub-'+args.subject))
+            if not os.path.isdir(os.path.join(ica_qa_dir,'sub-'+args.subject+'/ses-'+args.session)):
+                os.makedirs(os.path.join(ica_qa_dir,'sub-'+args.subject+'/ses-'+args.session))
             process_subject_up_to_icaqa(args.subject, args)
 
         elif args.process_manual_ica_qa:

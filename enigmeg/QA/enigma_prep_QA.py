@@ -38,6 +38,8 @@ if __name__=='__main__':
     parser.add_argument('-subjid', help='''Define the subject id to process''')
     parser.add_argument('-session', help='''Session number''', default=None)
     parser.add_argument('-run', help='''Run number, note that 01 is different from 1''', default='1')
+    parser.add_argument('-rest_tag', help= '''override if rest task name is other than rest''', default='rest')
+    parser.add_argument('-emptyroom_tag', help= '''override if emptyroom task name is other than empty''', default='empty')
     parser.add_argument('-proc_from_csv', help='''Loop over all subjects in a .csv file''', default=None)
     parser.description='''This python script will compile a series of QA images for assessment of the enigma_MEG pipeline'''
     
@@ -51,7 +53,10 @@ if __name__=='__main__':
         bids_root = 'bids_out'
     else:
         bids_root=args.bids_root
-        
+    
+    if args.emptyroom_tag:
+            if args.emptyroom_tag.lower()=='none': args.emptyroom_tag=None
+    
     if not op.exists(bids_root):
         raise ValueError('Please specify a correct -bids_root')
     
@@ -62,11 +67,6 @@ if __name__=='__main__':
         raise ValueError('No ENIGMA_MEG directory - did you run process_meg.py?')
                 
     subjects_dir = op.join(derivatives_dir,'freesurfer/subjects')  
-
-    QA_dir = op.join(derivatives_dir,'ENIGMA_MEG_QA/')
-
-    if not os.path.exists(QA_dir):
-        os.mkdir(QA_dir)
         
     # process a single subject
     
@@ -75,13 +75,6 @@ if __name__=='__main__':
         args.subjid=args.subjid.replace('sub-','')
         subjid=args.subjid
         print(args.subjid)
-            
-        subj_path=op.join(QA_dir + 'sub-'+subjid)
-        if not os.path.exists(subj_path):
-            os.mkdir(subj_path)    
-        png_path=op.join(subj_path, 'ses-' + args.session)
-        if not os.path.exists(png_path):
-            os.mkdir(png_path) 
                 
         if args.proc_from_csv != None:
             raise ValueError("You can't specify both a subject id and a csv file, sorry")    
@@ -90,15 +83,14 @@ if __name__=='__main__':
                         bids_root=bids_root, 
                         deriv_root=derivatives_dir,
                         subjects_dir=subjects_dir,
-                        rest_tagname='rest',
-                        emptyroom_tagname='emptyroom', 
+                        rest_tagname=args.rest_tag,
+                        emptyroom_tagname=args.emptyroom_tag, 
                         session=args.session, 
                         mains=0,      
                         run=args.run,
                         t1_override=None,
                         fs_ave_fids=False
                         )
-        subjstruct.QA_dir = png_path
         _prepare_QA(subjstruct)
     
     elif args.proc_fromcsv:
@@ -120,15 +112,15 @@ if __name__=='__main__':
                         bids_root=bids_root, 
                         deriv_root=derivatives_dir,
                         subjects_dir=subjects_dir,
-                        rest_tagname='rest',
-                        emptyroom_tagname='emptyroom', 
+                        rest_tagname=args.rest_tag,
+                        emptyroom_tagname=args.emptyroom_tag,  
                         session=session, 
                         mains=0,      
                         run=run,
                         t1_override=None,
                         fs_ave_fids=False
                         )
-        
+
             _prepare_QA(subjstruct)
 
 
