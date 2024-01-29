@@ -4,7 +4,9 @@
 
 @author: Jeff Stout and Allison Nugent
 """
-
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
 import os
 import os.path as op
 import sys
