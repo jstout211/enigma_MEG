@@ -7,6 +7,7 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
+
 import os
 import os.path as op
 import sys
@@ -28,17 +29,14 @@ from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import scipy as sp
 from mne_bids import BIDSPath
 import functools
-import MEGnet
-from MEGnet.prep_inputs.ICA import main as ICA
-from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
 from scipy.stats import zscore
 from mne.preprocessing import maxwell_filter
 
 # Set tensorflow to use CPU
+# The import is performed in the sub-functions to delay the unsuppressable warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
-from tensorflow import keras
 
 # define some variables
 
@@ -479,6 +477,7 @@ class process():
     
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
+        from MEGnet.prep_inputs.ICA import main as ICA
         ica_basename = self.meg_rest_raw.basename + '_ica'
         bad_channels = [i for i in self.bad_channels if i in self.raw_rest.info['ch_names']] #Prevent drop channels from erroring
         ICA(self.raw_rest,mains_freq=float(self.proc_vars['mains']), 
@@ -502,6 +501,9 @@ class process():
     @log           
     def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
         from scipy.io import loadmat
+        import MEGnet
+        from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
+        from tensorflow import keras
         model_path = op.join(MEGnet.__path__[0] ,  'model_v2')
         # This is set to use CPU in initial import
         kModel=keras.models.load_model(model_path)
