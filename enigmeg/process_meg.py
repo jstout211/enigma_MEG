@@ -768,7 +768,7 @@ class process():
                 noise_cov = mne.read_cov(self.fnames.eroom_cov)
                 filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, noise_cov=noise_cov,  pick_ori='max-power',
                     weight_norm='unit-noise-gain', rank=noise_rank)
-        if self.meg_er_raw == None and self.vendor[0] == '306m':
+        elif self.meg_er_raw == None and self.vendor[0] == '306m':
             noise_cov = mne.make_ad_hoc_cov(epochs.info)
             filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05, noise_cov=noise_cov,
                         pick_ori='max-power', weight_norm='unit-noise-gain', rank=epo_rank)
