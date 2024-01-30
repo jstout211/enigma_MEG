@@ -92,6 +92,12 @@ if __name__=='__main__':
                         fs_ave_fids=False
                         )
         _prepare_QA(subjstruct)
+        
+        rogue_bidspath = subjstruct.deriv_path.copy().update(extension=None)
+        rogue_dir = op.join(rogue_bidspath.directory, rogue_bidspath.basename)
+        if os.path.isdir(rogue_dir):
+            if len(os.listdir(rogue_dir))==0: # make sure directory is empty
+                os.rmdir(rogue_dir) # this won't work unless the irectory is empty
     
     elif args.proc_from_csv:
         
@@ -123,6 +129,10 @@ if __name__=='__main__':
 
             _prepare_QA(subjstruct)
 
-
+            rogue_bidspath = subjstruct.deriv_path.copy().update(extension=None)
+            rogue_dir = op.join(rogue_bidspath.directory, rogue_bidspath.basename)
+            if os.path.isdir(rogue_dir):
+                if len(os.listdir(rogue_dir))==0: # make sure directory is empty
+                    os.rmdir(rogue_dir) # this won't work unless the irectory is empty
     
     

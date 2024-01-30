@@ -958,6 +958,7 @@ class process():
         self.do_label_psds()
         self.do_spectral_parameterization()
         self.do_mri_segstats()
+        self.cleanup()
         
 # =============================================================================
 #       Super secret hidden debugging functions. 
@@ -1005,7 +1006,18 @@ def compile_fs_process_list(process):       # function to determine what freesur
     if not(process.anat_vars.fsdict['lh_dkaparc']) and not(process.anat_vars.fsdict['lh_dkaparc_alt']):
         process_steps.append('recon-all -autorecon3 -s {}'.format(fs_subject))
     return process_steps   
-        
+
+def cleanup(process):
+    rogue_derivpath = process.deriv_path.update(extension=None)
+    rogue_derivdir = op.join(rogue_derivpath.directory, rogue_derivpath.basename)
+    if os.path.isdir(rogue_derivdir):
+        if len(os.listdir(rogue_derivdir))==0: # make sure directory is empty
+            os.rmdir(rogue_derivdir)
+    rogue_bidspath = process.bids_path
+    rogue_bidsdir = op.join(rogue_bidspath.directory, rogue_bidspath.basename)
+    if os.path.isdir(rogue_bidsdir):
+        if len(os.listdir(rogue_bidsdir))==0:
+            os.rmdir(rogue_bidsdir)
 
 def get_fs_filedict(subject, bids_root):    # make a dictionary of freesurfer filenames
     subjects_dir = op.join(bids_root, 'derivatives', 'freesurfer', 'subjects')
@@ -1340,6 +1352,7 @@ def process_subject_after_icaqa(subject, args):
     proc.do_label_psds()
     proc.do_spectral_parameterization()
     proc.do_mri_segstats()
+    proc.cleanup()
         
 def parse_manual_ica_qa(self):
     logfile_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/ica_QA_logfile.txt'
