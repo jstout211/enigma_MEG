@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enigma"
+description = "Package to calculate metrics for the Enigma MEG consortium"
+readme = "README.md"
+version = '0.2'
+#requires-python = ">=3.7"
+#keywords = ["one", "two"]
+license = {text = "UNLICENSE"}
+classifiers = [
+    "License :: OSI Approved :: UNLICENSE",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "requests",
+    'mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui',
+                      'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids','MEGnet @ git+https://github.com/nih-megcore/MegNET_2020.git', 'pyctf-lite @ git+https://github.com/nih-megcore/pyctf-lite.git' 
+]
+#dynamic = ["version"]
+
+[project.optional-dependencies]
+#pdf = ["ReportLab>=1.2", "RXP"]
+#rest = ["docutils>=0.3", "pack ==1.1, ==1.3"]
+
+[project.scripts]
+#my-script = "my_package.module:function"
+'process_meg.py' = "enigmeg:process_meg.py"
+
+#[include]
+#enigmeg
+
+
+
+[tool.setuptools]
+packages = ['enigmeg']
