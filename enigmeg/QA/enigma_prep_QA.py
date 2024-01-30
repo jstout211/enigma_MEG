@@ -93,11 +93,11 @@ if __name__=='__main__':
                         )
         _prepare_QA(subjstruct)
     
-    elif args.proc_fromcsv:
+    elif args.proc_from_csv:
         
-        print('processing subject list from %s' % args.proc_fromcsv)
+        print('processing subject list from %s' % args.proc_from_csv)
         
-        dframe = pd.read_csv(args.proc_fromcsv, dtype={'sub':str, 'ses':str, 'run':str})
+        dframe = pd.read_csv(args.proc_from_csv, dtype={'sub':str, 'ses':str, 'run':str})
         dframe = dframe.astype(object).replace(np.nan,None)
         
         for idx, row in dframe.iterrows():  # iterate over each row in the .csv file
