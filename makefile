@@ -6,6 +6,16 @@ SHELL=/bin/bash
 CONDA_ACTIVATE=source $$(conda info --base)/etc/profile.d/conda.sh ; conda activate ; conda activate 
 # <<<<
 
+data_repo = multi_vendor_test
+tmp_dir = $(pwd)
+test_datadir = /data/NIGHTLY_TESTDATA
+
+install_data:
+	mkdir -p $(test_datadir)
+	($(CONDA_ACTIVATE) datalad ; cd $(test_datadir); datalad install $(MEG_DATA_SERVER):$(data_repo); cd $(data_repo);  datalad get ./*  ) 
+	cd $(tmp_dir)  #Revert out of datalad download location
+
+
 install_test:
 	#conda install --channel=conda-forge --name=base mamba -y
 	conda env remove -n enigma_meg_test
