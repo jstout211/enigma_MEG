@@ -61,7 +61,7 @@ def get_subj_logger(subjid, session, task, run, log_dir=None):
      This is particularly useful in the multiprocessing where logging is not
      necessarily in order'''
      fmt = '%(asctime)s :: %(levelname)s :: %(message)s'
-     sub_ses = f'{subjid}_ses_{session}'
+     sub_ses = f'{subjid}_ses_{session}_task_{task}_run_{run}'
      subj_logger = logging.getLogger(sub_ses)
      if subj_logger.handlers != []: # if not first time requested, use the file handler already defined
          tmp_ = [type(i) for i in subj_logger.handlers ]
@@ -72,7 +72,7 @@ def get_subj_logger(subjid, session, task, run, log_dir=None):
          fileHandle.setLevel(logging.INFO)
          fileHandle.setFormatter(logging.Formatter(fmt)) 
          subj_logger.addHandler(fileHandle)
-         subj_logger.info('Initializing subject level enigma_anonymization log')
+         subj_logger.info('Initializing subject level enigma log')
      return subj_logger   
 
 
