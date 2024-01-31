@@ -1,0 +1,4 @@
+sub,ses,run,type,path,mripath,eroom
+ON02747,1.0,1,.ds,/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-rest_run-01_meg.ds,/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-ON02747/ses-01/anat/sub-ON02747_ses-01_acq-MPRAGE_T1w.nii.gz,/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-ON02747/ses-01/meg/sub-ON02747_ses-01_task-noise_run-01_meg.ds
+01,,01,.fif,/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-01/meg/sub-01_task_somato_meg.fif,/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-01/anat/sub-01_T1w.nii.gz,
+fourD,1.0,01,4d,"/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-fourD/ses-1/meg/sub-fourD_ses-1_task-rest_run-01_meg/c,rfhp1.0Hz",/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-fourD/ses-1/anat/sub-fourD_ses-1_T1w.nii.gz,"/data/NIGHTLY_TESTDATA/multi_vendor_test/sub-fourD/ses-1/meg/sub-fourD_ses-1_task-empty_run-01_meg/c,rfDC"
