@@ -13,6 +13,7 @@ import os.path as op
 import sys
 import mne
 import re
+import glob
 import numpy as np
 import pandas as pd
 import enigmeg
@@ -231,14 +232,16 @@ class process():
                                                           check=False)
         
         self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
-        self.check_paths()
+        if check_paths:
+            self.check_paths()
 
             
         self.anat_vars=munch.Munch()
         self.anat_vars.fsdict = get_fs_filedict(self.subject,self.bids_root)
         self.anat_vars.process_list = compile_fs_process_list(self)  
         
-        self.check_for_files()         
+        if check_paths:
+            self.check_for_files()         
 
     
     def initialize_fnames(self, rest_tagname, emptyroom_tagname):
@@ -1066,6 +1069,15 @@ def check_datatype(filename):               # function to determine the file for
         return 'fif'
     elif os.path.splitext(filename)[-1] == '.4d' or ',' in str(filename):
         return '4d'
+    elif os.path.isdir(str(filename)):
+        tmp_ = glob.glob(op.join(str(filename),'*,*'))
+        if len(tmp_) > 1: 
+            raise ValueError('Too many files with commas in the meg bids folder')
+        if len(tmp_) == 1:
+            filename = tmp_[0]
+            return '4d'
+        else:
+            raise ValueError('Cannot determine if this is 4D data or other')
     elif os.path.splitext(filename)[-1] == '.sqd':
         return 'kit'
     elif os.path.splitext(filename)[-1] == 'con':
@@ -1088,7 +1100,12 @@ def return_dataloader(datatype):            # function to return a data loader b
 def load_data(filename):                    # simple function to load raw MEG data
     datatype = check_datatype(filename)
     dataloader = return_dataloader(datatype)
-    raw = dataloader(filename, preload=True)
+    if dataloader == mne.io.read_raw_bti:
+        tmp_ = glob.glob(op.join(str(filename),'*,*'))
+        assert len(tmp_) == 1
+        raw = dataloader(filename / tmp_[0], preload=True, head_shape_fname=None)
+    else:
+        raw = dataloader(filename, preload=True)
     return raw
 
 def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad channels

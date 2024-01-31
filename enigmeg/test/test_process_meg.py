@@ -15,6 +15,7 @@ pd.set_option('display.max_colwidth', 255)
 import pytest
 import numpy as np
 from pathlib import Path
+import shutil
 
 os.environ['n_jobs']='1'
 
@@ -28,7 +29,22 @@ test_id = 'ON02747'
 # =============================================================================
 # Build object instance
 # =============================================================================
-def test_load():
+
+def test_load_fourD():
+    proc = process_meg.process(subject='fourD',
+                        bids_root='/data/NIGHTLY_TESTDATA/multi_vendor_test',
+                        session='1',
+                        run='01',
+                        emptyroom_tagname='empty', 
+                        mains=60)
+    
+    assert proc.check_paths() == None
+    proc.load_data()
+    assert type(proc.raw_rest) is mne.io.bti.bti.RawBTi
+    assert type(proc.raw_eroom) is mne.io.bti.bti.RawBTi
+
+
+def test_load_ctf():
     proc = process_meg.process(subject='ON02747',
                         bids_root=bids_root,
                         session='01',
@@ -42,7 +58,7 @@ def test_load():
     assert type(proc.raw_eroom) is mne.io.ctf.ctf.RawCTF   
     return proc
 
-proc = test_load()
+proc = test_load_ctf()
 
 def test_vendor_prep():
     assert proc.vendor_prep() == None
@@ -159,6 +175,25 @@ def test_csv_procmeg(tmp_path):
     cmd_ = f'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file} -remove_old'
     assert subprocess.run(cmd_.split(), check=True)
     
+def test_QA_fromcsv(tmp_path):
+    d = tmp_path / "parse_bids"    
+    out_root = d / 'tmp_parse_bids'
+    #Must run test_csv_procmeg first to generate this file
+    csv_file = out_root / 'ParsedBIDS_dataframe.csv'
+    cmd_ = f'enigma_prep_QA.py -bids_root {bids_root}  -proc_from_csv {csv_file}'
+    # cmd_ = f'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file}'
+    assert subprocess.run(cmd_.split(), check=True)
+    #assert  os.path.exists(.....)
+
+
+
+def test_fourD(tmp_path):
+    bids_root = '/data/NIGHTLY_TESTDATA/multi_vendor_test'
+    test_deriv_dir = op.join(bids_root, 'ENIGMA_MEG','sub-fourD')
+    if op.exists(test_deriv_dir): shutil.rmtree(test_deriv_dir)
+    cmd_ = f'process_meg.py -bids_root {bids_root} -mains 60 -n_jobs 1 -run 01 -session 1 -subject fourD -emptyroom_tag empty -rest_tag rest'
+    assert subprocess.run(cmd_.split(), check=True)  
+    #assert op.exists(                 
 
 # =============================================================================
 # 
@@ -174,5 +209,13 @@ def test_csv_procmeg(tmp_path):
 # args = make_args()
 # -bids_root {bids_root} -mains 60 -n_jobs 1 -proc_fromcsv {csv_file}    
     
+
+subject='fourD'
+bids_root='/data/NIGHTLY_TESTDATA/multi_vendor_test'
+session='01'
+run='1'
+emptyroom_tagname='empty'
+mains=60
+check_paths=False
     
 
