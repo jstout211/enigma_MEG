@@ -102,6 +102,7 @@ class process():
             subjects_dir=None,
             rest_tagname='rest',
             emptyroom_tagname='emptyroom',
+            emptyroom_run=None,
             session='1', 
             mains=60,
             run='1',
@@ -207,7 +208,7 @@ class process():
         else:
             self.eroom_derivpath = self.deriv_path.copy().update(
                 task=emptyroom_tagname,
-                run=run
+                run=emptyroom_run
                 )
         
         self.meg_rest_raw = self.bids_path.copy().update(
@@ -222,7 +223,7 @@ class process():
             self.meg_er_raw = self.bids_path.copy().update(
                 datatype='meg',
                 task=emptyroom_tagname, 
-                run=run
+                run=emptyroom_run
                 )
         
         self.anat_bidspath = self.bids_path.copy().update(root=self.subjects_dir,
@@ -420,7 +421,7 @@ class process():
         print('bad or flat channels')
         print(all_bad) 
         
-        # Movement correction for Elekta systems
+        # Movement correction and Maxwell filtering for Elekta systems
         if ((self.vendor[0] == '306m') | (self.vendor[0] == '122m')):
             # Get the calibration files - check global variable to see if they 
             # were passed on the commandline
@@ -465,15 +466,23 @@ class process():
         chpi_amplitudes = mne.chpi.compute_chpi_amplitudes(raw_inst)
         chpi_locs = mne.chpi.compute_chpi_locs(raw_inst.info, chpi_amplitudes)
         head_pos = mne.chpi.compute_head_pos(raw_inst.info, chpi_locs,verbose=False)
-        np.save(str(deriv_path.fpath)[:-4]+'_headpos.npy', head_pos)
+        np.save(str(deriv_path.fpath)[:-4]+'_run-'+str(self.run)+'_headpos.npy', head_pos)
         raw_tsss = maxwell_filter(raw_inst, head_pos=head_pos,
                                  cross_talk=self.ct_sparse,
                                  calibration=self.sss_cal, 
                                  st_duration=10.0)
         raw_tsss = mne.chpi.filter_chpi(raw_tsss)
-        raw_tsss.save(deriv_path.copy().update(processing='mcorr', extension='.fif'),
+        raw_tsss.save(deriv_path.copy().update(processing='mcorr', run=self.run, extension='.fif'),
                                                overwrite=True)
         self.raw_rest=raw_tsss
+        eroom_inst = self.raw_eroom
+        eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
+                                raw=raw_tsss, bads='keep')
+        eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
+                                cross_talk=self.ct_sparse,
+                                calibration=self.sss_cal, 
+                                st_duration=10.0)
+        self.raw_eroom = eroom_tsss
     
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
@@ -1472,6 +1481,10 @@ if __name__=='__main__':
                          top level of the bids tree.''', 
                          default=None
                          )
+    altargs.add_argument('-emptyroom_run',
+                        help='Override in case run designation differs for \
+                             the emptyroom and rest datasets',
+                        default=None)
     qaargs = parser.add_argument_group('QA Inputs')
     qaargs.add_argument('-ica_manual_qa_prep',
                         help='''if flag is present, stop after ICA for manual QA''',
@@ -1512,7 +1525,7 @@ if __name__=='__main__':
         if args.session.lower()=='none': args.session=None
     if args.emptyroom_tag:
         if args.emptyroom_tag.lower()=='none': args.emptyroom_tag=None
-    
+        
     if not args.bids_root:
         bids_root = op.join(os.getcwd(), 'bids_out')
         args.bids_root = bids_root
@@ -1561,7 +1574,10 @@ if __name__=='__main__':
         
         args.subject=args.subject.replace('sub-','') # strip the sub- off for uniformity
         print(args.subject)
-                
+        
+        if args.emptyroom_run == None:
+            args.emptyroom_run = args.run
+        
         if args.remove_old:
             print('Removing files from prior runs')
             logfilename = args.subject + '_ses-' + str(args.session) + '_log.txt'
@@ -1683,6 +1699,7 @@ if __name__=='__main__':
                                        subjects_dir = args.subjects_dir,
                                        rest_tagname = rest_ent['task'],
                                        emptyroom_tagname = er_ent['task'],
+                                       emptyroom_run = er_ent['run'],
                                        session = row['ses'],
                                        mains = float(args.mains),
                                        run = row['run'],
