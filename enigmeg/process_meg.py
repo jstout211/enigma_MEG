@@ -704,7 +704,7 @@ class process():
                 elif(self.datatype == 'ctf'):
                     trans = get_head_mri_trans(self.meg_rest_raw, {'system_clock' : 'ignore'},
                                            t1_bids_path=t1_bids_path,
-                                           fs_subject='sub-'+self.bids_path.subject)
+                                           fs_subject='sub-'+self.bids_path.subject)                   
                 else:
                     trans = get_head_mri_trans(self.meg_rest_raw,
                                            t1_bids_path=t1_bids_path,
@@ -1102,8 +1102,12 @@ def load_data(filename):                    # simple function to load raw MEG da
     dataloader = return_dataloader(datatype)
     if dataloader == mne.io.read_raw_bti:
         tmp_ = glob.glob(op.join(str(filename),'*,*'))
+        hs_file = glob.glob(op.join(str(filename),'hs_file'))
         assert len(tmp_) == 1
-        raw = dataloader(filename / tmp_[0], preload=True, head_shape_fname=None)
+        if len(hs_file) == 1:  
+            raw = dataloader(filename / tmp_[0], preload=True, head_shape_fname=hs_file[0])
+        else:  #This will be the case for emptyroom
+            raw = dataloader(filename / tmp_[0], preload=True, head_shape_fname=None)
     else:
         raw = dataloader(filename, preload=True)
     return raw
