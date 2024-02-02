@@ -475,14 +475,15 @@ class process():
         raw_tsss.save(deriv_path.copy().update(processing='mcorr', run=self.run, extension='.fif'),
                                                overwrite=True)
         self.raw_rest=raw_tsss
-        eroom_inst = self.raw_eroom
-        eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
+        if self.raw_eroom != None:
+            eroom_inst = self.raw_eroom
+            eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
                                 raw=raw_tsss, bads='keep')
-        eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
+            eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
                                 cross_talk=self.ct_sparse,
                                 calibration=self.sss_cal, 
                                 st_duration=10.0)
-        self.raw_eroom = eroom_tsss
+            self.raw_eroom = eroom_tsss
     
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
