@@ -14,6 +14,10 @@ from enigmeg.QA.enigma_QA_functions import gen_epo_pngs, gen_fooof_pngs
 import sys
 import pandas as pd
 import numpy as np
+import logging
+
+
+
 
 def _prepare_QA(subjstruct):
     
@@ -67,6 +71,10 @@ if __name__=='__main__':
         raise ValueError('No ENIGMA_MEG directory - did you run process_meg.py?')
                 
     subjects_dir = op.join(derivatives_dir,'freesurfer/subjects')  
+    
+    # Setup logging if there are errors
+    logging.basicConfig(filename=op.join(enigma_root+'_QA', 'QA_logfile.txt'),
+                        level=logging.WARNING, format='%(asctime)s :: %(message)s')
         
     # process a single subject
     
@@ -101,7 +109,7 @@ if __name__=='__main__':
     
     elif args.proc_from_csv:
         
-        print('processing subject list from %s' % args.proc_from_csv)
+        logging.info('processing subject list from %s' % args.proc_from_csv)
         
         dframe = pd.read_csv(args.proc_from_csv, dtype={'sub':str, 'ses':str, 'run':str})
         dframe = dframe.astype(object).replace(np.nan,None)
@@ -113,26 +121,30 @@ if __name__=='__main__':
             subjid=row['sub']
             session=str(row['ses'])
             run=str(row['run'])
-             
-            subjstruct = process(subject=subjid, 
-                        bids_root=bids_root, 
-                        deriv_root=derivatives_dir,
-                        subjects_dir=subjects_dir,
-                        rest_tagname=args.rest_tag,
-                        emptyroom_tagname=args.emptyroom_tag,  
-                        session=session, 
-                        mains=0,      
-                        run=run,
-                        t1_override=None,
-                        fs_ave_fids=False
-                        )
-
-            _prepare_QA(subjstruct)
-
-            rogue_bidspath = subjstruct.deriv_path.copy().update(extension=None)
-            rogue_dir = op.join(rogue_bidspath.directory, rogue_bidspath.basename)
-            if os.path.isdir(rogue_dir):
-                if len(os.listdir(rogue_dir))==0: # make sure directory is empty
-                    os.rmdir(rogue_dir) # this won't work unless the irectory is empty
+            
+            try:
+                subjstruct = process(subject=subjid, 
+                            bids_root=bids_root, 
+                            deriv_root=derivatives_dir,
+                            subjects_dir=subjects_dir,
+                            rest_tagname=args.rest_tag,
+                            emptyroom_tagname=args.emptyroom_tag,  
+                            session=session, 
+                            mains=0,      
+                            run=run,
+                            t1_override=None,
+                            fs_ave_fids=False
+                            )
+    
+                _prepare_QA(subjstruct)
+    
+                rogue_bidspath = subjstruct.deriv_path.copy().update(extension=None)
+                rogue_dir = op.join(rogue_bidspath.directory, rogue_bidspath.basename)
+                if os.path.isdir(rogue_dir):
+                    if len(os.listdir(rogue_dir))==0: # make sure directory is empty
+                        os.rmdir(rogue_dir) # this won't work unless the irectory is empty
+            except BaseException as e:
+                logging.warning(f':: {subjid} :: {str(e)}')
+                
     
     
