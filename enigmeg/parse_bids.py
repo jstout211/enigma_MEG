@@ -6,7 +6,7 @@ Created on Tue Apr  4 17:28:12 2023
 @author: nugenta
 """
 
-import os
+import os, os.path as op
 import re
 import sys
 import mne_bids
@@ -34,6 +34,60 @@ def get_runnumbers(path: str, stem: str) -> list:
                 run_numbers.add(match.group(1))
     return list(run_numbers)
 
+def assemble_cmd(row, bids_root=None):
+    '''
+    Use the pandas series to generate the process_meg command
+
+    Parameters
+    ----------
+    row : pd.Series
+        Row from Dataframe
+    bids_root : str
+        DESCRIPTION. The default is None.
+
+    Returns
+    -------
+    cmd_ : str
+        Line in the swarmfile command.
+
+    '''
+    cmd_ = f'process_meg.py -bids_root {bids_root}'
+    tag_dict = {
+        'sub':'-subject',
+        'ses':'-session',
+        'run':'-run',
+        'rest_tag':'-rest_tag',
+        'eroom_tag':'-emptyroom_tag',
+                }
+    if len(row['eroom']) != 0 :
+        row['eroom_tag']=op.basename(row.eroom).split('_task')[1].split('_')[0][1:]
+    else:
+        row['eroom_tag']=None
+    if len(row['path']) != 0 : 
+        row['rest_tag']=op.basename(row.path).split('_task')[1].split('_')[0][1:]
+    else:
+        raise ValueError('Could not find MEG rest dataset')
+    
+    for row_tag, cmd_flag in tag_dict.items():
+        if (row[row_tag]==None) or (len(row[row_tag])==0):
+            cmd_ += f' {cmd_flag} None'
+        else:
+            cmd_ += f' {cmd_flag} {row[row_tag]}'
+    cmd_ += ' -n_jobs 6'
+    cmd_ += '\n'
+    return cmd_
+    
+
+def dframe_toswarm(dframe, bids_root=None, outfile='enigma_swarm.sh'):
+    "Convert the dataframe to swarm file"
+    swarm = []
+    for idx, row in dframe.iterrows():
+        swarm.append(assemble_cmd(row, bids_root=bids_root))
+    with open(outfile, 'w') as f:
+        f.writelines(swarm)
+                     
+        
+
 if __name__=='__main__':
 
     # parse the arguments and initialize variables   
@@ -42,6 +96,9 @@ if __name__=='__main__':
     parser.add_argument('-bids_root', help='''The name of the BIDS directory to be parsed''')
     parser.add_argument('-rest_tag',help='''The filename stem to find rest datasets''')
     parser.add_argument('-emptyroom_tag',help='''The filename stem to find emptyroom datasets''')
+    parser.add_argument('-swarmfile', 
+                        help='''For internal use at NIH.  Write a swarmfile for biowulf''',
+                        default=False, action='store_true')
     parser.description='''This python script parses a BIDS directory into a CSV file with one line per MEG to process'''
     
     args = parser.parse_args()
@@ -206,6 +263,10 @@ if __name__=='__main__':
         # concatenate the subject dataframe with the global datafram for all subjects
         allsubj_df = pd.concat([allsubj_df, subj_df])
 
-    # save out the dataframe as a .csv file
-    allsubj_df.to_csv('ParsedBIDS_dataframe.csv', index=False)
+    if args.swarmfile == True:
+        dframe_toswarm(allsubj_df, bids_root=bids_root,
+                       outfile=op.join(os.getcwd(),'enigma_swarmfile.sh'))
+    else:
+        # save out the dataframe as a .csv file
+        allsubj_df.to_csv('ParsedBIDS_dataframe.csv', index=False)
     

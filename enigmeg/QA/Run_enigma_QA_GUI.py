@@ -83,7 +83,7 @@ if __name__ == '__main__':
         
     # search for QA images matching the requested QAtype
 
-    image_list = glob.glob(op.join(QA_root,'*/*/*' + QAtype + '*.png'))
+    image_list = glob.glob(op.join(QA_root,'*/*/*/*' + QAtype + '*.png'))
     sub_obj_list = [sub_qa_info(i, fname) for i,fname in enumerate(image_list)]
     
     #Update status based on previous log
