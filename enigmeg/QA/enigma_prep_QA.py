@@ -121,6 +121,11 @@ if __name__=='__main__':
             subjid=row['sub']
             session=str(row['ses'])
             run=str(row['run'])
+            args.rest_tag = row['path'].split('task-')[1].split('_')[0]
+            try:
+                args.emptyroom_tag = row['eroom'].split('task-')[1].split('_')[0]
+            except:
+                args.emptyroom_tag = None
             
             try:
                 subjstruct = process(subject=subjid, 
