@@ -396,53 +396,60 @@ class process():
                         logging.info('Applying 3rd order gradient to emptyroom data')
                         self.raw_eroom.apply_gradient_compensation(3)
          
-        # run bad channel assessments on rest and emptyroom (if present)
+        # check to see if data has already been maxfiltered before further processing
 
-        rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
-        if hasattr(self, 'raw_eroom'):
-            if self.raw_eroom != None:
-                er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
-        else:
-            er_bad = []
-            er_flat =[]
-        if hasattr(self, 'raw_eroom'):
-            if self.raw_eroom != None:
-                all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
-                    rest_bad + rest_flat + er_bad + er_flat
-            else:
-                all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat #This may be redundant to below
-        else:
-            all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat 
-        # remove duplicates
-        all_bad = list(set(all_bad))
-            
-        # mark bad/flat channels as such in datasets
-        self.bad_channels = all_bad
-        self.raw_rest.drop_channels(all_bad)
-        if self.raw_eroom != None: 
-                self.raw_eroom.drop_channels(all_bad)
-        print('bad or flat channels')
-        print(all_bad) 
+        if (len(self.raw_rest.info['proc_history']) > 0):
+            if ("max_info" in self.raw_rest.info['proc_history'][0]):
+                logging.info('Maxfilter already applied, skipping ahead')
         
-        # Movement correction and Maxwell filtering for Elekta systems
-        if ((self.vendor[0] == '306m') | (self.vendor[0] == '122m')):
-            # Get the calibration files - check global variable to see if they 
-            # were passed on the commandline
-            if 'megin_cal_files' in globals().keys():
-                ct_sparse_path, sss_cal_path = find_cal_files(args=megin_cal_files, 
-                                                              bids_path=None)
+        # run bad channel assessments on rest and emptyroom (if present)
+        else: 
+            print(self.vendor[0])
+            rest_bad, rest_flat = assess_bads(self.meg_rest_raw.fpath, self.vendor[0])
+            if hasattr(self, 'raw_eroom'):
+                if self.raw_eroom != None:
+                    er_bad, er_flat = assess_bads(self.meg_er_raw.fpath, self.vendor[0], is_eroom=True)
             else:
-                ct_sparse_path, sss_cal_path = find_cal_files(args=None, 
-                                                              bids_path=self.bids_path)
-            self.ct_sparse = ct_sparse_path
-            self.sss_cal = sss_cal_path         
+                er_bad = []
+                er_flat =[]
+            if hasattr(self, 'raw_eroom'):
+                if self.raw_eroom != None:
+                    all_bad = self.raw_rest.info['bads'] + self.raw_eroom.info['bads'] + \
+                        rest_bad + rest_flat + er_bad + er_flat
+                else:
+                    all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat #This may be redundant to below
+            else:
+                all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat 
+            # remove duplicates
+            all_bad = list(set(all_bad))
+                
+            # mark bad/flat channels as such in datasets
+            self.bad_channels = all_bad
+            self.raw_rest.drop_channels(all_bad)
+            if self.raw_eroom != None: 
+                    self.raw_eroom.drop_channels(all_bad)
+            print('bad or flat channels')
+            print(all_bad) 
             
-            # Check for and run the movement correction on the dataset
-            chpi_info = mne.chpi.get_chpi_info(self.raw_rest.info)
-            if hasattr(chpi_info[0], '__len__'):
-                if len(chpi_info[0]) > 0:
-                    self._movement_comp()
-    
+            # Movement correction and Maxwell filtering for Elekta systems
+            if ((self.vendor[0] == '306m') | (self.vendor[0] == '122m')):
+                # Get the calibration files - check global variable to see if they 
+                # were passed on the commandline
+                if 'megin_cal_files' in globals().keys():
+                    ct_sparse_path, sss_cal_path = find_cal_files(args=megin_cal_files, 
+                                                                  bids_path=None)
+                else:
+                    ct_sparse_path, sss_cal_path = find_cal_files(args=None, 
+                                                                  bids_path=self.bids_path)
+                self.ct_sparse = ct_sparse_path
+                self.sss_cal = sss_cal_path         
+                
+                # Check for and run the movement correction on the dataset
+                chpi_info = mne.chpi.get_chpi_info(self.raw_rest.info)
+                if hasattr(chpi_info[0], '__len__'):
+                    if len(chpi_info[0]) > 0:
+                        self._movement_comp()
+        
                    
 # =============================================================================
 #       Preprocessing
