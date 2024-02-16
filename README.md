@@ -10,7 +10,7 @@ pip install git+https://github.com/jstout211/enigma_MEG.git
 ```
 # Description
 
-The programs in this package perform the full processing pipeline for the ENIGMA BIDS working group. This suite requires
+The programs in this package perform the full processing pipeline for the ENIGMA MEG Working Group. This suite requires
 that your data be organized in BIDS format; if you need a tool for that you can use enigma_anonymization_lite. The core tool 
 is process_meg.py, which performs all processing steps for the anatomical MRI and the associated MEG. You can either process
 a single subject, or you can loop over all subjects in batch mode. In order to do batch processing, you must first run 
@@ -20,7 +20,7 @@ likely the most accurate, if you have a very small dataset to process and you ha
 ica with MEGnet automated classification of artifact components. MEGnet was retrained on data from the CTF, Elekta/MEGIN, 4D, 
 and KIT data. The model classifies components with >98% accuracy, so this is also an excellent option. 
 
-Once all the processing is complete, you can generate QA images using preq_QA.py. Like process_meg.py, prep_QA.py will operate 
+Once all the processing is complete, you can generate QA images using prep_QA.py. Like process_meg.py, prep_QA.py will operate 
 either on a single subject or on all subjects listed in a the .csv file produced by parse_bids.py. Once the .png files are 
 created, you can use Run_enigma_QA_GUI.py to interactively label your subject images as good or bad. 
 
