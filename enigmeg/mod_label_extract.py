@@ -43,7 +43,8 @@ def _pca15_fft(flip, data, fmin, fmax, srate):
                                                 n_jobs=n_jobs, 
                                                 adaptive=True, 
                                                 low_bias=True, 
-                                                normalization='full') 
+                                                normalization='full',
+                                                verbose='warning') 
     
     eigval_weighted_spectra=s[0:maxeig,np.newaxis]*epoch_spectra
     

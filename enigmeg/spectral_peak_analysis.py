@@ -56,10 +56,8 @@ def calc_spec_peak(freqs, powers, fitting_bw=[1,55], out_image_path=None):
         fig.tight_layout()
         fig.savefig(out_image_path, dpi=150, bbox_inches="tight")
         
-        
     
     params=fm1.get_results()
-    params.peak_params[0]
 
     # plot_spectrum(freqs, powers, log_powers=True,
     #               color='black', label='Original Spectrum')
