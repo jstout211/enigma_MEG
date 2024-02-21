@@ -227,9 +227,12 @@ class process():
                 run=emptyroom_run
                 )
         
-        self.anat_bidspath = self.bids_path.copy().update(root=self.subjects_dir,
+        if(self._t1_override == None):
+            self.anat_bidspath = self.bids_path.copy().update(root=self.subjects_dir,
                                                           session=None,
                                                           check=False)
+        else:
+            self.anat_bidspath = mne_bids.get_bids_path_from_fname(self._t1_override)
         
         self.fnames=self.initialize_fnames(rest_tagname, emptyroom_tagname)
         if check_paths:
@@ -254,9 +257,12 @@ class process():
         ## Setup bids paths for all 
         # Conversion to actual paths at end
         
-        _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii')
-        if not os.path.exists(_tmp['anat'].fpath):
-            _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii.gz')
+        if(self._t1_override == None):
+            _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii')
+            if not os.path.exists(_tmp['anat'].fpath):
+                _tmp['anat']=self.bids_path.copy().update(datatype='anat',extension='.nii.gz')
+        else:
+            _tmp['anat'] = mne_bids.get_bids_path_from_fname(self._t1_override)
 
         _tmp['raw_rest']=self.meg_rest_raw
         if emptyroom_tagname!=None:
@@ -554,9 +560,9 @@ class process():
         print("removing ica components")
         print("self.fnames.ica_folder %s" % self.fnames.ica_folder)
         print("self.fnames.ica %s" % self.fnames.ica)
-        QAdir = op.join(self.bids_root,'derivatives/ENIGMA_MEG_QA')
-        QAsubjdir = QAdir + '/sub-' + self.subject + '/ses-' + self.session
-        figname_icaoverlay = QAsubjdir + '/sub-' + self.subject + '_ses-' + self.session + '_run-' + self.run + '_cleaned.png'
+        QAsubjdir = str(self.QA_dir.directory)
+        QAfname = self.QA_dir.update(suffix='cleaned',extension='png')
+        figname_icaoverlay = QAsubjdir + QAfname.basename
         ica=mne.preprocessing.read_ica(op.join(self.fnames.ica))
         ica.exclude = self.ica_comps_toremove #meg_rest_raw.icacomps
         self.load_data()
@@ -632,8 +638,7 @@ class process():
         
         # if not provided with a separate T1 MRI filename, extract it from the BIDSpath objects
         if t1_override is not None:
-            entities=mne_bids.get_entities_from_fname(t1_override)
-            t1_bids_path = BIDSPath(**entities)
+            t1_bids_path = self.anat_bidspath
         else:
             t1_bids_path = self.bids_path.copy().update(datatype='anat', 
                                                     suffix='T1w')
@@ -1702,9 +1707,10 @@ if __name__=='__main__':
             
             subject=row['sub']
             subject = subject.replace('sub-','')
-            
             session=str(row['ses'])
-            logger = get_subj_logger(subject, session, args.rest_tag, args.run, log_dir)
+            run=str(row['run'])
+
+            logger = get_subj_logger(subject, session, args.rest_tag, run, log_dir)
             logger.info(f'processing subject {subject} session {session}')
                         
             if args.remove_old:
@@ -1732,9 +1738,9 @@ if __name__=='__main__':
                                        session = row['ses'],
                                        mains = float(args.mains),
                                        run = row['run'],
-                                       t1_override = None,
+                                       t1_override = row['mripath'],
                                        fs_ave_fids = False,
-                                       check_paths = False,
+                                       check_paths = True,
                                        do_dics = args.do_dics
                                        )
                 
