@@ -18,7 +18,9 @@ from enigmeg.process_meg import process
 from enigmeg.process_meg import subcommand
 from enigmeg.process_meg import log, get_subj_logger
 
+logger=logging.getLogger()
 
+@log
 def hcp_load_data(proc_subj):
     
         if not hasattr(proc_subj, 'raw_rest'):
@@ -46,6 +48,7 @@ def hcp_load_data(proc_subj):
         # datatype if the datatype is .fif
         proc_subj.vendor = mne.channels.channels._get_meg_system(proc_subj.raw_rest.info)
 
+@log
 def proc_hcp_mri(proc_subj, t1_override=None,redo_all=False):
         
         trans_bids_path = proc_subj.bids_path.copy().update(datatype='anat',
@@ -295,13 +298,12 @@ if __name__=='__main__':
         enigmadir = os.path.join(bids_root,'derivatives/ENIGMA_MEG')
         subprocess.call(['rm','-r', os.path.join(enigmadir, subject_enigmadir)])
                         
-        print('processing a single subject %s' % args.subject)      
+    print('processing a single subject %s' % args.subject)      
                   
-        logger = get_subj_logger(args.subject, args.session,args.rest_tag, args.run, log_dir)
-        logger.info(f'processing subject {args.subject} session {args.session}')
-        
-    logger = get_subj_logger(args.subject, args.session, args.rest_tag, args.run, log_dir)
+    logger = get_subj_logger(args.subject, args.session,args.rest_tag, args.run, log_dir)
+    logger.info(f'processing subject {args.subject} session {args.session}')
     logger.info('Initializing structure')
+    
     proc = process(subject=args.subject, 
             bids_root=args.bids_root, 
             deriv_root=None,
