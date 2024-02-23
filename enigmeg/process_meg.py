@@ -561,7 +561,7 @@ class process():
         print("self.fnames.ica_folder %s" % self.fnames.ica_folder)
         print("self.fnames.ica %s" % self.fnames.ica)
         QAsubjdir = str(self.QA_dir.directory)
-        QAfname = self.QA_dir.update(suffix='cleaned',extension='png')
+        QAfname = self.QA_dir.copy().update(suffix='cleaned',extension='png')
         figname_icaoverlay = QAsubjdir + QAfname.basename
         ica=mne.preprocessing.read_ica(op.join(self.fnames.ica))
         ica.exclude = self.ica_comps_toremove #meg_rest_raw.icacomps
