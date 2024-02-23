@@ -18,10 +18,36 @@ from enigmeg.process_meg import process
 from enigmeg.process_meg import subcommand
 from enigmeg.process_meg import log, get_subj_logger
 
+
+def hcp_load_data(proc_subj):
+    
+        if not hasattr(proc_subj, 'raw_rest'):
+            
+            filename = str(proc_subj.meg_rest_raw.fpath) + '/c,rf0.0Hz'
+            proc_subj.raw_rest = mne.io.read_raw_bti(filename,
+                                    head_shape_fname=None,convert=False,preload=True)
+            for i in range(len(proc_subj.raw_rest.info['chs'])):                      # was processed similar to the HCP data
+                        proc_subj.raw_rest.info['chs'][i]['coord_frame'] = 1
+            proc_subj.raw_rest.pick_types(meg=True, eeg=False)
+            
+        if (not hasattr(proc_subj, 'raw_eroom')) and (proc_subj.meg_er_raw != None):
+            
+            filename_er = str(proc_subj.meg_er_raw.fpath)+ '/c,rf0.0Hz'
+            proc_subj.raw_eroom = mne.io.read_raw_bti(filename_er,
+                                    head_shape_fname=None,convert=False,preload=True)
+            for i in range(len(proc_subj.raw_eroom.info['chs'])):                      # was processed similar to the HCP data
+                        proc_subj.raw_eroom.info['chs'][i]['coord_frame'] = 1
+            proc_subj.raw_eroom.pick_types(meg=True, eeg=False)
+
+        # For subsequent reference, if raw_room not provided, set to None
+        if (not hasattr(proc_subj, 'raw_eroom')):
+            proc_subj.raw_eroom=None
+        # figure out the MEG system vendor, note that this may be different from 
+        # datatype if the datatype is .fif
+        proc_subj.vendor = mne.channels.channels._get_meg_system(proc_subj.raw_rest.info)
+
 def proc_hcp_mri(proc_subj, t1_override=None,redo_all=False):
         
-        t1_bids_path = proc_subj.bids_path.copy().update(datatype='anat', 
-                                                    suffix='T1w')
         trans_bids_path = proc_subj.bids_path.copy().update(datatype='anat',
                                                     session=proc_subj.session,
                                                     suffix=None,
@@ -289,7 +315,8 @@ if __name__=='__main__':
             fs_ave_fids=args.fs_ave_fids,
             do_dics=args.do_dics)
     
-    proc.load_data()
+    hcp_load_data(proc)
+    
     proc.vendor_prep()
     proc.do_ica()
     proc.do_classify_ica()
