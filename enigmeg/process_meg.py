@@ -117,6 +117,8 @@ class process():
 # =============================================================================
 #         # Initialize variables and directories
 # =============================================================================
+        global logger
+        logger=get_subj_logger(subject, session, rest_tagname, run, log_dir=op.join(bids_root, 'derivatives', 'ENIGMA_MEG','logs'))
 
         self.subject=subject.replace('sub-','')  # Strip sub- if present
         self.session = session
