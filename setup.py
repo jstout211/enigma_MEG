@@ -26,5 +26,5 @@ setuptools.setup(
              'enigmeg/process_anatomical.py',
              'enigmeg/QA/enigma_prep_QA.py',
 	     'enigmeg/QA/Run_enigma_QA_GUI.py',
-	     'enigmeg/parse_bids.py'],
+	     'enigmeg/parse_bids.py', 'extras/copy_enigma_tree.py'],
     )
