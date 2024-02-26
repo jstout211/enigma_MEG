@@ -56,13 +56,19 @@ def main(subjct, input_dir, output_dir, copy_fsave):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser('Copy a single subjects BIDS data over to new folder')
-    parser.add_argument('-subject')
+    parser.add_argument('-subject', default=None,
+                        help='Subject ID  (optional).  If left empty - the remote dir will be listed at the prompt')
     parser.add_argument('-rbids', help='Remote Bids directory')
     parser.add_argument('-lbids', help='Local/Destination Bids directory')
     parser.add_argument('-copy_fsave', help='Copy Fsaverage to the freesurfer folder (default=False)', 
                         default=False, action='store_true')
     args = parser.parse_args()
-    subject = args.subject
+    if args.subject==None:
+        subj_list = [op.basename(i) for i in  glob.glob(op.join(args.rbids, 'sub-*'))]
+        print(subj_list)
+        subject=input('Choose a subject:')
+    else:
+        subject = args.subject
     if subject[0:4]=='sub-':
         subject=subject[4:]
     input_dir = args.rbids
