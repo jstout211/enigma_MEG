@@ -99,7 +99,11 @@ if __name__=='__main__':
     parser.add_argument('-swarmfile', 
                         help='''For internal use at NIH.  Write a swarmfile for biowulf''',
                         default=False, action='store_true')
+    parser.add_argument('-make_link', 
+                        help='''If the MRI is in a separate session from the MEG, create a symbolic link''',
+                        default=False, action='store_true')
     parser.description='''This python script parses a BIDS directory into a CSV file with one line per MEG to process'''
+    
     
     args = parser.parse_args()
     
@@ -251,10 +255,28 @@ if __name__=='__main__':
                 if restmeg.mripath == '':
                     restmeg.mripath = mrilist[0].path
                     print('No MRI MEG session match, using an MRI from same subject, different session')
+                    if args.make_link == True:
+                        anat_bidspath = mne_bids.get_bids_path_from_fname(restmeg.mripath)
+                        all_anat_files = glob.glob(f'{anat_bidspath.directory}/*')
+                        new_anat_bidspath = anat_bidspath.copy().update(session = restmeg.ses)
+                        if not os.path.isdir(new_anat_bidspath.directory):
+                            os.mkdir(new_anat_bidspath.directory)
+                        for file in all_anat_files:
+                            file_bidspath = mne_bids.get_bids_path_from_fname(file,check=False)
+                            new_file_bidspath = file_bidspath.copy().update(session=restmeg.ses,check=False)
+                            print('making a symbolic link to make a same session MRI')
+                            os.symlink(file_bidspath.fpath, new_file_bidspath.fpath)
+                        restmeg.mripath=new_anat_bidspath.fpath
+                        mri_count = mri_count+1
+                        mri_object = munch.Munch()
+                        mri_object.ses = restmeg.ses
+                        mri_object.path = new_anat_bidspath.fpath
+                        mrilist.append(mri_object)
             
             # now, merge all the proc objects into a single dictionary, and make that a dataframe. 
         else:
-            print('No MRI for this participant')
+            print('No MRI for this participant, removing from list')
+            subrestlist = []
     
         # once we've finished with the subject, unmunchify the list of objects and make a dataframe for the subject
         subrestlist = munch.unmunchify(subrestlist)     
