@@ -768,7 +768,10 @@ class process():
             epochs = mne.read_epochs(self.fnames.rest_epo)
             fname_lcmv = self.fnames.lcmv #Pre-assign output name
         
-        epo_rank = mne.compute_rank(epochs)          # compute rank of rest dataset
+        if(_check_maxfilter(self.raw_rest)):
+            epo_rank = mne.compute_rank(epochs, rank='info')
+        else:
+            epo_rank = mne.compute_rank(epochs)          # compute rank of rest dataset
         
         # If emptyroom present - use in beamformer
 
