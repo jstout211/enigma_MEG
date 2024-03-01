@@ -404,10 +404,9 @@ class process():
          
         # check to see if data has already been maxfiltered before further processing
 
-        if (len(self.raw_rest.info['proc_history']) > 0):
-            if ("max_info" in self.raw_rest.info['proc_history'][0]):
-                logging.info('Maxfilter already applied, skipping ahead')
-        
+        if (_check_maxfilter(self.raw_rest)):
+            logging.info('Maxfilter already applied, skipping ahead')
+            
         # run bad channel assessments on rest and emptyroom (if present)
         else: 
             print(self.vendor[0])
@@ -1072,6 +1071,16 @@ def get_fs_filedict(subject, bids_root):    # make a dictionary of freesurfer fi
         if not op.exists(fs_dict[key]):
             fs_dict[key]=False
     return fs_dict
+
+def _check_maxfilter(raw):
+    maxfilter_status = False  
+    if (len(raw.info['proc_history']) > 0):
+        if ("max_info" in raw.info['proc_history'][0]):
+            if ("sss_cal" in raw.info['proc_history'][0]['max_info']):
+                if (len(raw.info['proc_history'][0]['max_info']['sss_cal']) > 0):
+                    maxfilter_status = True
+    return maxfilter_status
+                    
  
 def check_datatype(filename):               # function to determine the file format of MEG data 
     '''Check datatype based on the vendor naming convention to choose best loader'''
