@@ -406,6 +406,7 @@ class process():
 
         if (_check_maxfilter(self.raw_rest)):
             logging.info('Maxfilter already applied, skipping ahead')
+            self.bad_channels = []
             
         # run bad channel assessments on rest and emptyroom (if present)
         else: 
