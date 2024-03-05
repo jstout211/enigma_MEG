@@ -436,11 +436,13 @@ class process():
             self.bad_channels = all_bad
             
             # if the vendor is MEGIN, we don't want to drop the channels, only declare them as bad
+            # in the dataset header - Maxfilter will interpolate them
             if ((self.vendor[0] == '306m') | (self.vendor[0] == '122m')):
                 self.raw_rest.info['bads'] = all_bad
                 if self.raw_eroom != None:
                     self.raw_eroom.info['bads'] = all_bad
                 print('declared all bad or flat channels in info[bads]')
+                self.bad_channels = []
                 print(all_bad) 
             
             # if it's not an elekta scan, just drop all the bad channels
