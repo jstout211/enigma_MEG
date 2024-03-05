@@ -108,6 +108,7 @@ class process():
             mains=60,
             run='1',
             t1_override=None,
+            megin_ignore=None,
             fs_ave_fids=False, 
             check_paths=True,
             do_dics=False,
@@ -158,6 +159,8 @@ class process():
             self._use_fsave_coreg=True
         else:
             self._use_fsave_coreg=False
+            
+        self._megin_ignore = megin_ignore
         
         try:
             #The commandline args have been assigned into os.environ['n_jobs']
@@ -388,7 +391,7 @@ class process():
 # =============================================================================
 
     @log
-    def vendor_prep(self):
+    def vendor_prep(self, megin_ignore=None):
         
         '''Different vendor types require special cleaning / initialization'''
         print('vendor = %s' % self.vendor[0])
@@ -431,13 +434,25 @@ class process():
                 
             # mark bad/flat channels as such in datasets
             self.bad_channels = all_bad
-            self.raw_rest.drop_channels(all_bad)
-            if self.raw_eroom != None: 
+            
+            # if the vendor is MEGIN, we don't want to drop the channels, only declare them as bad
+            if ((self.vendor[0] == '306m') | (self.vendor[0] == '122m')):
+                self.raw_rest.info['bads'] = all_bad
+                if self.raw_eroom != None:
+                    self.raw_eroom.info['bads'] = all_bad
+                print('declared all bad or flat channels in info[bads]')
+                print(all_bad) 
+            
+            # if it's not an elekta scan, just drop all the bad channels
+            else:                
+                self.raw_rest.drop_channels(all_bad)
+                if self.raw_eroom != None: 
                     self.raw_eroom.drop_channels(all_bad)
-            print('bad or flat channels')
-            print(all_bad) 
+                    print('dropped all bad or flat channels')
+                    print(all_bad) 
             
             # Movement correction and Maxwell filtering for Elekta systems
+            
             if ((self.vendor[0] == '306m') | (self.vendor[0] == '122m')):
                 # Get the calibration files - check global variable to see if they 
                 # were passed on the commandline
@@ -450,12 +465,17 @@ class process():
                 self.ct_sparse = ct_sparse_path
                 self.sss_cal = sss_cal_path         
                 
-                # Check for and run the movement correction on the dataset
-                chpi_info = mne.chpi.get_chpi_info(self.raw_rest.info)
-                if hasattr(chpi_info[0], '__len__'):
-                    if len(chpi_info[0]) > 0:
-                        self._movement_comp()
-        
+                if (megin_ignore != 'motcorr'):
+                
+                    # Check for and run the movement correction on the dataset
+                    chpi_info = mne.chpi.get_chpi_info(self.raw_rest.info)
+                    if hasattr(chpi_info[0], '__len__'):
+                        if len(chpi_info[0]) > 0:
+                            self._movement_comp()
+                
+                if (megin_ignore == 'motcorr'):
+  
+                    self._tsss()
                    
 # =============================================================================
 #       Preprocessing
@@ -500,7 +520,32 @@ class process():
                                 calibration=self.sss_cal, 
                                 st_duration=10.0)
             self.raw_eroom = eroom_tsss
-    
+            
+    @log
+    def _tsss(self,
+                         ):
+          '''
+          Perform tsss without movement correction - currently restricted to MEGIN data
+          '''
+          deriv_path = self.deriv_path
+          raw_inst = self.raw_rest
+          raw_tsss = maxwell_filter(raw_inst,
+                                   cross_talk=self.ct_sparse,
+                                   calibration=self.sss_cal, 
+                                   st_duration=10.0)
+          raw_tsss.save(deriv_path.copy().update(processing='tsss', run=self.run, extension='.fif'),
+                                                 overwrite=True)
+          self.raw_rest=raw_tsss
+          if self.raw_eroom != None:
+              eroom_inst = self.raw_eroom
+              eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
+                                  raw=raw_tsss, bads='keep')
+              eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
+                                  cross_talk=self.ct_sparse,
+                                  calibration=self.sss_cal, 
+                                  st_duration=10.0)
+              self.raw_eroom = eroom_tsss
+  
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
         from MEGnet.prep_inputs.ICA import main as ICA
@@ -984,9 +1029,9 @@ class process():
 #       Perform all functions on an instance of the process class
 # =============================================================================
     
-    def do_proc_allsteps(self):             # do all the steps for single subject command line processing
+    def do_proc_allsteps(self):  # do all the steps for single subject command line processing
         self.load_data()
-        self.vendor_prep()
+        self.vendor_prep(megin_ignore=self._megin_ignore)
         self.do_ica()
         self.do_classify_ica()
         self.do_preproc()
@@ -1356,6 +1401,7 @@ def process_subject(subject, args):
             mains=float(args.mains),
             run=args.run,
             t1_override=None,
+            megin_ignore=args.megin_ignore,
             fs_ave_fids=args.fs_ave_fids,
             do_dics=args.do_dics)
     proc.do_proc_allsteps()
@@ -1373,11 +1419,12 @@ def process_subject_up_to_icaqa(subject, args):
             mains=float(args.mains),
             run=args.run,
             t1_override=None,
+            megin_ignore=args.megin_ignore,
             fs_ave_fids=args.fs_ave_fids,
             do_dics=args.do_dics
             )
     proc.load_data()
-    proc.vendor_prep()
+    proc.vendor_prep(megin_ignore=proc._megin_ignore)
     proc.do_ica()
     proc.prep_ica_qa()    
     
@@ -1394,11 +1441,12 @@ def process_subject_after_icaqa(subject, args):
             mains=float(args.mains),
             run=args.run,
             t1_override=None,
+            megin_ignore=args.megin_ignore,
             fs_ave_fids=args.fs_ave_fids,
             do_dics=args.do_dics
             )
     proc.load_data()
-    proc.vendor_prep()
+    proc.vendor_prep(megin_ignore=proc._megin_ignore)
     proc.set_ica_comps_manual()
     proc.do_preproc()
     proc.do_clean_ica()
@@ -1543,12 +1591,14 @@ if __name__=='__main__':
                         action='store_true',
                         default=0
                         )
-
     parser.add_argument('-remove_old',
                         help='''If flag is present, remove any files from a prior run (excepting freesurfer data). ''',
                         action='store_true',
                         default=0
                         )
+    parser.add_argument('-megin_ignore',
+                        help='''Flag can be set to ignore megin processing, i.e. motcorr''',
+                        default=None)
                                    
     args = parser.parse_args()
     
