@@ -27,11 +27,16 @@ def get_subdirectories(path: str, stem: str) -> list:
 def get_runnumbers(path: str, stem: str) -> list:
     """ Get a list of run numbers for a given 'task-stem' string"""
     run_numbers = set()
-    for file in os.listdir(path):
-        if f'task-{stem}_' in file:
-            match = re.search(r'run-(\d+)', file)
-            if match:
-                run_numbers.add(match.group(1))
+    searchpath = f'{path}/*{stem}*_meg.json'
+    for file in glob.glob(searchpath):
+        print(file)
+        tmpdict = mne_bids.get_entities_from_fname(file)
+        if tmpdict['run'] == None:
+            run_numbers.add('None')
+            print('adding none')
+        else:
+            run_numbers.add(tmpdict['run'])
+            print('adding runnumber')
     return list(run_numbers)
 
 def assemble_cmd(row, bids_root=None):
@@ -56,9 +61,12 @@ def assemble_cmd(row, bids_root=None):
         'sub':'-subject',
         'ses':'-session',
         'run':'-run',
+        'emptyroom_run':'-emptyroom_run',
         'rest_tag':'-rest_tag',
         'eroom_tag':'-emptyroom_tag',
                 }
+    
+    print(row['eroom'])
     if len(row['eroom']) != 0 :
         row['eroom_tag']=op.basename(row.eroom).split('_task')[1].split('_')[0][1:]
     else:
@@ -76,7 +84,6 @@ def assemble_cmd(row, bids_root=None):
     cmd_ += ' -n_jobs 6'
     cmd_ += '\n'
     return cmd_
-    
 
 def dframe_toswarm(dframe, bids_root=None, outfile='enigma_swarm.sh'):
     "Convert the dataframe to swarm file"
@@ -85,8 +92,6 @@ def dframe_toswarm(dframe, bids_root=None, outfile='enigma_swarm.sh'):
         swarm.append(assemble_cmd(row, bids_root=bids_root))
     with open(outfile, 'w') as f:
         f.writelines(swarm)
-                     
-        
 
 if __name__=='__main__':
 
@@ -141,7 +146,7 @@ if __name__=='__main__':
     
     subject_list = get_subdirectories(bids_root, 'sub-')
     
-    allsubj_df = pd.DataFrame(columns=['sub','ses','run','type','path','mripath','eroom'], 
+    allsubj_df = pd.DataFrame(columns=['sub','ses','run','type','path','mripath','eroom','emptyroom_run'], 
                               dtype=str)
 
     for subject in subject_list:
@@ -191,6 +196,7 @@ if __name__=='__main__':
         for session in session_list:   
             
             subrestlist_ses = []
+            eroom_run_list = []
             
             session_dir = os.path.join(subj_dir,'ses-' + session)
             # only look at the current session, that requires a list of all the other sessions
@@ -202,41 +208,59 @@ if __name__=='__main__':
     
             # is there an MEG in the session?
             if(os.path.exists(megpath)):
-        
                 print('found a megpath')
-                # make a list of the runs, and make a new entry for each run
-                run_list = get_runnumbers(megpath, rest_tag)
-                print('found %d rest runs for session %s' % (len(run_list), session))
-                for run in run_list:
-                
-                    # we'll have to search for available MEGs looping over all datatypes
-                    for dattype in type_list:
-                        restfiles = glob.glob(f'{megpath}/*{rest_tag}*run-{run}*{dattype}')
-                        
-                        # if an MEG dataset is found, create an object 
-                        if len(restfiles) > 0:
-                            print('found an MEG')
-                            record_count = rest_count + 1
-                            proc_object = munch.Munch()
-                            proc_object.sub = subject
-                            proc_object.ses = session
-                            proc_object.run = run
-                            proc_object.type = dattype
-                            proc_object.path = restfiles[0]
-                            proc_object.mripath = ''
-                            proc_object.eroom = ''
-                            subrestlist_ses.append(proc_object)
-                
-                        
-                # look for emptyroom datasets in the same session, don't care about run
+        
                 for dattype in type_list:
-                    emptyfiles = glob.glob(f'{megpath}/*{emptyroom_tag}*{dattype}')
+                    
+                    # are there any rest files for this datatype?
+                    restfiles = glob.glob(f'{megpath}/*{rest_tag}*{dattype}')
+                    if len(restfiles) > 0:
+                    
+                        # look for emptyroom datasets in the same session
+                        print('starting on dattype %s' % dattype)
+                        emptyfiles = glob.glob(f'{megpath}/*{emptyroom_tag}*{dattype}')
+                        if len(emptyfiles) > 0:
+                            eroom_run_list = get_runnumbers(megpath, emptyroom_tag)
+                            print(eroom_run_list)
                 
-                    if len(emptyfiles) > 0:
-                        print('found an emptyroom')
-                        for subrest_ses in subrestlist_ses:     
-                            subrest_ses.eroom = emptyfiles[0]
-            subrestlist.extend(subrestlist_ses)
+                
+                        # make a list of the runs, and make a new entry for each run
+                        run_list = get_runnumbers(megpath, rest_tag)
+                        print('found %d rest runs for session %s' % (len(run_list), session))
+                        for run in run_list:
+                        # we'll have to search for available MEGs looping over all datatypes
+                            print(f'{megpath}/*{rest_tag}*run-{run}*{dattype}')
+
+                            restfiles = glob.glob(f'{megpath}/*{rest_tag}*run-{run}*{dattype}')
+                            
+                            if len(eroom_run_list) > 0:
+                                if run in eroom_run_list:
+                                    emptyroom_run = run
+                                    eroom = glob.glob(f'{megpath}/*{emptyroom_tag}*run-{run}*{dattype}')
+                                    print(eroom)
+                                    eroom = eroom[0]
+                                                  
+                                else:
+                                    eroom = emptyfiles[0]
+                                    emptyroom_run = mne_bids.get_entities_from_fname(eroom)['run']
+                                
+                        
+                            # if an MEG dataset is found, create an object 
+                            if len(restfiles) > 0:
+                                print('found an MEG')
+                                record_count = rest_count + 1
+                                proc_object = munch.Munch()
+                                proc_object.sub = subject
+                                proc_object.ses = session
+                                proc_object.run = run
+                                proc_object.type = dattype
+                                proc_object.path = restfiles[0]
+                                proc_object.mripath = ''
+                                proc_object.eroom = eroom
+                                proc_object.emptyroom_run = emptyroom_run
+                                subrestlist_ses.append(proc_object)
+                                           
+                subrestlist.extend(subrestlist_ses)
        
         # OKAY. So at this point we have two lists. One has all the MRIs, and one has all the 
         # MpdEGs. We have to match them up. 
@@ -263,9 +287,12 @@ if __name__=='__main__':
                             os.mkdir(new_anat_bidspath.directory)
                         for file in all_anat_files:
                             file_bidspath = mne_bids.get_bids_path_from_fname(file,check=False)
-                            new_file_bidspath = file_bidspath.copy().update(session=restmeg.ses,check=False)
-                            print('making a symbolic link to make a same session MRI')
-                            os.symlink(file_bidspath.fpath, new_file_bidspath.fpath)
+                            new_file_bidspath = file_bidspath.copy().update(session=restmeg.ses,check=False,run=None)
+                            if not os.path.islink(new_file_bidspath.fpath):
+                                print('making a symbolic link to make a same session MRI')
+                                os.symlink(file_bidspath.fpath, new_file_bidspath.fpath)
+                            else:
+                                print('link already exists to anatomical, doing nothing')
                         restmeg.mripath=new_anat_bidspath.fpath
                         mri_count = mri_count+1
                         mri_object = munch.Munch()
