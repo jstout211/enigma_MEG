@@ -4,7 +4,7 @@ Setup Conda Environment:
 
 ```
 conda install --channel=conda-forge --name=base mamba
-mamba create --override-channels --channel=conda-forge --name=enigma_meg mne pip 
+mamba create --override-channels --channel=conda-forge --name=enigma_meg mne pip python<3.12
 conda activate enigma_meg
 pip install git+https://github.com/jstout211/enigma_MEG.git
 ```
