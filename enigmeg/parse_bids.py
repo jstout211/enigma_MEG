@@ -15,6 +15,7 @@ import glob
 import munch
 import pandas as pd
 import argparse
+import shutil
 
 def get_subdirectories(path: str, stem: str) -> list:
     """Get a list of subdirectorty names that start with the requested stem; return strings without stem"""
@@ -29,7 +30,6 @@ def get_runnumbers(path: str, stem: str) -> list:
     run_numbers = set()
     searchpath = f'{path}/*{stem}*_meg.json'
     for file in glob.glob(searchpath):
-        print(file)
         tmpdict = mne_bids.get_entities_from_fname(file)
         if tmpdict['run'] == None:
             run_numbers.add('None')
@@ -66,8 +66,7 @@ def assemble_cmd(row, bids_root=None):
         'eroom_tag':'-emptyroom_tag',
                 }
     
-    print(row['eroom'])
-    if len(row['eroom']) != 0 :
+    if row['eroom'] != None :
         row['eroom_tag']=op.basename(row.eroom).split('_task')[1].split('_')[0][1:]
     else:
         row['eroom_tag']=None
@@ -93,6 +92,38 @@ def dframe_toswarm(dframe, bids_root=None, outfile='enigma_swarm.sh'):
     with open(outfile, 'w') as f:
         f.writelines(swarm)
 
+def standardize_sub(sub):
+    print(sub)
+    return 'sub-'+ sub if not sub.startswith('sub-') else sub
+
+def dframe_tomanifest(scan_dframe, bids_root=None, outfile='manifext.txt'):
+    
+    fname = f'{bids_root}/{outfile}'
+    participants_df = pd.read_csv(f'{bids_root}/participants.tsv', sep="\t" )
+    participants_df['sub_standardized'] = participants_df['participant_id'].apply(standardize_sub)
+    scan_dframe['sub_standardized'] = scan_dframe['sub'].apply(standardize_sub)
+    participants_df = participants_df.drop(['participant_id'], axis=1)
+    
+    merged_df = pd.merge(participants_df, scan_dframe, left_on='sub_standardized',right_on='sub_standardized')
+    merged_df = merged_df.rename(columns={'sub_standardized':'participant_id'})
+    print(merged_df)
+    
+    selected_columns = ['participant_id','task','ses','run']
+    for field in ['age', 'sex', 'hand','group','Diagnosis_TP1', 'Diagnosis_TP2']:
+        if field in participants_df:
+            selected_columns.append(field)
+            
+    print(selected_columns)
+    
+    duplicate_columns = merged_df.columns[merged_df.columns.duplicated()]
+    # If there are duplicate columns, drop one of them
+    if len(duplicate_columns) > 0:
+        merged_df = merged_df.drop(columns=duplicate_columns[0])
+    
+    result_df = merged_df[selected_columns]
+
+    result_df.to_csv(fname)
+
 if __name__=='__main__':
 
     # parse the arguments and initialize variables   
@@ -103,6 +134,9 @@ if __name__=='__main__':
     parser.add_argument('-emptyroom_tag',help='''The filename stem to find emptyroom datasets''')
     parser.add_argument('-swarmfile', 
                         help='''For internal use at NIH.  Write a swarmfile for biowulf''',
+                        default=False, action='store_true')
+    parser.add_argument('-makemanifest', 
+                        help='''For internal use at NIH.  Make a manifest of scans''',
                         default=False, action='store_true')
     parser.add_argument('-make_link', 
                         help='''If the MRI is in a separate session from the MEG, create a symbolic link''',
@@ -135,7 +169,7 @@ if __name__=='__main__':
         emptyroom_tag = 'emptyroom'
 
     # define list of MEG file format types to search for       
-    type_list = ['.fif','.ds','4d','.con','.sqd','rfDC']
+    type_list = ['.fif','.ds','4d','.con','.sqd','c,rf']
 
     # initialize the BIDSPath object
     bids_path = BIDSPath(root=bids_root)
@@ -169,14 +203,21 @@ if __name__=='__main__':
         #session_list = mne_bids.get_entity_vals(bids_root, 'session', ignore_subjects = other_subjects)
         
         session_list = get_subdirectories(subj_dir, 'ses-')
+        
+        if session_list == []:
+            print("No ses- directories, will try going straight to meg/anat directories")
+            session_list = ['None']
+
+        # first, we are going to make a list of all available anatomical MRI scans        
         print('%d sessions for subject %s' % (len(session_list),subject))
         
-        # first, we are going to make a list of all available anatomical MRI scans
-        
         for session in session_list:
+            if (session != 'None'):
+                anatpath = bids_root + '/sub-' + subject + '/ses-' + session + '/anat/'   
+            elif (session == 'None'):
+                anatpath = bids_root + '/sub-' + subject + '/anat/'
             
-            anatpath = bids_root + '/sub-' + subject + '/ses-' + session + '/anat/'
-            mrifiles = glob.glob(f'{anatpath}*T1w.nii*')
+            mrifiles = glob.glob(f'{anatpath}*T1w.nii*')    
                 
             if len(mrifiles) > 0:   # if mri files found in current session, add to mri object list
                 
@@ -198,51 +239,88 @@ if __name__=='__main__':
             subrestlist_ses = []
             eroom_run_list = []
             
-            session_dir = os.path.join(subj_dir,'ses-' + session)
-            # only look at the current session, that requires a list of all the other sessions
-            #other_sessions = list(set(session_list) - set([session]))
-            #run_list = mne_bids.get_entity_vals(bids_root, 'run', ignore_subjects = other_subjects,
-            #                    ignore_sessions=other_sessions)
-            
-            megpath = bids_root + '/sub-' + subject + '/ses-' + session + '/meg'
+            if (session != 'None'):
+                session_dir = os.path.join(subj_dir,'ses-' + session)
+                megpath = bids_root + '/sub-' + subject + '/ses-' + session + '/meg'
+            elif (session == 'None'):
+                megpath = bids_root + '/sub-' + subject + '/meg'
     
             # is there an MEG in the session?
             if(os.path.exists(megpath)):
                 print('found a megpath')
+                print(megpath)
         
                 for dattype in type_list:
                     
                     # are there any rest files for this datatype?
-                    restfiles = glob.glob(f'{megpath}/*{rest_tag}*{dattype}')
+                    if dattype == 'c,rf':
+                        restfiles = glob.glob(f'{megpath}/*{rest_tag}*/*{dattype}*')
+                    else:
+                        restfiles = glob.glob(f'{megpath}/*{rest_tag}*{dattype}')
                     if len(restfiles) > 0:
                     
                         # look for emptyroom datasets in the same session
-                        print('starting on dattype %s' % dattype)
-                        emptyfiles = glob.glob(f'{megpath}/*{emptyroom_tag}*{dattype}')
-                        if len(emptyfiles) > 0:
-                            eroom_run_list = get_runnumbers(megpath, emptyroom_tag)
-                            print(eroom_run_list)
-                
+                        if dattype == 'c,rf':
+                            emptyfiles = glob.glob(f'{megpath}/*{emptyroom_tag}*/*{dattype}*')
+                        else:
+                            emptyfiles = glob.glob(f'{megpath}/*{emptyroom_tag}*{dattype}')
+                        numemptyfiles = len(emptyfiles)
+                        if numemptyfiles == 0: 
+                            eroom = None
+                            emptyroom_run = None
+                            eroom_run_list = []
+                            
+                        if numemptyfiles > 0:         
+                            # if there are more than one emptyroom datasets, move them away.
+                            # this was really just a hack to accomodate Omega
+                            # if (numemptyfiles > 1):   
+                            #    for i in range(1,numemptyfiles):
+                            #        epathextra = mne_bids.get_bids_path_from_fname(emptyfiles[i])
+                            #        epathextra.update(suffix=None,extension=None)
+                            #        epathextra_flist = glob.glob(f'{epathextra.directory}/{epathextra.basename}*')
+                            #        for efile in epathextra_flist:
+                            #            efile_basename = os.path.basename(efile)
+                            #            print(efile_basename)
+                            #            print(f'{bids_root}/extra_empty_rooms/{efile_basename}')
+                            #            shutil.move(efile,f'{bids_root}/extra_empty_rooms/{efile_basename}')                              
+                            eroom_run_list = get_runnumbers(megpath, emptyroom_tag)          
                 
                         # make a list of the runs, and make a new entry for each run
                         run_list = get_runnumbers(megpath, rest_tag)
                         print('found %d rest runs for session %s' % (len(run_list), session))
                         for run in run_list:
                         # we'll have to search for available MEGs looping over all datatypes
-                            print(f'{megpath}/*{rest_tag}*run-{run}*{dattype}')
-
-                            restfiles = glob.glob(f'{megpath}/*{rest_tag}*run-{run}*{dattype}')
                             
-                            if len(eroom_run_list) > 0:
-                                if run in eroom_run_list:
-                                    emptyroom_run = run
-                                    eroom = glob.glob(f'{megpath}/*{emptyroom_tag}*run-{run}*{dattype}')
-                                    print(eroom)
-                                    eroom = eroom[0]
-                                                  
+                            if run == 'None':
+                                if dattype == 'c,rf':
+                                    restfiles = glob.glob(f'{megpath}/*{rest_tag}*/*{dattype}*')
                                 else:
-                                    eroom = emptyfiles[0]
-                                    emptyroom_run = mne_bids.get_entities_from_fname(eroom)['run']
+                                    restfiles = glob.glob(f'{megpath}/*{rest_tag}*{dattype}')    
+                                if len(eroom_run_list) > 0:
+                                    if run in eroom_run_list:
+                                        emptyroom_run = run
+                                        eroom = glob.glob(f'{megpath}/*{emptyroom_tag}*{dattype}')
+                                        eroom = eroom[0]
+                                    else:
+                                        eroom = emptyfiles[0]
+                                        emptyroom_run = mne_bids.get_entities_from_fname(eroom)['run']
+                            else:
+                                if dattype == 'c,rf':
+                                    restfiles = glob.glob(f'{megpath}/*{rest_tag}*run-{run}*/*{dattype}*')
+                                else:
+                                    restfiles = glob.glob(f'{megpath}/*{rest_tag}*run-{run}*{dattype}')
+                                if len(eroom_run_list) > 0:
+                                    if run in eroom_run_list:
+                                        emptyroom_run = run
+                                        if dattype == 'c,rf':
+                                            eroom = glob.glob(f'{megpath}/*{emptyroom_tag}*run-{run}*/*{dattype}*')
+                                        else:
+                                            eroom = glob.glob(f'{megpath}/*{emptyroom_tag}*run-{run}*{dattype}')
+                                        eroom = eroom[0]
+                                                  
+                                    else:
+                                        eroom = emptyfiles[0]
+                                        emptyroom_run = mne_bids.get_entities_from_fname(eroom)['run']
                                 
                         
                             # if an MEG dataset is found, create an object 
@@ -258,7 +336,17 @@ if __name__=='__main__':
                                 proc_object.mripath = ''
                                 proc_object.eroom = eroom
                                 proc_object.emptyroom_run = emptyroom_run
+                                proc_object.task = rest_tag
                                 subrestlist_ses.append(proc_object)
+                                
+                            # check if there's a processing tag in the file, make a link without it if so
+                            tmp_ents = mne_bids.get_entities_from_fname(restfiles[0])
+                            if ((tmp_ents['processing'] != None) & (args.make_link == True)):
+                                bids_path_orig = mne_bids.get_bids_path_from_fname(restfiles[0])
+                                bids_path_out = bids_path_orig.copy().update(processing=None)
+                                if not os.path.islink(bids_path_out.fpath):
+                                   print('making a symbolic link to make a same session MRI')
+                                   os.symlink(bids_path_orig.fpath, bids_path_out.fpath)
                                            
                 subrestlist.extend(subrestlist_ses)
        
@@ -315,6 +403,11 @@ if __name__=='__main__':
     if args.swarmfile == True:
         dframe_toswarm(allsubj_df, bids_root=bids_root,
                        outfile=op.join(os.getcwd(),'enigma_swarmfile.sh'))
+    
+    if args.makemanifest == True:
+        dframe_tomanifest(allsubj_df, bids_root=bids_root,
+                       outfile='manifest.txt')
+        
     else:
         # save out the dataframe as a .csv file
         allsubj_df.to_csv('ParsedBIDS_dataframe.csv', index=False)

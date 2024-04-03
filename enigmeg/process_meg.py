@@ -320,10 +320,14 @@ class process():
         
         outfolder = self.deriv_path.directory / \
             self.deriv_path.copy().update(datatype=None, extension=None).basename
-            
-        path_dict['spectra'] = str(outfolder) + f'_label_task-{rest_tagname}_run-{self.run}_spectra.csv'
-        path_dict['power'] = str(outfolder) + f'_band_task-{rest_tagname}_run-{self.run}_rel_power.csv'
         
+        if self.run != None:
+            path_dict['spectra'] = str(outfolder) + f'_label_task-{rest_tagname}_run-{self.run}_spectra.csv'
+            path_dict['power'] = str(outfolder) + f'_band_task-{rest_tagname}_run-{self.run}_rel_power.csv'
+        else:
+            path_dict['spectra'] = str(outfolder) + f'_label_task-{rest_tagname}_spectra.csv'
+            path_dict['power'] = str(outfolder) + f'_band_task-{rest_tagname}_rel_power.csv'
+            
         return munch.Munch(path_dict)
 
     @log
@@ -447,11 +451,15 @@ class process():
             
             # if it's not an elekta scan, just drop all the bad channels
             else:                
-                self.raw_rest.drop_channels(all_bad)
+                for chan in all_bad:
+                    if chan in self.raw_rest.info['ch_names']:
+                        self.raw_rest.drop_channels(chan)
                 if self.raw_eroom != None: 
-                    self.raw_eroom.drop_channels(all_bad)
-                    print('dropped all bad or flat channels')
-                    print(all_bad) 
+                    for chan in all_bad:
+                        if chan in self.raw_rest.info['ch_names']:
+                            self.raw_eroom.drop_channels(all_bad)
+                print('dropped all bad or flat channels')
+                print(all_bad) 
             
             # Movement correction and Maxwell filtering for Elekta systems
             
@@ -854,6 +862,8 @@ class process():
                     inversion='matrix', weight_norm='unit-noise-gain', rank=epo_rank)
             
             else:
+                # make an ad hoc covariance with 
+                noise_cov = mne.make_ad_hoc_cov(epochs.info,std=5.0e-13)
                 filters = make_lcmv(epochs.info, forward, dat_cov, reg=0.05,
                             pick_ori='max-power', weight_norm='unit-noise-gain', rank=epo_rank)
         
