@@ -18,8 +18,8 @@ install_data:
 
 install_test:
 	#conda install --channel=conda-forge --name=base mamba -y
-	conda env remove -n enigma_meg_test
-	mamba create --override-channels --channel=conda-forge --name=enigma_meg_test mne pip -y
+	conda env remove -n enigma_meg_test -y
+	mamba create --override-channels --channel=conda-forge --name=enigma_meg_test "python<3.12" mne pip -y
 	($(CONDA_ACTIVATE) enigma_meg_test ; pip install -e .[testing]; pip install pytest pytest-reportlog )
 	git submodule init
 	git pull --recurse-submodules

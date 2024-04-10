@@ -18,7 +18,7 @@ setuptools.setup(
         "License :: OSI Approved :: UNLICENSE",
         "Operating System :: Linux/Unix",
     ],
-    #python_requires='<3.9',
+    python_requires='<3.12',
     install_requires=['mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui<5.0',
                       'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids','MEGnet @ git+https://github.com/nih-megcore/MegNET_2020.git', 'pyctf-lite @ git+https://github.com/nih-megcore/pyctf-lite.git' ], #'pyvista', 'pyqt5','pyvistaqt',
     extras_require={"testing":['datalad','pytest','pygit2']},
