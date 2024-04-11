@@ -28,7 +28,7 @@ def get_subdirectories(path: str, stem: str) -> list:
 def get_runnumbers(path: str, stem: str) -> list:
     """ Get a list of run numbers for a given 'task-stem' string"""
     run_numbers = set()
-    searchpath = f'{path}/*{stem}*_meg.json'
+    searchpath = f'{path}/*{stem}*_meg*'
     for file in glob.glob(searchpath):
         tmpdict = mne_bids.get_entities_from_fname(file)
         if tmpdict['run'] == None:
@@ -284,9 +284,11 @@ if __name__=='__main__':
                             #            print(f'{bids_root}/extra_empty_rooms/{efile_basename}')
                             #            shutil.move(efile,f'{bids_root}/extra_empty_rooms/{efile_basename}')                              
                             eroom_run_list = get_runnumbers(megpath, emptyroom_tag)          
-                
+                           
                         # make a list of the runs, and make a new entry for each run
                         run_list = get_runnumbers(megpath, rest_tag)
+                        if run_list == []:
+                            run_list = ['None']
                         print('found %d rest runs for session %s' % (len(run_list), session))
                         for run in run_list:
                         # we'll have to search for available MEGs looping over all datatypes

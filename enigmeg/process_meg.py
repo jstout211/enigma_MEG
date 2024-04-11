@@ -30,7 +30,7 @@ from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import scipy as sp
 from mne_bids import BIDSPath
 import functools
-from scipy.stats import zscore
+from scipy.stats import zscore, trim_mean
 from mne.preprocessing import maxwell_filter
 
 # Set tensorflow to use CPU
@@ -51,6 +51,8 @@ n_bins = 177
 # parameters for rejecting bad epochs
 magthresh = 5000e-15
 gradthresh = 5000e-13
+flatmagthresh = 10e-15
+flatgradthresh = 10e-13
 std_thresh = 15
 
 logger=logging.getLogger()
@@ -650,11 +652,15 @@ class process():
         if 'grad' in chtypes:
             if 'mag' in chtypes: 
                 reject_dict = dict(mag=magthresh, grad=gradthresh)
+                flat_dict = dict(mag=flatmagthresh, grad=flatgradthresh)
             else:
                 reject_dict = dict(grad=gradthresh)
+                flat_dict = dict(grad=flatgradthresh)
         else:
             reject_dict = dict(mag=magthresh)
-        epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, preload=True, baseline=None, tmin=0, tmax=tmax)
+            flat_dict = dict(mag=flatmagthresh)
+        epochs = mne.Epochs(raw_inst, evts, reject=reject_dict, flat=flat_dict,
+                            preload=True, baseline=None, tmin=0, tmax=tmax)
         #epochs = mne.make_fixed_length_epochs(raw_inst, 
         #                                      duration=self.proc_vars['epoch_len'], 
         #                                      preload=True)
@@ -939,7 +945,8 @@ class process():
             if self.do_dics:
                 current_psd = label_stack[label_idx, :]
             else:
-                current_psd = label_stack[:,label_idx, :].mean(axis=0)  ###???
+                labels_trimmedmean = trim_mean(label_stack[:,label_idx,:], 0.1, axis=0)
+                current_psd = labels_trimmedmean  
             label_power[label_idx,:] = current_psd
             
             #spectral_image_path = os.path.join(outfolder, 'Spectra_'+
@@ -975,7 +982,7 @@ class process():
         relative_power = label_power / label_power.sum(axis=1, keepdims=True)
     
         #Define bands
-        bands = [[1,3], [3,6], [8,12], [13,35], [35,55]]
+        bands = [[1,3], [3,6], [8,12], [13,35], [35,45]]
         band_idxs = get_freq_idx(bands, freq_bins)
     
         #initialize output
