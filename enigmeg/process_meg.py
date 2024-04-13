@@ -519,7 +519,12 @@ class process():
                                  cross_talk=self.ct_sparse,
                                  calibration=self.sss_cal, 
                                  st_duration=10.0)
-        raw_tsss = mne.chpi.filter_chpi(raw_tsss)
+        # raw_tsss = mne.chpi.filter_chpi(raw_tsss)
+        # Note that filtering out the chpi channels was tested and removed 
+        # because it sometimes injected peaks in the 25-40Hz range, particularly
+        # for scans collected with powerline frequency = 50Hz. Because we are only
+        # interested in 1-45 Hz, and the chpi coils are substantially higher frequency,
+        # this step can be omitted.
         raw_tsss.save(deriv_path.copy().update(processing='mcorr', run=self.run, extension='.fif'),
                                                overwrite=True)
         self.raw_rest=raw_tsss
