@@ -7,6 +7,7 @@ CONDA_ACTIVATE=source $$(conda info --base)/etc/profile.d/conda.sh ; conda activ
 # <<<<
 
 data_repo = multi_vendor_test
+data_repo2 = enigma_test_data
 tmp_dir = $(pwd)
 test_datadir = /data/NIGHTLY_TESTDATA
 
@@ -14,6 +15,7 @@ install_data:
 	mkdir -p $(test_datadir)
 	($(CONDA_ACTIVATE) datalad ; cd $(test_datadir); datalad install $(MEG_DATA_SERVER):$(data_repo); cd $(data_repo);  datalad get ./*  ) 
 	cd $(tmp_dir)  #Revert out of datalad download location
+	($(CONDA_ACTIVATE) datalad ; cd $(test_datadir); datalad install $(MEG_DATA_SERVER):$(data_repo2); cd $(data_repo2);  datalad get ./*  ) 
 
 
 install_test:
