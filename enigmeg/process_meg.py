@@ -1302,9 +1302,9 @@ def write_aparc_sub(subjid=None, subjects_dir=None):    # write the parcel annot
     
     https://mne.tools/stable/auto_examples/visualization/plot_parcellation.html
     '''
-    if not op.exists(op.join(subjects_dir, 'fs_average')):
+    if not op.exists(op.join(subjects_dir, 'fsaverage')):
         mne.datasets.fetch_fsaverage(verbose='ERROR') #True requires TQDM
-    if not op.exists(op.join(subjects_dir, 'fs_average', 'label', 
+    if not op.exists(op.join(subjects_dir, 'fsaverage', 'label', 
                              'lh.aparc_sub.annot')):
         mne.datasets.fetch_aparc_sub_parcellation(subjects_dir=subjects_dir,
                                           verbose='ERROR')
