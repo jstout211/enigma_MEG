@@ -11,7 +11,8 @@ import mne
 from enigmeg.process_meg import write_aparc_sub
 import pytest
 import pygit2
-
+from numpy import allclose
+import numpy as np
 
 
 enigma_test_dir = op.join(os.environ['ENIGMA_TEST_DIR'], 'enigma_test_data')
@@ -32,27 +33,6 @@ elekta1_kwargs = {'subject':'CC110101',
               'emptyroom_tagname':'emptyroom',
               }
 
-def test_elekta1_proc(kwargs):
-    proc=process(**elekta1_kwargs)
-    proc.load_data()
-    # assert proc.
-    proc.vendor_prep(megin_ignore=proc._megin_ignore)
-    proc.do_ica()
-    proc.do_classify_ica()
-    proc.do_preproc()
-    proc.do_clean_ica()
-    proc.do_proc_epochs()
-    proc.proc_mri(t1_override=proc._t1_override)
-    proc.do_beamformer()
-    proc.do_make_aparc_sub()
-    proc.do_label_psds()
-    proc.do_spectral_parameterization()
-    proc.do_mri_segstats()
-    proc.cleanup()
-
-# =============================================================================
-# MOUS - CTF    
-# =============================================================================
 ctf1_kwargs=   {'subject':'A2021',
               'bids_root':op.join(enigma_test_dir, 'MOUS'), 
               'run': None,
@@ -60,33 +40,9 @@ ctf1_kwargs=   {'subject':'A2021',
               'mains':50,
               'rest_tagname':'rest',
               'emptyroom_tagname': None,
-              }  
-def test_ctf1_proc(): 
-    proc=process(**ctf1_kwargs)
-    proc.load_data()
-    # assert proc.
-    proc.vendor_prep(megin_ignore=proc._megin_ignore)
-    proc.do_ica()
-    proc.do_classify_ica()
-    proc.do_preproc()
-    proc.do_clean_ica()
-    proc.do_proc_epochs()
-    proc.proc_mri(t1_override=proc._t1_override)
-    proc.do_beamformer()
-    proc.do_make_aparc_sub()
-    proc.do_label_psds()
-    proc.do_spectral_parameterization()
-    proc.do_mri_segstats()
-    proc.cleanup()
+              } 
 
-
-
-
-
-# =============================================================================
-# HCP - 4D
-# =============================================================================
-hcp1_kwargs=   {'subject':'100307',
+fourD1_kwargs=   {'subject':'100307',
               'bids_root':op.join(enigma_test_dir, 'HCP'), 
               'run': '01',
               'session': '1',
@@ -95,10 +51,10 @@ hcp1_kwargs=   {'subject':'100307',
               'emptyroom_tagname': 'empty',
               } 
 
-def test_hcp1_proc(): 
-    proc=process(**hcp1_kwargs)
+@pytest.mark.parametrize("kwargs", [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs])
+def test_vendor_proc(kwargs):
+    proc=process(**kwargs)
     proc.load_data()
-    # assert proc.
     proc.vendor_prep(megin_ignore=proc._megin_ignore)
     proc.do_ica()
     proc.do_classify_ica()
@@ -112,5 +68,21 @@ def test_hcp1_proc():
     proc.do_spectral_parameterization()
     proc.do_mri_segstats()
     proc.cleanup()
-          
 
+#%%
+
+    
+# def test_elekta1_outputs():
+#     #Setup
+#     bids_root = elekta1_kwargs['bids_root']
+#     deriv_root = op.join(bids_root, 'derivatives')
+#     enigma_root = op.join(deriv_root, 'ENIGMA_MEG')
+#     out_meg_root = op.join(enigma_root, 'sub-'+elekta1_kwargs['subject'], 'ses-01','meg')
+#     gt_meg_root = op.join(enigma_test_dir, 'all_derivatives', 'CAMCAN', 'ENIGMA_MEG', 'sub-'+elekta1_kwargs['subject'], 'ses-01','meg')
+#     target = f'sub-{elekta1_kwargs["subject"]}_ses-01_meg_run-01_headpos.npy'
+#     headpos = op.join(out_meg_root, target)
+#     headpos_gt = op.join(gt_meg_root, target)
+#     assert np_compare(headpos, headpos_gt, tol=.01)    #< Fix    
+
+    
+         
