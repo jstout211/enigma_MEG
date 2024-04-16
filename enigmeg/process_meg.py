@@ -1285,7 +1285,10 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
         # get the standard deviation for each channel, and the trimmed mean of the stds
         stdraw_megs = np.std(raw_check._data[megs,:],axis=1)
         stdraw_trimmedmean_megs = sp.stats.trim_mean(stdraw_megs,0.1)
-        flat_idx_megs = megs[np.where(stdraw_megs < stdraw_trimmedmean_megs/100)[0]]
+        # note the that the threshold here is different for non-CTF or MEGIN systems
+        # we empirically observed that flat channels in KIT scanners sometimes had
+        # significant noise resulting in a failure to detect the flat channel
+        flat_idx_megs = megs[np.where(stdraw_megs < stdraw_trimmedmean_megs/50)[0]]
         flats = []
         for flat in flat_idx_megs:
             flats.append(raw_check.info['ch_names'][flat]) 
