@@ -751,7 +751,8 @@ class process():
         if (not os.path.exists(watershed_check_path)) or (redo_all is True):
             mne.bem.make_watershed_bem(f'sub-{self.subject}',
                                        self.subjects_dir,
-                                       overwrite=True
+                                       overwrite=True, 
+                                       gcaatlas=True
                                        )
         if (not bem_fname.fpath.exists()) or (redo_all is True):
             bem = mne.make_bem_model(f'sub-{self.subject}', 
