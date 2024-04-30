@@ -124,8 +124,7 @@ def dframe_tomanifest(scan_dframe, bids_root=None, outfile='manifext.txt'):
 
     result_df.to_csv(fname)
 
-if __name__=='__main__':
-
+def main():
     # parse the arguments and initialize variables   
 
     parser = argparse.ArgumentParser()
@@ -413,4 +412,10 @@ if __name__=='__main__':
     else:
         # save out the dataframe as a .csv file
         allsubj_df.to_csv('ParsedBIDS_dataframe.csv', index=False)
+    
+
+if __name__=='__main__':
+    main()
+
+
     

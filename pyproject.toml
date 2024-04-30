@@ -33,6 +33,9 @@ testing = ['datalad','pytest','pygit2']
 
 [project.scripts]
 "process_meg.py" = "enigmeg.process_meg:main"
+"enigma_prep_QA.py" = 'enigmeg.QA.enigma_prep_QA:main'
+"Run_enigma_QA_GUI.py" = 'enigmeg.QA.Run_enigma_QA_GUI:main'
+"parse_bids.py" =  'enigmeg.parse_bids:main'
 
 
 [tool.setuptools.packages.find]

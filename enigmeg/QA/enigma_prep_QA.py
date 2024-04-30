@@ -33,8 +33,7 @@ def _prepare_QA(subjstruct):
     
     gen_fooof_pngs(subjstruct)
 
-if __name__=='__main__':
-    
+def main():
     # parse the arguments and initialize variables   
 
     parser = argparse.ArgumentParser()
@@ -150,6 +149,11 @@ if __name__=='__main__':
                         os.rmdir(rogue_dir) # this won't work unless the irectory is empty
             except BaseException as e:
                 logging.warning(f':: {subjid} :: {str(e)}')
+
+    
+if __name__=='__main__':
+    main()
+
                 
     
     

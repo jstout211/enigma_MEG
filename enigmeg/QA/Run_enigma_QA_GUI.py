@@ -15,9 +15,8 @@ from enigmeg.QA.enigma_QA_GUI_functions import initialize, sub_qa_info, get_last
 
 
 PROJECT = 'ENIGMA_MEG_QA'
-    
-if __name__ == '__main__':
-    
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-bids_root', help='''Location of bids directory, default=bids_out''')
     parser.add_argument('-QAtype', help='''QA type to run. Options are 'coreg', 'ica', 'bem','src','surf','spectra','beamformer''')
@@ -97,5 +96,11 @@ if __name__ == '__main__':
         for sub_qa in sub_obj_list:
             sub_qa.qa_type=QAtype
     
-    run_gui(sub_obj_list,rows,columns,imgsize,QAtype)                    
+    run_gui(sub_obj_list,rows,columns,imgsize,QAtype)          
+    
+    
+if __name__ == '__main__':
+    main()
+    
+          
                            
