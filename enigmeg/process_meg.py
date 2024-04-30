@@ -700,7 +700,7 @@ class process():
                               deriv_path=self.eroom_derivpath)
     
     @log                        # Process the anatomical MRI
-    def proc_mri(self, t1_override=None,redo_all=False):
+    def proc_mri(self, t1_override=None,redo_all=False,volume='T1',preflood=None, gcaatlas=True):
         
         # if not provided with a separate T1 MRI filename, extract it from the BIDSpath objects
         if t1_override is not None:
@@ -752,7 +752,9 @@ class process():
             mne.bem.make_watershed_bem(f'sub-{self.subject}',
                                        self.subjects_dir,
                                        overwrite=True, 
-                                       gcaatlas=True
+                                       gcaatlas=gcaatlas,
+                                       volume=volume,
+                                       preflood=preflood,
                                        )
         if (not bem_fname.fpath.exists()) or (redo_all is True):
             bem = mne.make_bem_model(f'sub-{self.subject}', 
