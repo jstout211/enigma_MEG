@@ -1410,7 +1410,7 @@ def get_freq_idx(bands, freq_bins):
     ''' Get the frequency indexes'''
     output=[]
     for band in bands:
-        tmp = np.nonzero((band[0] < freq_bins) & (freq_bins < band[1]))[0]   ### <<<<<<<<<<<<< Should this be =<...
+        tmp = np.nonzero((band[0] < freq_bins) & (freq_bins < band[1]))[0]   
         output.append(tmp)
     return output
 
@@ -1525,7 +1525,7 @@ def parse_manual_ica_qa(self):
     return newdict
 
 #%%  Argparse
-if __name__=='__main__':
+def main():
     import argparse  
     parser = argparse.ArgumentParser()
     standardargs = parser.add_argument_group('Standard Inputs')
@@ -1858,3 +1858,6 @@ if __name__=='__main__':
                     
                 else:    
                     process_subj.do_proc_allsteps()
+ 
+if __name__=='__main__':
+    main()

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enigmeg"
+description = "Package to calculate metrics for the Enigma MEG consortium"
+readme = "README.md"
+requires-python = "<3.12"
+#keywords = ["one", "two"]
+
+authors = [
+  { name="Jeff Stout", email="stoutjd@nih.gov" },
+  { name="Allison Nugent", email="nugenta@nih.gov" },
+]
+
+license = {text = "UNLICENSE"}
+classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: UNLICENSE",
+        "Operating System :: Linux/Unix",
+    ]
+dependencies = [
+    'mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui<5.0',
+    'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids',
+    'MEGnet @ git+https://github.com/nih-megcore/MegNET_2020.git', 
+    'pyctf-lite @ git+https://github.com/nih-megcore/pyctf-lite.git'
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+testing = ['datalad','pytest','pygit2']
+
+[project.scripts]
+"process_meg.py" = "enigmeg.process_meg:main"
+
+
+[tool.setuptools.packages.find]
+include = ["enigmeg*"]
+exclude = ["extras*", "conda*"]
