@@ -57,7 +57,9 @@ def test_vendor_proc(kwargs):
     proc.load_data()
     #Crop data for testing
     proc.raw_rest.crop(0, 180)
-    proc.raw_eroom.crop(0, 180)
+    if proc.raw_eroom != None:
+        if proc.raw_eroom.times[-1] > 180:
+            proc.raw_eroom.crop(0, 180)
     
     proc.vendor_prep(megin_ignore=proc._megin_ignore)
     proc.do_ica()
