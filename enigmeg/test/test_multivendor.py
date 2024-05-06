@@ -16,7 +16,7 @@ import numpy as np
 
 
 enigma_test_dir = op.join(os.environ['ENIGMA_TEST_DIR'], 'enigma_test_data')
-repo = pygit2.Repository(enigma_test_dir) 
+#repo = pygit2.Repository(enigma_test_dir) 
 #TODO - force repo back to original hash to offset any processing changes
 #repo.checkout(refname=......)
 
@@ -55,6 +55,10 @@ fourD1_kwargs=   {'subject':'100307',
 def test_vendor_proc(kwargs):
     proc=process(**kwargs)
     proc.load_data()
+    #Crop data for testing
+    proc.raw_rest.crop(0, 180)
+    proc.raw_eroom.crop(0, 180)
+    
     proc.vendor_prep(megin_ignore=proc._megin_ignore)
     proc.do_ica()
     proc.do_classify_ica()
