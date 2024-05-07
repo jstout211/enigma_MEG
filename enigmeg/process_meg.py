@@ -1683,6 +1683,7 @@ def main():
     # check and make sure all fsaverage files are present and download if not. 
     mne.datasets.fetch_fsaverage(op.join(bids_root,'derivatives/freesurfer/subjects/'))
     
+    global log_dir 
     log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'
     if not os.path.isdir(os.path.join(bids_root,'derivatives/ENIGMA_MEG')):
         os.makedirs(os.path.join(bids_root,'derivatives/ENIGMA_MEG'))
