@@ -39,6 +39,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
+# Define some MNE settings
+os.environ['MNE_3D_OPTION_ANTIALIAS'] = 'false' # necessary for headless operation
+
+
 # define some variables
 
 fmin = 1
@@ -1525,7 +1529,7 @@ def parse_manual_ica_qa(self):
     return newdict
 
 #%%  Argparse
-def main():
+def return_args():
     import argparse  
     parser = argparse.ArgumentParser()
     standardargs = parser.add_argument_group('Standard Inputs')
@@ -1631,20 +1635,22 @@ def main():
                         default=None)
                                    
     args = parser.parse_args()
+    # print help if no arguments
+    if len(sys.argv) == 1:
+        parser.print_help()
+        parser.exit(1) 
+    return args
+    
+
+def main():
+    args = return_args()
     
     logger=logging.getLogger()
     logging.basicConfig(level=logging.INFO)
     
     n_jobs = args.n_jobs  #extract this from the configuration file
     os.environ['n_jobs'] = str(n_jobs)
-    
-    os.environ['MNE_3D_OPTION_ANTIALIAS'] = 'false' # necessary for headless operation
-    
-    # print help if no arguments
-    if len(sys.argv) == 1:
-        parser.print_help()
-        parser.exit(1) 
-    
+        
     # set some defaults
     if args.run:
         if args.run.lower()=='none': args.run=None
