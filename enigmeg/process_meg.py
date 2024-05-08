@@ -59,7 +59,9 @@ flatmagthresh = 10e-15
 flatgradthresh = 10e-13
 std_thresh = 15
 
-logger=logging.getLogger()
+global log_dir
+# global logger
+logger=logging.getLogger('__name__')
 
 # Function to retrieve the subject/session specific logger
 
@@ -124,7 +126,9 @@ class process():
 # =============================================================================
 #         # Initialize variables and directories
 # =============================================================================
-
+        log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'        
+        logger = get_subj_logger(subject, session, rest_tagname, run, log_dir)
+        
         self.subject=subject.replace('sub-','')  # Strip sub- if present
         self.session = session
         self.run = run
@@ -1423,8 +1427,8 @@ def get_freq_idx(bands, freq_bins):
 # =============================================================================
 
 def process_subject(subject, args):
-    logger = get_subj_logger(subject, args.session, args.rest_tag, args.run, log_dir)
-    logger.info('Initializing structure')
+    # logger = get_subj_logger(subject, args.session, args.rest_tag, args.run, log_dir)
+    # logger.info('Initializing structure')
     proc = process(subject=subject, 
             bids_root=args.bids_root, 
             deriv_root=None,
@@ -1645,8 +1649,8 @@ def return_args():
 def main():
     args = return_args()
     
-    logger=logging.getLogger()
-    logging.basicConfig(level=logging.INFO)
+    # logger=logging.getLogger()
+    # logging.basicConfig(level=logging.INFO)
     
     n_jobs = args.n_jobs  #extract this from the configuration file
     os.environ['n_jobs'] = str(n_jobs)
@@ -1689,7 +1693,6 @@ def main():
     # check and make sure all fsaverage files are present and download if not. 
     mne.datasets.fetch_fsaverage(op.join(bids_root,'derivatives/freesurfer/subjects/'))
     
-    global log_dir 
     log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'
     if not os.path.isdir(os.path.join(bids_root,'derivatives/ENIGMA_MEG')):
         os.makedirs(os.path.join(bids_root,'derivatives/ENIGMA_MEG'))
@@ -1758,8 +1761,8 @@ def main():
             # now that we've set up the symbolic links, we can now use the default subjects directory
             args.subjects_dir = default_dir
       
-        logger = get_subj_logger(args.subject, args.session,args.rest_tag, args.run, log_dir)
-        logger.info(f'processing subject {args.subject} session {args.session}')
+        # logger = get_subj_logger(args.subject, args.session,args.rest_tag, args.run, log_dir)
+        # logger.info(f'processing subject {args.subject} session {args.session}')
         
         if args.ica_manual_qa_prep:
             
@@ -1810,8 +1813,8 @@ def main():
             session=str(row['ses'])
             run=str(row['run'])
 
-            logger = get_subj_logger(subject, session, args.rest_tag, run, log_dir)
-            logger.info(f'processing subject {subject} session {session}')
+            # logger = get_subj_logger(subject, session, args.rest_tag, run, log_dir)
+            # logger.info(f'processing subject {subject} session {session}')
                         
             if args.remove_old:
                 print('Removing files from prior runs')
@@ -1822,7 +1825,7 @@ def main():
                 subprocess.call(['rm','-r', os.path.join(enigmadir, subject_enigmadir)])
 
             if row['mripath'] == None:
-                logger.info('No MRI, cannot process any further')
+                # logger.info('No MRI, cannot process any further')
                 print("Can't process subject %s, no MRI found" % args.subject)
             
             else:
