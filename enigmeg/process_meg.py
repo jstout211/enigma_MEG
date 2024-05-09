@@ -32,6 +32,7 @@ from mne_bids import BIDSPath
 import functools
 from scipy.stats import zscore, trim_mean
 from mne.preprocessing import maxwell_filter
+from io import StringIO
 
 # Set tensorflow to use CPU
 # The import is performed in the sub-functions to delay the unsuppressable warnings
@@ -61,7 +62,7 @@ std_thresh = 15
 
 
 # Make a string buffer logger before establishing final log filename
-from io import StringIO  
+  
 global log_dir
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -1664,10 +1665,7 @@ def return_args():
 def main():
     args = return_args()
     
-    # logger=logging.getLogger()
-    # logging.basicConfig(level=logging.INFO)
-    
-    n_jobs = args.n_jobs  #extract this from the configuration file
+    n_jobs = args.n_jobs  
     os.environ['n_jobs'] = str(n_jobs)
         
     # set some defaults
@@ -1705,6 +1703,7 @@ def main():
     # check and make sure all fsaverage files are present and download if not. 
     mne.datasets.fetch_fsaverage(op.join(bids_root,'derivatives/freesurfer/subjects/'))
     
+    global logger
     log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'
     if not os.path.isdir(os.path.join(bids_root,'derivatives/ENIGMA_MEG')):
         os.makedirs(os.path.join(bids_root,'derivatives/ENIGMA_MEG'))
@@ -1773,8 +1772,6 @@ def main():
             # now that we've set up the symbolic links, we can now use the default subjects directory
             args.subjects_dir = default_dir
       
-        global logger  
-        # logger = get_subj_logger(args.subject, args.session,args.rest_tag, args.run, log_dir)
         logger.info(f'processing subject {args.subject} session {args.session}')
         
         if args.ica_manual_qa_prep:
@@ -1826,8 +1823,7 @@ def main():
             session=str(row['ses'])
             run=str(row['run'])
 
-            # logger = get_subj_logger(subject, session, args.rest_tag, run, log_dir)
-            # logger.info(f'processing subject {subject} session {session}')
+            logger.info(f'processing subject {subject} session {session}')
                         
             if args.remove_old:
                 print('Removing files from prior runs')
@@ -1838,7 +1834,7 @@ def main():
                 subprocess.call(['rm','-r', os.path.join(enigmadir, subject_enigmadir)])
 
             if row['mripath'] == None:
-                # logger.info('No MRI, cannot process any further')
+                logger.info('No MRI, cannot process any further')
                 print("Can't process subject %s, no MRI found" % args.subject)
             
             else:
