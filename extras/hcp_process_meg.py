@@ -92,7 +92,8 @@ def proc_hcp_mri(proc_subj, t1_override=None,redo_all=False):
         if (not os.path.exists(watershed_check_path)) or (redo_all is True):
             mne.bem.make_watershed_bem(f'sub-{proc_subj.subject}',
                                        proc_subj.subjects_dir,
-                                       overwrite=True
+                                       overwrite=True,
+                                       gcaatlas=True
                                        )
         if (not bem_fname.fpath.exists()) or (redo_all is True):
             bem = mne.make_bem_model(f'sub-{proc_subj.subject}', 
