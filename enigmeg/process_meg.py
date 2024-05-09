@@ -59,9 +59,15 @@ flatmagthresh = 10e-15
 flatgradthresh = 10e-13
 std_thresh = 15
 
+
+# Make a string buffer logger before establishing final log filename
+from io import StringIO  
 global log_dir
-# global logger
-logger=logging.getLogger('__name__')
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+buffer_logstream = StringIO('')
+ch = logging.StreamHandler(stream=buffer_logstream)
+logger.addHandler(ch)
 
 # Function to retrieve the subject/session specific logger
 
@@ -126,8 +132,13 @@ class process():
 # =============================================================================
 #         # Initialize variables and directories
 # =============================================================================
-        log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'        
+        
+        # Establish subject level logger and flush string buffer into file
+        log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs' 
+        global logger
+        _buffer = logger.handlers[0].stream.getvalue()
         logger = get_subj_logger(subject, session, rest_tagname, run, log_dir)
+        logger.info(_buffer)
         
         self.subject=subject.replace('sub-','')  # Strip sub- if present
         self.session = session
@@ -1643,6 +1654,10 @@ def return_args():
     if len(sys.argv) == 1:
         parser.print_help()
         parser.exit(1) 
+    
+    if not op.exists(args.bids_root):    # throw an error if the BIDS root directory doesn't exist
+        parser.print_help()
+        raise ValueError('Please specify a correct -bids_root')     
     return args
     
 
@@ -1669,9 +1684,6 @@ def main():
     else:
         bids_root=args.bids_root
         
-    if not op.exists(bids_root):    # throw an error if the BIDS root directory doesn't exist
-        parser.print_help()
-        raise ValueError('Please specify a correct -bids_root')     
     
     # To make file handling easier, even if there is another subjects directory, we'll create one in 
     # the BIDS derivatives/ folder and set up symbolic links there. 
@@ -1761,8 +1773,9 @@ def main():
             # now that we've set up the symbolic links, we can now use the default subjects directory
             args.subjects_dir = default_dir
       
+        global logger  
         # logger = get_subj_logger(args.subject, args.session,args.rest_tag, args.run, log_dir)
-        # logger.info(f'processing subject {args.subject} session {args.session}')
+        logger.info(f'processing subject {args.subject} session {args.session}')
         
         if args.ica_manual_qa_prep:
             
