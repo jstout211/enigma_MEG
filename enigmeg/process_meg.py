@@ -136,6 +136,7 @@ class process():
         
         # Establish subject level logger and flush string buffer into file
         log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs' 
+        if not op.exists(log_dir): os.makedirs(log_dir)
         _buffer = None
         global logger
         if len(logger.handlers) > 0:
