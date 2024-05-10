@@ -140,7 +140,7 @@ class process():
         _buffer = None
         global logger
         if len(logger.handlers) > 0:
-            if hasattr(logger.handlers[0], 'stream'):
+            if hasattr(logger.handlers[0], 'stream.getvalue'):
                 _buffer = logger.handlers[0].stream.getvalue()
         logger = get_subj_logger(subject, session, rest_tagname, run, log_dir)
         if _buffer != None:
