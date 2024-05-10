@@ -136,10 +136,14 @@ class process():
         
         # Establish subject level logger and flush string buffer into file
         log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs' 
+        _buffer = None
         global logger
-        _buffer = logger.handlers[0].stream.getvalue()
+        if len(logger.handlers) > 0:
+            if hasattr(logger.handlers[0], 'stream'):
+                _buffer = logger.handlers[0].stream.getvalue()
         logger = get_subj_logger(subject, session, rest_tagname, run, log_dir)
-        logger.info(_buffer)
+        if _buffer != None:
+            logger.info(_buffer)
         
         self.subject=subject.replace('sub-','')  # Strip sub- if present
         self.session = session
