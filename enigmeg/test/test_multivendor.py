@@ -111,7 +111,7 @@ def test_mcorr_outputs(kwargs):
 
 #%% Anatomical
 @pytest.mark.parametrize("kwargs", kwarg_list)    
-def test_anat_outputs(kwargs):
+def test_src(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
     # Source space test
@@ -129,23 +129,33 @@ def test_anat_outputs(kwargs):
     assert allclose(src['rr'], gt_src['rr'])
     assert allclose(src['nn'], gt_src['nn'])
     assert allclose(src['vertno'], gt_src['vertno'])
+
+
+@pytest.mark.parametrize("kwargs", kwarg_list)    
+def test_bem(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
-    # BEM test
     bem_fname = get_fname(enigma_root, tag='bem')
     gt_bem_fname =  get_fname(gt_enigma_root, tag='bem')
     bem = mne.bem.read_bem_solution(bem_fname)
     gt_bem = mne.bem.read_bem_solution(gt_bem_fname)
     assert type(bem) == type(gt_bem)
     assert allclose(bem['solution'], gt_bem['solution'])
+
+@pytest.mark.parametrize("kwargs", kwarg_list)    
+def test_fwd(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
-    # Forward Model 
     fwd_fname = get_fname(enigma_root, tag='fwd')
     gt_fwd_fname = get_fname(gt_enigma_root, tag='fwd')
     fwd = mne.read_forward_solution(fwd_fname)
     gt_fwd = mne.read_forward_solution(gt_fwd_fname)
     assert allclose(fwd['sol']['data'], gt_fwd['sol']['data'])
+
+@pytest.mark.parametrize("kwargs", kwarg_list)    
+def test_aparcsub(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
-    # Parcellation
     for HEMI in {'lh','rh'}:
         fs_dir = op.join(deriv_root, 'freesurfer', 'subjects')
         gt_fs_dir = op.join(deriv_root, 'freesurfer', 'subjects')
@@ -156,45 +166,45 @@ def test_anat_outputs(kwargs):
                                           hemi=HEMI)
         gt_parc = mne.read_labels_from_annot(f'sub-{kwargs["subject"]}',
                                           parc='aparc_sub', 
-                                          subjects_dir=fs_dir, 
+                                          subjects_dir=gt_fs_dir, 
                                           hemi=HEMI)
         for i,j in zip(parc, gt_parc):
             assert i.name == j.name
             assert np.alltrue(i.vertices == j.vertices)
             
 
-#%% Beamformer source localization
-
+#%% Source localization
 @pytest.mark.parametrize("kwargs", kwarg_list)        
-def test_source_loc_outputs(kwargs):
+def test_transform(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
-    #Transform
     trans_fname = get_fname(enigma_root, tag='trans')
     gt_trans_fname = get_fname(gt_enigma_root, tag='trans')
     trans = mne.read_trans(trans_fname)
     gt_trans = mne.read_trans(gt_trans_fname)
     assert allclose(trans['trans'], gt_trans['trans'])
     assert trans['to']==gt_trans['to']
-    assert trans['from']==gt_trans['from']
-    
-    #Covariance
+    assert trans['from']==gt_trans['from'] 
+
+@pytest.mark.parametrize("kwargs", kwarg_list)        
+def test_covariance(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+
     restcov_fname =  glob.glob(op.join(enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
     gt_restcov_fname = glob.glob(op.join(gt_enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
     restcov = mne.read_cov(restcov_fname)
     gt_restcov = mne.read_cov(gt_restcov_fname)
-    assert np.allclose(restcov['data'], gt_restcov['data'])
-    
-    #Beamformer Filters
+    assert np.allclose(restcov['data'], gt_restcov['data'])    
+
+@pytest.mark.parametrize("kwargs", kwarg_list)        
+def test_beamformer(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+
     beam_fname = glob.glob(op.join(enigma_root, '**','*lcmv.h5'), recursive=True)[0]
     gt_beam_fname =  glob.glob(op.join(gt_enigma_root, '**','*lcmv.h5'), recursive=True)[0]
     beam = mne.beamformer.read_beamformer(beam_fname)
     gt_beam = mne.beamformer.read_beamformer(gt_beam_fname)
     assert np.allclose(beam['weights'], gt_beam['weights'], rtol=0.01)
-
-
-
-        
 
 @pytest.mark.parametrize("kwargs", kwarg_list)    
 def test_logfile(kwargs):
@@ -209,11 +219,9 @@ def test_logfile(kwargs):
     with open(logfile_fname) as f:
         logfile = f.readlines()
         logfile = [i.split('INFO')[-1] for i in logfile]
-        logfile = logfile[1:]
     with open(gt_logfile_fname) as f:
         gt_logfile = f.readlines()
         gt_logfile = [i.split('INFO')[-1] for i in gt_logfile]
-        gt_logfile = gt_logfile[3:]
 
     for i,j in zip(logfile, gt_logfile):
         assert i==j
