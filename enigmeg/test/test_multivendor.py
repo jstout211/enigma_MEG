@@ -79,7 +79,7 @@ def test_vendor_proc(kwargs):
     proc.do_mri_segstats()
     proc.cleanup()
 
-#%% Test results
+#%% Helper functions
 def get_fname(topdir, tag=None):
     tmp = glob.glob(op.join(topdir, '**',f'*{tag}.fif'), recursive=True)
     if len(tmp) > 1:
@@ -94,6 +94,7 @@ def get_dirs(kwargs):
     gt_enigma_root = op.join(enigma_test_dir, 'all_derivatives', f'{repo_name}_crop', 'ENIGMA_MEG')
     return bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name
 
+#%% Preprocessing
 
 @pytest.mark.parametrize("kwargs", [elekta1_kwargs])
 def test_mcorr_outputs(kwargs):
@@ -108,57 +109,7 @@ def test_mcorr_outputs(kwargs):
     assert allclose(headpos, headpos_gt, atol=1e-3)
 
 
-@pytest.mark.parametrize("kwargs", kwarg_list)        
-def test_spectra_outputs(kwargs):
-    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
-    
-    #Test
-    spectra_fname = glob.glob(op.join(enigma_root, f'sub-{kwargs["subject"]}', '**', '*spectra.csv'), recursive=True)[0]
-    gt_spectra_fname = glob.glob(op.join(gt_enigma_root, f'sub-{kwargs["subject"]}', '**', '*spectra.csv'), recursive=True)[0]
-    spectra = pd.read_csv(spectra_fname)    
-    gt_spectra = pd.read_csv(gt_spectra_fname)
-    assert np.allclose(spectra.values, gt_spectra.values, atol=0.0001) 
-
-@pytest.mark.parametrize("kwargs", kwarg_list)  
-def test_fooof_outputs(kwargs):
-    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
-    
-    #Test
-    relpow_fname = glob.glob(op.join(enigma_root, f'sub-{kwargs["subject"]}', '**', '*rel_power.csv'), recursive=True)[0]
-    gt_relpow_fname = glob.glob(op.join(gt_enigma_root, f'sub-{kwargs["subject"]}', '**', '*rel_power.csv'), recursive=True)[0]
-    relpow = pd.read_csv(relpow_fname, sep='\t', index_col=0)
-    gt_relpow = pd.read_csv(gt_relpow_fname, sep='\t', index_col=0)
-    assert np.allclose(relpow.values, gt_relpow.values, atol=0.01)
-    
-
-@pytest.mark.parametrize("kwargs", kwarg_list)        
-def test_source_loc_outputs(kwargs):
-    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
-
-    #Transform
-    trans_fname = get_fname(enigma_root, tag='trans')
-    gt_trans_fname = get_fname(gt_enigma_root, tag='trans')
-    trans = mne.read_trans(trans_fname)
-    gt_trans = mne.read_trans(gt_trans_fname)
-    assert allclose(trans['trans'], gt_trans['trans'])
-    assert trans['to']==gt_trans['to']
-    assert trans['from']==gt_trans['from']
-    
-    #Covariance
-    restcov_fname =  glob.glob(op.join(enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
-    gt_restcov_fname = glob.glob(op.join(gt_enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
-    restcov = mne.read_cov(restcov_fname)
-    gt_restcov = mne.read_cov(gt_restcov_fname)
-    assert np.allclose(restcov['data'], gt_restcov['data'])
-    
-    #Beamformer Filters
-    beam_fname = glob.glob(op.join(enigma_root, '**','*lcmv.h5'), recursive=True)[0]
-    gt_beam_fname =  glob.glob(op.join(gt_enigma_root, '**','*lcmv.h5'), recursive=True)[0]
-    beam = mne.beamformer.read_beamformer(beam_fname)
-    gt_beam = mne.beamformer.read_beamformer(gt_beam_fname)
-    assert np.allclose(beam['weights'], gt_beam['weights'], rtol=0.01)
-
-
+#%% Anatomical
 @pytest.mark.parametrize("kwargs", kwarg_list)    
 def test_anat_outputs(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
@@ -210,6 +161,39 @@ def test_anat_outputs(kwargs):
         for i,j in zip(parc, gt_parc):
             assert i.name == j.name
             assert np.alltrue(i.vertices == j.vertices)
+            
+
+#%% Beamformer source localization
+
+@pytest.mark.parametrize("kwargs", kwarg_list)        
+def test_source_loc_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+
+    #Transform
+    trans_fname = get_fname(enigma_root, tag='trans')
+    gt_trans_fname = get_fname(gt_enigma_root, tag='trans')
+    trans = mne.read_trans(trans_fname)
+    gt_trans = mne.read_trans(gt_trans_fname)
+    assert allclose(trans['trans'], gt_trans['trans'])
+    assert trans['to']==gt_trans['to']
+    assert trans['from']==gt_trans['from']
+    
+    #Covariance
+    restcov_fname =  glob.glob(op.join(enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
+    gt_restcov_fname = glob.glob(op.join(gt_enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
+    restcov = mne.read_cov(restcov_fname)
+    gt_restcov = mne.read_cov(gt_restcov_fname)
+    assert np.allclose(restcov['data'], gt_restcov['data'])
+    
+    #Beamformer Filters
+    beam_fname = glob.glob(op.join(enigma_root, '**','*lcmv.h5'), recursive=True)[0]
+    gt_beam_fname =  glob.glob(op.join(gt_enigma_root, '**','*lcmv.h5'), recursive=True)[0]
+    beam = mne.beamformer.read_beamformer(beam_fname)
+    gt_beam = mne.beamformer.read_beamformer(gt_beam_fname)
+    assert np.allclose(beam['weights'], gt_beam['weights'], rtol=0.01)
+
+
+
         
 
 @pytest.mark.parametrize("kwargs", kwarg_list)    
@@ -234,6 +218,30 @@ def test_logfile(kwargs):
     for i,j in zip(logfile, gt_logfile):
         assert i==j
 
+
+
+#%% Test final outputs
+@pytest.mark.parametrize("kwargs", kwarg_list)        
+def test_spectra_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+    
+    #Test
+    spectra_fname = glob.glob(op.join(enigma_root, f'sub-{kwargs["subject"]}', '**', '*spectra.csv'), recursive=True)[0]
+    gt_spectra_fname = glob.glob(op.join(gt_enigma_root, f'sub-{kwargs["subject"]}', '**', '*spectra.csv'), recursive=True)[0]
+    spectra = pd.read_csv(spectra_fname)    
+    gt_spectra = pd.read_csv(gt_spectra_fname)
+    assert np.allclose(spectra.values, gt_spectra.values, atol=0.0001) 
+
+@pytest.mark.parametrize("kwargs", kwarg_list)  
+def test_fooof_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+    
+    #Test
+    relpow_fname = glob.glob(op.join(enigma_root, f'sub-{kwargs["subject"]}', '**', '*rel_power.csv'), recursive=True)[0]
+    gt_relpow_fname = glob.glob(op.join(gt_enigma_root, f'sub-{kwargs["subject"]}', '**', '*rel_power.csv'), recursive=True)[0]
+    relpow = pd.read_csv(relpow_fname, sep='\t', index_col=0)
+    gt_relpow = pd.read_csv(gt_relpow_fname, sep='\t', index_col=0)
+    assert np.allclose(relpow.values, gt_relpow.values, atol=0.01)
 
     
     
