@@ -10,24 +10,17 @@ from enigmeg.process_meg import process
 import mne
 from enigmeg.process_meg import write_aparc_sub
 import pytest
+import pandas as pd
 # import pygit2
 from numpy import allclose
 import numpy as np
 import datalad as dl
+import glob
 
 enigma_test_dir = op.join(os.environ['ENIGMA_TEST_DIR'], 'enigma_test_data')
 #repo = pygit2.Repository(enigma_test_dir) 
 #TODO - force repo back to original hash to offset any processing changes
 #repo.checkout(refname=......)
-
-# =============================================================================
-# Data Prep
-# =============================================================================
-# Remove label files and unlock label folder
-# rm op.join(subjects_dir, 'morph_maps')
-# Remove 
-
-
 
 # =============================================================================
 # Test Setups
@@ -60,7 +53,9 @@ fourD1_kwargs=   {'subject':'100307',
               'emptyroom_tagname': 'empty',
               } 
 
-@pytest.mark.parametrize("kwargs", [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs])
+kwarg_list = [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs]
+
+@pytest.mark.parametrize("kwargs", kwarg_list)
 def test_vendor_proc(kwargs):
     proc=process(**kwargs)
     proc.load_data()
@@ -85,100 +80,93 @@ def test_vendor_proc(kwargs):
     proc.cleanup()
 
 #%% Test results
-# def anat_list(prefix=None, suffix=None):
-#     outlist = {}
-#     outlist{'bem'}=f'{prefix}_bem.fif'
-#     outlist{'src'}=f'{prefix}_src.fif'
-#     outlist{
-#     bem_fname=
-
-@pytest.mark.parametrize("kwargs", [elekta1_kwargs]) #, ctf1_kwargs, fourD1_kwargs])
-def test_elekta1_outputs(kwargs):
-    #Setup
-    bids_root = kwargs['bids_root']
-    deriv_root = op.join(bids_root, 'derivatives')
-    enigma_root = op.join(deriv_root, 'ENIGMA_MEG')
-    out_meg_root = op.join(enigma_root, 'sub-'+elekta1_kwargs['subject'], 'ses-01','meg')
-    gt_meg_root = op.join(enigma_test_dir, 'all_derivatives', 'CAMCAN_crop', 'ENIGMA_MEG', 'sub-'+elekta1_kwargs['subject'], 'ses-01','meg')
-    target = f'sub-{elekta1_kwargs["subject"]}_ses-01_meg_run-01_headpos.npy'
-    #Movement corr
-    headpos = np.load(op.join(out_meg_root, target))
-    headpos_gt = np.load(op.join(gt_meg_root, target))
-    assert allclose(headpos, headpos_gt, atol=1e-3)
-    #Finish HERE ---- 
-
 def get_fname(topdir, tag=None):
     tmp = glob.glob(op.join(topdir, '**',f'*{tag}.fif'), recursive=True)
     if len(tmp) > 1:
         raise ValueError(f'More than one {tag} files')
     return tmp[0]
 
-
-
-
-
-
-
-
-
-
-
-
-
-# @pytest.mark.parametrize("kwargs", [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs])        
-# def test_preproc(kwargs):
-#     sub-CC110101_ses-01_run-01_proc-mcorr_meg.fif
-#     sub-CC110101_ses-01_task-emptyroom_epo.fif
-#     sub-CC110101_ses-01_task-emptyroom_proc-filt_meg.fif
-#     sub-CC110101_ses-01_task-rest_run-01_ica/
-#     sub-CC110101_ses-01_task-rest_run-01_epo.fif
-#     sub-CC110101_ses-01_task-rest_run-01_proc-filt_meg.fif
-# sub-CC110101_ses-01_meg_run-01_headpos.npy
-    
-# @pytest.mark.parametrize("kwargs", [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs])        
-# def test_fooof_outputs(kwargs):
-#     sub-CC110101_ses-01_meg_band_task-rest_run-01_rel_power.csv
-#     sub-CC110101_ses-01_meg_label_task-rest_run-01_spectra.csv    
-
-# @pytest.mark.parametrize("kwargs", [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs])        
-# def test_source_loc_outputs(kwargs):
-#     #Transform
-#     trans_fname = 
-#     gt_trans_fname = 
-#     trans = 
-#     gt_trans = 
-#     sub-CC110101_ses-01_task-rest_run-01_trans.fif
-    
-#     #Covariance
-#     restcov_fname = 
-#     gt_restcov_fname = 
-#     restcov = 
-#     gt_restcov = 
-    
-#     #Beamformer Filters
-#     filters = 
-#     gt_filters = 
-#     sub-CC110101_ses-01_run-01_lcmv.h5
-    
-#     sub-CC110101_ses-01_task-emptyroom_cov.fif
-#     sub-CC110101_ses-01_task-rest_run-01_cov.fif
-    
-
-    
-
-
-@pytest.mark.parametrize("kwargs", [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs])    
-def test_anat_outputs(kwargs):
+def get_dirs(kwargs):
     bids_root = kwargs['bids_root']
+    repo_name = op.basename(bids_root)
     deriv_root = op.join(bids_root, 'derivatives')
     enigma_root = op.join(deriv_root, 'ENIGMA_MEG')
-    repo_name = op.basename(bids_root)
-    gt_meg_root = op.join(enigma_test_dir, 'all_derivatives', f'{repo_name}_crop', 'ENIGMA_MEG')
+    gt_enigma_root = op.join(enigma_test_dir, 'all_derivatives', f'{repo_name}_crop', 'ENIGMA_MEG')
+    return bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name
+
+
+@pytest.mark.parametrize("kwargs", [elekta1_kwargs])
+def test_mcorr_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+    
+    #Test
+    target = f'sub-{kwargs["subject"]}_ses-01_meg_run-01_headpos.npy'
+    headpos_fname = glob.glob(op.join(enigma_root, '**', target), recursive=True)[0]
+    gt_headpos_fname = glob.glob(op.join(gt_enigma_root, '**', target), recursive=True)[0]
+    headpos = np.load(headpos_fname)
+    headpos_gt = np.load(gt_headpos_fname)
+    assert allclose(headpos, headpos_gt, atol=1e-3)
+
+
+@pytest.mark.parametrize("kwargs", kwarg_list)        
+def test_spectra_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+    
+    #Test
+    spectra_fname = glob.glob(op.join(enigma_root, f'sub-{kwargs["subject"]}', '**', '*spectra.csv'), recursive=True)[0]
+    gt_spectra_fname = glob.glob(op.join(gt_enigma_root, f'sub-{kwargs["subject"]}', '**', '*spectra.csv'), recursive=True)[0]
+    spectra = pd.read_csv(spectra_fname)    
+    gt_spectra = pd.read_csv(gt_spectra_fname)
+    assert np.allclose(spectra.values, gt_spectra.values, atol=0.0001) 
+
+@pytest.mark.parametrize("kwargs", kwarg_list)  
+def test_fooof_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+    
+    #Test
+    relpow_fname = glob.glob(op.join(enigma_root, f'sub-{kwargs["subject"]}', '**', '*rel_power.csv'), recursive=True)[0]
+    gt_relpow_fname = glob.glob(op.join(gt_enigma_root, f'sub-{kwargs["subject"]}', '**', '*rel_power.csv'), recursive=True)[0]
+    relpow = pd.read_csv(relpow_fname, sep='\t', index_col=0)
+    gt_relpow = pd.read_csv(gt_relpow_fname, sep='\t', index_col=0)
+    assert np.allclose(relpow.values, gt_relpow.values, atol=0.01)
+    
+
+@pytest.mark.parametrize("kwargs", kwarg_list)        
+def test_source_loc_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+
+    #Transform
+    trans_fname = get_fname(enigma_root, tag='trans')
+    gt_trans_fname = get_fname(gt_enigma_root, tag='trans')
+    trans = mne.read_trans(trans_fname)
+    gt_trans = mne.read_trans(gt_trans_fname)
+    assert allclose(trans['trans'], gt_trans['trans'])
+    assert trans['to']==gt_trans['to']
+    assert trans['from']==gt_trans['from']
+    
+    #Covariance
+    restcov_fname =  glob.glob(op.join(enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
+    gt_restcov_fname = glob.glob(op.join(gt_enigma_root, '**','*rest*cov*.fif'), recursive=True)[0]
+    restcov = mne.read_cov(restcov_fname)
+    gt_restcov = mne.read_cov(gt_restcov_fname)
+    assert np.allclose(restcov['data'], gt_restcov['data'])
+    
+    #Beamformer Filters
+    beam_fname = glob.glob(op.join(enigma_root, '**','*lcmv.h5'), recursive=True)[0]
+    gt_beam_fname =  glob.glob(op.join(gt_enigma_root, '**','*lcmv.h5'), recursive=True)[0]
+    beam = mne.beamformer.read_beamformer(beam_fname)
+    gt_beam = mne.beamformer.read_beamformer(gt_beam_fname)
+    assert np.allclose(beam['weights'], gt_beam['weights'], rtol=0.01)
+
+
+@pytest.mark.parametrize("kwargs", kwarg_list)    
+def test_anat_outputs(kwargs):
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
     # Source space test
     # Left Hemi
     src_fname = get_fname(enigma_root, tag='src')
-    gt_src_fname = get_fname(gt_meg_root, tag='src')
+    gt_src_fname = get_fname(gt_enigma_root, tag='src')
     src = mne.read_source_spaces(src_fname)[0]
     gt_src = mne.read_source_spaces(gt_src_fname)[0]
     assert allclose(src['rr'], gt_src['rr'])
@@ -193,47 +181,55 @@ def test_anat_outputs(kwargs):
     
     # BEM test
     bem_fname = get_fname(enigma_root, tag='bem')
-    gt_bem_fname =  get_fname(gt_meg_root, tag='bem')
+    gt_bem_fname =  get_fname(gt_enigma_root, tag='bem')
     bem = mne.bem.read_bem_solution(bem_fname)
     gt_bem = mne.bem.read_bem_solution(gt_bem_fname)
     assert type(bem) == type(gt_bem)
     assert allclose(bem['solution'], gt_bem['solution'])
     
     # Forward Model 
-    # fwd_fname = 
-    # gt_fwd_fname = 
-    # fwd = 
-    # gt_fwd = 
-    # sub-CC110101_ses-01_task-rest_run-01_fwd.fif
+    fwd_fname = get_fname(enigma_root, tag='fwd')
+    gt_fwd_fname = get_fname(gt_enigma_root, tag='fwd')
+    fwd = mne.read_forward_solution(fwd_fname)
+    gt_fwd = mne.read_forward_solution(gt_fwd_fname)
+    assert allclose(fwd['sol']['data'], gt_fwd['sol']['data'])
     
-    # Parcellation   FIX - should test this
-    # parc_fname = op.join(deriv_root, 'freesurfer', 'subjects',f'sub-{kwargs["subject"]}', 'label','lh.aparc_sub.annot')
-    # gt_parc_fname = op.join(deriv_root, 'freesurfer', 'subjects',f'sub-{kwargs["subject"]}', 'label','lh.aparc_sub.annot')
-    # parc = 
-    # gt_parc = 
+    # Parcellation
+    for HEMI in {'lh','rh'}:
+        fs_dir = op.join(deriv_root, 'freesurfer', 'subjects')
+        gt_fs_dir = op.join(deriv_root, 'freesurfer', 'subjects')
+        HEMI='lh'
+        parc = mne.read_labels_from_annot(f'sub-{kwargs["subject"]}',
+                                          parc='aparc_sub', 
+                                          subjects_dir=fs_dir, 
+                                          hemi=HEMI)
+        gt_parc = mne.read_labels_from_annot(f'sub-{kwargs["subject"]}',
+                                          parc='aparc_sub', 
+                                          subjects_dir=fs_dir, 
+                                          hemi=HEMI)
+        for i,j in zip(parc, gt_parc):
+            assert i.name == j.name
+            assert np.alltrue(i.vertices == j.vertices)
+        
 
-@pytest.mark.parametrize("kwargs", [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs])    
+@pytest.mark.parametrize("kwargs", kwarg_list)    
 def test_logfile(kwargs):
-    #Setup
-    bids_root = kwargs['bids_root']
-    deriv_root = op.join(bids_root, 'derivatives')
-    enigma_root = op.join(deriv_root, 'ENIGMA_MEG')
-    repo_name = op.basename(bids_root)
-    out_meg_root = op.join(enigma_root, 'sub-'+elekta1_kwargs['subject'], 'ses-01','meg')
-    gt_meg_root = op.join(enigma_test_dir, 'all_derivatives', f'{repo_name}_crop', 'ENIGMA_MEG', 'sub-'+elekta1_kwargs['subject'], 'ses-01','meg')
-    
+    bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
+
     #Logfile testings
     subject, run, session, rest_tagname = kwargs['subject'], kwargs['run'], kwargs['session'], kwargs['rest_tagname']
     
-    logfile_fname = op.join(enigma_root, 'logs',f'{subject}_ses-{session}_task-{rest_tagname}_run-{run}_log.txt')
-    gt_logfile_fname = op.join(gt_meg_root, 'logs', f'{subject}_ses-{session}_task-{rest_tagname}_run-{run}_log.txt')
+    logfile_fname = glob.glob(op.join(enigma_root, 'logs',f'{subject}_*_log.txt'))[0]
+    gt_logfile_fname = glob.glob(op.join(gt_enigma_root, 'logs', f'{subject}_*_log.txt'))[0]
     
     with open(logfile_fname) as f:
         logfile = f.readlines()
         logfile = [i.split('INFO')[-1] for i in logfile]
+        logfile = logfile[1:]
     with open(gt_logfile_fname) as f:
         gt_logfile = f.readlines()
         gt_logfile = [i.split('INFO')[-1] for i in gt_logfile]
+        gt_logfile = gt_logfile[3:]
 
     for i,j in zip(logfile, gt_logfile):
         assert i==j
