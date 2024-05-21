@@ -55,7 +55,7 @@ fourD1_kwargs=   {'subject':'100307',
 
 kwarg_list = [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs]
 
-@pytest.mark.parametrize("kwargs", kwarg_list)
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])
 def test_vendor_proc(kwargs):
     proc=process(**kwargs)
     proc.load_data()
@@ -96,7 +96,7 @@ def get_dirs(kwargs):
 
 #%% Preprocessing
 
-@pytest.mark.parametrize("kwargs", [elekta1_kwargs])
+@pytest.mark.parametrize("kwargs", [elekta1_kwargs], ids=['MEGIN'])
 def test_mcorr_outputs(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
@@ -110,7 +110,7 @@ def test_mcorr_outputs(kwargs):
 
 
 #%% Anatomical
-@pytest.mark.parametrize("kwargs", kwarg_list)    
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])    
 def test_src(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
@@ -131,7 +131,7 @@ def test_src(kwargs):
     assert allclose(src['vertno'], gt_src['vertno'])
 
 
-@pytest.mark.parametrize("kwargs", kwarg_list)    
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])    
 def test_bem(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
@@ -142,7 +142,7 @@ def test_bem(kwargs):
     assert type(bem) == type(gt_bem)
     assert allclose(bem['solution'], gt_bem['solution'])
 
-@pytest.mark.parametrize("kwargs", kwarg_list)    
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])    
 def test_fwd(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
@@ -152,7 +152,7 @@ def test_fwd(kwargs):
     gt_fwd = mne.read_forward_solution(gt_fwd_fname)
     assert allclose(fwd['sol']['data'], gt_fwd['sol']['data'])
 
-@pytest.mark.parametrize("kwargs", kwarg_list)    
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])    
 def test_aparcsub(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
@@ -174,7 +174,7 @@ def test_aparcsub(kwargs):
             
 
 #%% Source localization
-@pytest.mark.parametrize("kwargs", kwarg_list)        
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])        
 def test_transform(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
@@ -186,7 +186,7 @@ def test_transform(kwargs):
     assert trans['to']==gt_trans['to']
     assert trans['from']==gt_trans['from'] 
 
-@pytest.mark.parametrize("kwargs", kwarg_list)        
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])        
 def test_covariance(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
@@ -196,7 +196,7 @@ def test_covariance(kwargs):
     gt_restcov = mne.read_cov(gt_restcov_fname)
     assert np.allclose(restcov['data'], gt_restcov['data'])    
 
-@pytest.mark.parametrize("kwargs", kwarg_list)        
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])        
 def test_beamformer(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
@@ -206,7 +206,7 @@ def test_beamformer(kwargs):
     gt_beam = mne.beamformer.read_beamformer(gt_beam_fname)
     assert np.allclose(beam['weights'], gt_beam['weights'], rtol=0.01)
 
-@pytest.mark.parametrize("kwargs", kwarg_list)    
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])    
 def test_logfile(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
 
@@ -229,7 +229,7 @@ def test_logfile(kwargs):
 
 
 #%% Test final outputs
-@pytest.mark.parametrize("kwargs", kwarg_list)        
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])        
 def test_spectra_outputs(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
@@ -240,7 +240,7 @@ def test_spectra_outputs(kwargs):
     gt_spectra = pd.read_csv(gt_spectra_fname)
     assert np.allclose(spectra.values, gt_spectra.values, atol=0.0001) 
 
-@pytest.mark.parametrize("kwargs", kwarg_list)  
+@pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])  
 def test_fooof_outputs(kwargs):
     bids_root, deriv_root, enigma_root, gt_enigma_root, repo_name = get_dirs(kwargs)
     
