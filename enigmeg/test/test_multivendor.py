@@ -18,9 +18,6 @@ import datalad as dl
 import glob
 
 enigma_test_dir = op.join(os.environ['ENIGMA_TEST_DIR'], 'enigma_test_data')
-#repo = pygit2.Repository(enigma_test_dir) 
-#TODO - force repo back to original hash to offset any processing changes
-#repo.checkout(refname=......)
 
 # =============================================================================
 # Test Setups
@@ -53,17 +50,17 @@ fourD1_kwargs=   {'subject':'100307',
               'emptyroom_tagname': 'empty',
               } 
 
-kit1_kwarsg = {'subject' : '0001',
+kit1_kwargs = {'subject' : '0001',
                'bids_root': op.join(enigma_test_dir, 'YOKOGOWA'), 
                'run': '1',
                'session': '1',
                'mains':50,
-               'rest_tagname':'eyes_closed',
+               'rest_tagname':'eyesclosed',
                'emptyroom_tagname': None
                }
 
-kwarg_list = [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs]
-all_vendors = pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])
+kwarg_list = [elekta1_kwargs, ctf1_kwargs, kit1_kwargs]
+all_vendors = pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'KIT'])
 
 @all_vendors
 def test_vendor_proc(kwargs):
@@ -88,6 +85,7 @@ def test_vendor_proc(kwargs):
     proc.do_spectral_parameterization()
     proc.do_mri_segstats()
     proc.cleanup()
+    
 
 #%% Helper functions
 def get_fname(topdir, tag=None):
