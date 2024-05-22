@@ -29,7 +29,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-testing = ['datalad','pytest','pygit2']
+testing = ['datalad','pytest','pygit2', 'pytest-cov']
 
 [project.scripts]
 "process_meg.py" = "enigmeg.process_meg:main"

@@ -53,6 +53,15 @@ fourD1_kwargs=   {'subject':'100307',
               'emptyroom_tagname': 'empty',
               } 
 
+kit1_kwarsg = {'subject' : '0001',
+               'bids_root': op.join(enigma_test_dir, 'YOKOGOWA'), 
+               'run': '1',
+               'session': '1',
+               'mains':50,
+               'rest_tagname':'eyes_closed',
+               'emptyroom_tagname': None
+               }
+
 kwarg_list = [elekta1_kwargs, ctf1_kwargs, fourD1_kwargs]
 all_vendors = pytest.mark.parametrize("kwargs", kwarg_list,  ids=['MEGIN', 'CTF', 'BTI'])
 
