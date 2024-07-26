@@ -1653,6 +1653,7 @@ def return_args():
                         )
     parser.add_argument('-megin_ignore',
                         help='''Flag can be set to ignore megin processing, i.e. motcorr''',
+                        action='store_true',
                         default=None)
                                    
     args = parser.parse_args()
