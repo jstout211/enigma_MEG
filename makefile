@@ -21,7 +21,7 @@ install_data:
 install_test:
 	#conda install --channel=conda-forge --name=base mamba -y
 	conda env remove -n enigma_meg_test -y
-	mamba create --override-channels --channel=conda-forge --name=enigma_meg_test "python<3.12" mne pip -y
+	mamba create --override-channels --channel=conda-forge --name=enigma_meg_test "python<3.12" "mne=1.5" "numba<0.60" pip -y
 	($(CONDA_ACTIVATE) enigma_meg_test ; pip install -e .[testing]; pip install pytest pytest-reportlog )
 	git submodule init
 	git pull --recurse-submodules
@@ -29,7 +29,7 @@ install_test:
 install_headless_test:
 	#conda install --channel=conda-forge --name=base mamba -y
 	conda env remove -n enigma_meg_test -y
-	mamba create --override-channels --channel=conda-forge --name=enigma_meg_test "mne<1.7" "python<3.12" pip "vtk>=9.2=*osmesa*" "mesalib=21.2.5" -y
+	mamba create --override-channels --channel=conda-forge --name=enigma_meg_test "mne=1.5" "python<3.12" "numba<0.60" pip "vtk>=9.2=*osmesa*" "mesalib=21.2.5" -y
 	($(CONDA_ACTIVATE) enigma_meg_test ; pip install -e .[testing]; pip install pytest pytest-reportlog )
 	git submodule init
 	git pull --recurse-submodules
