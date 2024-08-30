@@ -502,7 +502,7 @@ class process():
                 self.ct_sparse = ct_sparse_path
                 self.sss_cal = sss_cal_path         
                 
-                if (megin_ignore != 'motcorr'):
+                if (megin_ignore != True):
                 
                     # Check for and run the movement correction on the dataset
                     chpi_info = mne.chpi.get_chpi_info(self.raw_rest.info)
@@ -510,7 +510,7 @@ class process():
                         if len(chpi_info[0]) > 0:
                             self._movement_comp()
                 
-                if (megin_ignore == 'motcorr'):
+                else:
   
                     self._tsss()
                    
@@ -1859,7 +1859,8 @@ def main():
                                        t1_override = row['mripath'],
                                        fs_ave_fids = False,
                                        check_paths = True,
-                                       do_dics = args.do_dics
+                                       do_dics = args.do_dics, 
+                                       megin_ignore = args.megin_ignore
                                        )
                 
                 process_subj.load_data()
