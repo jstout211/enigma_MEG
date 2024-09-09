@@ -21,4 +21,7 @@ neurodocker generate singularity \
 ## Build Singularity container
 `sudo singularity build enigma_meg.sif enigma_meg.def`
 
+# Running container
+`singularity run -B ${BIDS_ROOT}:${BIDS_ROOT} enigma_meg.sif`
+
 
