@@ -1,0 +1,10 @@
+name: enigma_meg
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python[version='<3.12']
+  - mne=1.5
+  - numba[version='<0.60']
+  - pip:
+    - git+https://github.com/jstout211/enigma_MEG.git
