@@ -70,8 +70,11 @@ def assemble_cmd(row, bids_root=None):
         row['eroom_tag']=op.basename(row.eroom).split('_task')[1].split('_')[0][1:]
     else:
         row['eroom_tag']=None
-    if len(row['path']) != 0 : 
+
+    if len(row['path']) != 0 and (row['type'] != 'c,rf'): 
         row['rest_tag']=op.basename(row.path).split('_task')[1].split('_')[0][1:]
+    elif len(row['path']) != 0 and (row['type'] == 'c,rf'):
+        row['rest_tag']=op.basename(op.dirname(row.path)).split('_task')[1].split('_')[0][1:]
     else:
         raise ValueError('Could not find MEG rest dataset')
     
@@ -88,6 +91,7 @@ def dframe_toswarm(dframe, bids_root=None, outfile='enigma_swarm.sh'):
     "Convert the dataframe to swarm file"
     swarm = []
     for idx, row in dframe.iterrows():
+        print(idx, row)
         swarm.append(assemble_cmd(row, bids_root=bids_root))
     with open(outfile, 'w') as f:
         f.writelines(swarm)
@@ -109,7 +113,7 @@ def dframe_tomanifest(scan_dframe, bids_root=None, outfile='manifext.txt'):
     print(merged_df)
     
     selected_columns = ['participant_id','task','ses','run']
-    for field in ['age', 'sex', 'hand','group','Diagnosis_TP1', 'Diagnosis_TP2']:
+    for field in ['age', 'sex', 'hand','group','Diagnosis_TP1', 'Diagnosis_TP2','Diagnosis','diagnosis']:
         if field in participants_df:
             selected_columns.append(field)
             
@@ -346,8 +350,8 @@ def main():
                                 bids_path_orig = mne_bids.get_bids_path_from_fname(restfiles[0])
                                 bids_path_out = bids_path_orig.copy().update(processing=None)
                                 if not os.path.islink(bids_path_out.fpath):
-                                   print('making a symbolic link to make a same session MRI')
-                                   os.symlink(bids_path_orig.fpath, bids_path_out.fpath)
+                                  print('making a symbolic link to make a same session MRI')
+                                  os.symlink(bids_path_orig.fpath, bids_path_out.fpath)
                                            
                 subrestlist.extend(subrestlist_ses)
        
