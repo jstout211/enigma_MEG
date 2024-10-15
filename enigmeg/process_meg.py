@@ -19,6 +19,7 @@ import pandas as pd
 import enigmeg
 from enigmeg.spectral_peak_analysis import calc_spec_peak
 from enigmeg.QA.enigma_QA_GUI_functions import build_status_dict
+from enigmeg.utils import get_head_mri_trans_bti
 from enigmeg import mod_label_extract
 import logging
 import munch 
@@ -424,6 +425,13 @@ class process():
     @log
     def vendor_prep(self, megin_ignore=None):
         
+        # check for channels with no locations
+        badlocnames=[]
+        for chan in self.raw_rest.info['chs']:
+            if np.isnan(sum(chan['loc'])):
+                badlocnames.append(chan['ch_name'])
+        self.raw_rest.info['bads']=badlocnames
+        
         '''Different vendor types require special cleaning / initialization'''
         print('vendor = %s' % self.vendor[0])
         ## Apply 3rd order gradient for CTF datasets  
@@ -810,7 +818,12 @@ class process():
                 elif(self.datatype == 'ctf'):
                     trans = get_head_mri_trans(self.meg_rest_raw, {'system_clock' : 'ignore'},
                                            t1_bids_path=t1_bids_path,
-                                           fs_subject='sub-'+self.bids_path.subject)                   
+                                           fs_subject='sub-'+self.bids_path.subject)
+                elif(self.datatype == '4d'):
+                    trans = get_head_mri_trans_bti(self.meg_rest_raw,
+                                           t1_bids_path=t1_bids_path,
+                                           fs_subject='sub-'+self.bids_path.subject,
+                                           fs_subjects_dir=self.subjects_dir)
                 else:
                     trans = get_head_mri_trans(self.meg_rest_raw,
                                            t1_bids_path=t1_bids_path,
@@ -1244,6 +1257,14 @@ def assess_bads(raw_fname, vendor, is_eroom=False): # assess MEG data for bad ch
     if raw.times[-1] > 60.0:
         raw.crop(tmax=60.0)    
     raw.info['bads'] = []
+    
+    # catch any channels with no locations
+    badlocnames=[]
+    for chan in raw.info['chs']:
+        if np.isnan(sum(chan['loc'])):
+            badlocnames.append(chan['ch_name'])
+    raw.info['bads']=badlocnames
+    
     raw_check = raw.copy()
     
     if vendor == '306m' or vendor == '122m':
