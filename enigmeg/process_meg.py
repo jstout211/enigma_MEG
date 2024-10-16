@@ -28,6 +28,7 @@ import mne_bids
 from mne_bids import get_head_mri_trans
 from mne.beamformer import make_dics, apply_dics_csd
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
+from mne.bem import FIFF
 import scipy as sp
 from mne_bids import BIDSPath
 import functools
@@ -563,12 +564,25 @@ class process():
         self.raw_rest=raw_tsss
         if self.raw_eroom != None:
             eroom_inst = self.raw_eroom
-            eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
+            try:
+                eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
                                 raw=raw_tsss, bads='keep')
-            eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
+                eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
                                 cross_talk=self.ct_sparse,
                                 calibration=self.sss_cal, 
                                 st_duration=10.0)
+            except: 
+                  raw_hspmod = raw_tsss.copy()
+                  for d in raw_hspmod.info['dig']:
+                      if d['kind'] == FIFF.FIFFV_POINT_EEG:
+                          d['kind'] = FIFF.FIFFV_POINT_EXTRA
+                  eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
+                                    raw=raw_hspmod, bads='keep')
+                  eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
+                                    cross_talk=self.ct_sparse,
+                                    calibration=self.sss_cal, 
+                                    st_duration=10.0)    
+                
             self.raw_eroom = eroom_tsss
             
     @log
@@ -588,12 +602,26 @@ class process():
           self.raw_rest=raw_tsss
           if self.raw_eroom != None:
               eroom_inst = self.raw_eroom
-              eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
+              try: 
+                  eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
                                   raw=raw_tsss, bads='keep')
-              eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
+                  eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
                                   cross_talk=self.ct_sparse,
                                   calibration=self.sss_cal, 
                                   st_duration=10.0)
+              except: 
+                  print('initial hsp fit did not work, trying to copy any eeg points from digitization')
+                  raw_hspmod = raw_tsss.copy()
+                  for d in raw_hspmod.info['dig']:
+                      if d['kind'] == FIFF.FIFFV_POINT_EEG:
+                          d['kind'] = FIFF.FIFFV_POINT_EXTRA
+                  eroom_prep = mne.preprocessing.maxwell_filter_prepare_emptyroom(eroom_inst,
+                                    raw=raw_hspmod, bads='keep')
+                  eroom_tsss = maxwell_filter(eroom_prep, head_pos=None, 
+                                    cross_talk=self.ct_sparse,
+                                    calibration=self.sss_cal, 
+                                    st_duration=10.0)    
+                  
               self.raw_eroom = eroom_tsss
   
     @log
