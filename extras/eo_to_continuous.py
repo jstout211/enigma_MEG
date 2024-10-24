@@ -20,29 +20,50 @@ raw = mne.io.read_raw_ctf(fname, preload=True, system_clock='ignore')
 
 # Below is some semi-crappy code - seems to work
 anot = raw.annotations
-dur1 = anot[1]['onset'] - anot[0]['onset']
-dur2 = anot[3]['onset'] - anot[2]['onset']
-dur3 = raw.times[-1] - anot[4]['onset']
-
 sfreq = raw.info['sfreq']
 evts, evts_id = mne.events_from_annotations(raw)
-evts[0,1] = dur1 * sfreq
-evts[2,1] = dur2 * sfreq
-evts[4,1] = dur3 * sfreq
 
+assert evts[0,-1]==2  #Starts and ends with eyes open
+assert evts[-1,-1]==2
+
+
+for row_idx in range(evts.shape[0]):
+    if row_idx % 2 != 0: #force evens
+        continue
+    if row_idx==len(anot)-1:  #If last row, duration finishes at term of file
+        dur = raw.times[-1] - anot[row_idx]['onset']
+    else:
+        dur = anot[row_idx+1]['onset'] - anot[row_idx]['onset']
+    evts[row_idx,1] = dur *sfreq
+
+# Build out the data matrix while subtracting the offset
 raw_stack = [raw._data[:, evts[0,0]:(evts[0,0]+evts[0,1])]]
-tmp = raw._data[:, evts[2,0]:(evts[2,0]+evts[2,1])]
-raw_stack.append(tmp - tmp[:,0][:,np.newaxis]+raw_stack[0][:,-1][:,np.newaxis])
-tmp2 = raw._data[:, evts[4,0]:(evts[4,0]+evts[4,1])]
-raw_stack.append(tmp2-tmp2[:,0][:,np.newaxis]+ raw_stack[1][:,-1][:,np.newaxis]  )    
+stack_idx = 0
+for row_idx in range(evts.shape[0]):
+    if row_idx % 2 != 0: #force evens
+        continue
+    if row_idx == 0: #force start at 2
+        continue
+    print(row_idx)
+    tmp = raw._data[:, evts[row_idx,0]:(evts[row_idx,0]+evts[row_idx,1])]
+    raw_stack.append(tmp - tmp[:,0][:,np.newaxis]+raw_stack[-1][:,-1][:,np.newaxis])
+    
+   
 raw_array = np.concatenate(raw_stack, axis=-1)    
     
 #Make mne object from concatenated array
 raw_hack = mne.io.RawArray(raw_array, info=raw.info)
 
-new_evts = np.zeros([2,3])
-new_evts[0,0] = dur1 - 1  #Start a second before
-new_evts[1,0] = dur1+dur2 - 1
+
+# Add BAD designation to all breaks in data
+new_evts = evts[::2,:]
+new_evts[0,0]=0
+current_start=0
+for row_idx in range(new_evts.shape[0]-1):
+    print(row_idx)
+    current_start+=(new_evts[row_idx, 1] / sfreq)
+    new_evts[row_idx, 0]=current_start -1 
+
 
 annots = mne.Annotations(new_evts[:,0], 2, description='BAD_seg')
 raw_hack.set_annotations(annots)
