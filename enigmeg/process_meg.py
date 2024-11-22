@@ -379,10 +379,10 @@ class process():
     def load_data(self):
         if not hasattr(self, 'raw_rest'):
             self.raw_rest = load_data(self.meg_rest_raw.fpath) 
-            self.raw_rest.pick_types(meg=True, eeg=False)
+            self.raw_rest.pick_types(meg=True, eeg=False, exclude=[])
         if (not hasattr(self, 'raw_eroom')) and (self.meg_er_raw != None):
             self.raw_eroom = load_data(self.meg_er_raw.fpath) 
-            self.raw_eroom.pick_types(meg=True, eeg=False)
+            self.raw_eroom.pick_types(meg=True, eeg=False, exclude=[])
         # For subsequent reference, if raw_room not provided, set to None
         if (not hasattr(self, 'raw_eroom')):
             self.raw_eroom=None
@@ -427,7 +427,7 @@ class process():
     def vendor_prep(self, megin_ignore=None):
         
         # check for channels with no locations
-        badlocnames=[]
+        badlocnames=self.raw_rest.info['bads']
         for chan in self.raw_rest.info['chs']:
             if np.isnan(sum(chan['loc'])):
                 badlocnames.append(chan['ch_name'])
