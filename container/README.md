@@ -15,7 +15,7 @@ Apptainer>
 ```
 Setup internal freesurfer env:
 ```
-/opt/freesurfer-7.4.1/SetUpFreeSurfer.sh
+Apptainer> /opt/freesurfer-7.4.1/SetUpFreeSurfer.sh
 ```
 
 Run the process_meg.py commands from the main page:
