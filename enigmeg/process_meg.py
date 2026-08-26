@@ -1107,27 +1107,30 @@ class process():
         -------
         # outputs eTIV, lh.orig.nofix holes, rh.orig.nofix holes, and average holes 
         '''
-        os.environ['SUBJECTS_DIR'] = self.subjects_dir
-        out = subprocess.getoutput(f'mri_segstats --seg {self.subjects_dir}/sub-{self.subject}/mri/aseg.mgz --subject sub-{self.subject} --etiv-only')
-        pattern = r"atlas_icv \(eTIV\) = (\d+) mm\^3"
-        tiv = re.search(pattern,out).group(1)
-        out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/lh.orig.nofix')
-        pattern = r"index = (\d+)"
-        lh_tmp = re.search(pattern,out)
-        if hasattr(lh_tmp, 'group'):
-            lh_holes = lh_tmp.group(1)
-        else:
-            lh_holes = '0'
-        out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/rh.orig.nofix')
-        pattern = r"index = (\d+)"
-        rh_tmp = re.search(pattern,out)
-        if hasattr(rh_tmp, 'group'):
-            rh_holes = rh_tmp.group(1)
-        else:
-            rh_holes = '0'
-        logstring = 'eTIV: ' + str(tiv) + ' lh_holes: ' + str(lh_holes) + ' rh_holes: ' + str(rh_holes) + ' avg_holes: ' + str((int(lh_holes)+int(rh_holes))/2)
-        print(logstring)
-        logger.info(logstring)
+        try:
+            os.environ['SUBJECTS_DIR'] = self.subjects_dir
+            out = subprocess.getoutput(f'mri_segstats --seg {self.subjects_dir}/sub-{self.subject}/mri/aseg.mgz --subject sub-{self.subject} --etiv-only')
+            pattern = r"atlas_icv \(eTIV\) = (\d+) mm\^3"
+            tiv = re.search(pattern,out).group(1)
+            out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/lh.orig.nofix')
+            pattern = r"index = (\d+)"
+            lh_tmp = re.search(pattern,out)
+            if hasattr(lh_tmp, 'group'):
+                lh_holes = lh_tmp.group(1)
+            else:
+                lh_holes = '0'
+            out = subprocess.getoutput(f'mris_euler_number {self.subjects_dir}/sub-{self.subject}/surf/rh.orig.nofix')
+            pattern = r"index = (\d+)"
+            rh_tmp = re.search(pattern,out)
+            if hasattr(rh_tmp, 'group'):
+                rh_holes = rh_tmp.group(1)
+            else:
+                rh_holes = '0'
+            logstring = 'eTIV: ' + str(tiv) + ' lh_holes: ' + str(lh_holes) + ' rh_holes: ' + str(rh_holes) + ' avg_holes: ' + str((int(lh_holes)+int(rh_holes))/2)
+            print(logstring)
+            logger.info(logstring)
+        except:
+            logger.info('Error with segstats')
         
     def cleanup(self):
         rogue_derivpath = self.deriv_path.update(extension=None)
